@@ -20,7 +20,7 @@ function ocrPageLines() {
     ocrItem('Monday, 15 Sep 2026', 40, 700, 97),
     ocrItem('Grab GRA-123', 40, 686, 96), ocrItem('SGD - 20.83', 400, 686, 96), // clean
     ocrItem('Transport', 40, 672, 95),
-    ocrItem('Coffee House', 40, 658, 94), ocrItem('SGD - 4.50', 400, 658, 55), // low-confidence amount read
+    ocrItem('Coffee House', 40, 658, 94), ocrItem('SGD - 4.50', 400, 658, 0), // amount token confidence 0: item 5c's retry-disagreement signal
     ocrItem('Dining', 40, 644, 93),
     ocrItem('Salary ABC Corp', 40, 630, 96), ocrItem('SGD 3,000.00', 400, 630, 96), // no-sign credit
     ocrItem('Payroll', 40, 616, 95),

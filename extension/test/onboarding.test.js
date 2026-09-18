@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clampStep } from '../onboarding/onboarding.js';
+import { shouldShowOnboarding } from '../src/core/onboarding-gate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -15,10 +16,20 @@ test('clampStep stays within the 3 screens', () => {
   assert.equal(clampStep(2, 1), 3);
 });
 
-test('background.js opens the onboarding tab on install only, never update', () => {
+test('shouldShowOnboarding: shows once, ever, regardless of reason', () => {
+  assert.equal(shouldShowOnboarding(undefined), true); // nothing stored yet
+  assert.equal(shouldShowOnboarding({}), true);
+  assert.equal(shouldShowOnboarding({ onboardingShown: false }), true);
+  assert.equal(shouldShowOnboarding({ onboardingShown: true }), false);
+  // an unpacked reload can also report reason 'install' - the flag alone decides
+  assert.equal(shouldShowOnboarding({ onboardingShown: true }), false);
+});
+
+test('background.js gates the onboarding tab on the stored flag, not details.reason', () => {
   const src = fs.readFileSync(path.join(root, 'src/background.js'), 'utf-8');
   assert.match(src, /onInstalled\.addListener/);
-  assert.match(src, /details\.reason !== 'install'/);
+  assert.match(src, /shouldShowOnboarding/);
+  assert.match(src, /onboardingShown:\s*true/);
   assert.match(src, /onboarding\/onboarding\.html/);
 });
 

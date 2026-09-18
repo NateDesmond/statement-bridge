@@ -1,0 +1,169 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Pin it mockup</title>
+<!--
+  tools/pin-menu-mockup.html
+
+  Source for onboarding/pin-menu.png, the picture in the pin step.
+
+  Drawn rather than screenshotted for the same reason as Profanity Muter's
+  copy of this file (see its longer note): a real screenshot of the
+  Chrome extensions menu carries other vendors' names and icons, which is
+  third-party material to ship in our package and which dates the moment
+  Chrome's own chrome changes. The neighbour rows here are generic grey
+  placeholders; the only real artwork is our own icon48.png, inlined below.
+
+  RE-RENDER (Playwright is already a devDependency of this project; run
+  from the extension directory):
+
+    node -e "
+    import('playwright').then(async ({chromium}) => {
+      const b = await chromium.launch();
+      const c = await b.newContext({viewport:{width:520,height:340},deviceScaleFactor:2});
+      const p = await c.newPage();
+      await p.goto('file://' + process.cwd() + '/tools/pin-menu-mockup.html');
+      await p.screenshot({path:'onboarding/pin-menu.png',clip:{x:0,y:0,width:520,height:340}});
+      await b.close();
+    })"
+
+  Palette is onboarding.css / workspace.css: paper #f3efe6, ink #20241f,
+  brass #c6a15b.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 520px; height: 340px; }
+  body {
+    background: #f3efe6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #20241f;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ---- the browser window, top-right corner of ---- */
+  .win {
+    position: absolute;
+    /* Off the left edge on purpose, same trick as Profanity Muter's source:
+       cropping to the toolbar's right end keeps every distance from the
+       RIGHT edge exactly what it was measured against. */
+    top: 20px; left: -214px; right: 20px;
+    height: 118px;
+    background: #dee1e6;
+    border-radius: 12px 12px 0 0;
+    border: 1.5px solid #c7ccd4;
+    border-bottom: none;
+    overflow: hidden;
+  }
+  .tabrow { height: 40px; position: relative; }
+  .tab {
+    position: absolute; left: 14px; top: 8px;
+    width: 220px; height: 32px;
+    background: #fff; border-radius: 8px 8px 0 0;
+  }
+  .tab::after {
+    content: ""; position: absolute; left: 14px; top: 12px;
+    width: 120px; height: 8px; border-radius: 4px; background: #d5d8de;
+  }
+  .toolbar {
+    height: 78px; background: #fff;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 18px;
+  }
+  .omni {
+    flex: 1; height: 40px; border-radius: 20px;
+    background: #f1f3f4;
+    position: relative;
+  }
+  .omni::after {
+    content: ""; position: absolute; left: 22px; top: 16px;
+    width: 46%; height: 8px; border-radius: 4px; background: #d5d8de;
+  }
+  .tbtn {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+  }
+  .tbtn svg { width: 22px; height: 22px; fill: #5f6368; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #b9bfce; flex: none;
+  }
+  .dots { display: flex; flex-direction: column; gap: 3px; }
+  .dots i { width: 4px; height: 4px; border-radius: 50%; background: #5f6368; }
+
+  /* ---- the Extensions dropdown ---- */
+  .menu {
+    position: absolute;
+    top: 144px; right: 92px;
+    width: 340px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(32,36,31,0.22), 0 2px 6px rgba(32,36,31,0.12);
+    border: 1.5px solid #e3ddcd;
+    padding: 10px 0 8px;
+  }
+  .menu::before {
+    content: ""; position: absolute; top: -8px; right: 63px;
+    width: 16px; height: 16px; background: #fff;
+    border-left: 1.5px solid #e3ddcd; border-top: 1.5px solid #e3ddcd;
+    transform: rotate(45deg);
+  }
+  .menu h3 {
+    font-size: 15px; font-weight: 600; color: #20241f;
+    padding: 6px 16px 10px;
+  }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px;
+  }
+  .row .dot { width: 24px; height: 24px; border-radius: 50%; background: #d5d8de; flex: none; }
+  .row .name { flex: 1; font-size: 14px; color: #666a5f; }
+  .row .pin svg { width: 18px; height: 18px; fill: #b9bfce; }
+  .row .pin { width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex: none; }
+
+  /* Our row: raised background and a brass ring on its pin control, the
+     one control this step is about. Nothing else in the picture is ringed
+     - one target, clearly marked. */
+  .row--ours {
+    background: #f7f3ea;
+    border-top: 1.5px solid #efe9db;
+    border-bottom: 1.5px solid #efe9db;
+  }
+  .row--ours .name { color: #20241f; font-weight: 600; }
+  .row--ours img { width: 24px; height: 24px; border-radius: 6px; flex: none; }
+  .row--ours .pin {
+    background: #fbf2dd;
+    box-shadow: 0 0 0 3px #c6a15b;
+  }
+  .row--ours .pin svg { fill: #20241f; }
+</style>
+
+<div class="win">
+  <div class="tabrow"><div class="tab"></div></div>
+  <div class="toolbar">
+    <div class="omni"></div>
+    <div class="tbtn">
+      <svg viewBox="0 0 24 24"><path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.8h1.5a2.7 2.7 0 0 1 0 5.4H2V20a2 2 0 0 0 2 2h3.8v-1.5a2.7 2.7 0 0 1 5.4 0V22H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/></svg>
+    </div>
+    <div class="avatar"></div>
+    <div class="tbtn"><div class="dots"><i></i><i></i><i></i></div></div>
+  </div>
+</div>
+
+<div class="menu">
+  <h3>Extensions</h3>
+  <div class="row">
+    <div class="dot"></div><div class="name">Some extension</div>
+    <div class="pin"><svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></div>
+  </div>
+  <div class="row row--ours">
+    <img src="data:image/png;base64,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" alt="">
+    <div class="name">Statement Bridge</div>
+    <div class="pin"><svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></div>
+  </div>
+  <div class="row">
+    <div class="dot"></div><div class="name">Another extension</div>
+    <div class="pin"><svg viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></div>
+  </div>
+</div>

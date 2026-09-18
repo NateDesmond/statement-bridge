@@ -41,33 +41,35 @@ async function launchExtensionContext() {
   return { context, page };
 }
 
-async function openGearMenu(page) {
-  await page.click('#gear-btn');
-  await page.waitForSelector('#gear-overlay.open');
+// Item 11 (REBUILD-HOME, 2026-09-18): "Report a problem" is a persistent
+// quiet button bottom-right of every screen (#report-fab), opening the
+// report as a right-side sheet (#screen-report gets an "open" class, with a
+// dimmed #report-backdrop) over whatever screen was showing - never its own
+// full-screen route any more. #report-close-btn/backdrop/Escape close it.
+async function openReportSheet(page) {
+  await page.click('#report-fab');
+  await page.waitForSelector('#screen-report.open');
 }
 
 async function main() {
   const { context, page } = await launchExtensionContext();
 
-  // 1: the empty report screen, reached via the gear menu.
-  await openGearMenu(page);
-  await page.click('#gear-overlay .tile[data-screen="report"]');
-  await page.waitForSelector('#screen-report.active');
+  // 1: the empty report sheet, opened over an empty Home.
+  await openReportSheet(page);
   await page.waitForTimeout(150);
-  await page.screenshot({ path: path.join(shotsDir, nextName('empty')) });
+  await page.screenshot({ path: path.join(shotsDir, nextName('empty-over-home')) });
+  await page.click('#report-close-btn');
+  await page.waitForFunction(() => !document.getElementById('screen-report').classList.contains('open'));
 
   // Drop a real statement so the "which file" dropdown and the debug log
   // have real content to show off the anonymised preview.
-  await page.click('#shell-back-btn'); // back to Home
-  await page.waitForSelector('#screen-home.active');
   const input = await page.$('#file-input');
   await input.setInputFiles(path.join(fixturesDir, 'meridian_savings.csv'));
   await page.waitForTimeout(1500);
 
-  // 2: filled form with a file picked and the anonymised preview visible.
-  await openGearMenu(page);
-  await page.click('#gear-overlay .tile[data-screen="report"]');
-  await page.waitForSelector('#screen-report.active');
+  // 2: filled form with a file picked and the anonymised preview visible,
+  // the sheet open right over the Home screen behind it.
+  await openReportSheet(page);
   await page.fill('#report-what', 'The credit amount on 05/06 copied as blank.');
   await page.selectOption('#report-file', { label: 'meridian_savings.csv' });
   await page.waitForTimeout(150);
@@ -83,6 +85,18 @@ async function main() {
   await page.click('#report-send-btn');
   await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(shotsDir, nextName('sent-confirmation')) });
+  await page.click('#report-close-btn');
+  await page.waitForFunction(() => !document.getElementById('screen-report').classList.contains('open'));
+
+  // 5: the sheet opens over a DIFFERENT screen too, not just Home - Settings,
+  // reached via the gear menu, is the case audit/DESIGN-JUDGE.md scored.
+  await page.click('#gear-btn');
+  await page.waitForSelector('#gear-overlay.open');
+  await page.click('#gear-overlay .dropdown-item[data-screen="settings"]');
+  await page.waitForSelector('#screen-settings.active');
+  await openReportSheet(page);
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: path.join(shotsDir, nextName('over-settings')) });
 
   await context.close();
   console.log('report-shots.mjs: done, wrote to', shotsDir);

@@ -384,7 +384,13 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
     state.basics = state.updateProfile
       ? { bank: state.updateProfile.bank || '', statementType: state.updateProfile.statementType || 'savings', currency: state.updateProfile.defaultCurrency || '', suggested: {} }
       : (() => {
-          const bank = detectBankName(text, state.entry.name);
+          const detectedBank = detectBankName(text, state.entry.name);
+          // Finding 3: a bank detection never found in text or filename must
+          // still not leave the Basics field empty (an empty required field
+          // is exactly what let "Next" silently no-op with no visible next
+          // action) - fall back to the file's own first word, title-cased,
+          // so there is always something to confirm or edit.
+          const bank = detectedBank || bankNameFromFilename(state.entry.name);
           const detectedType = detectStatementType(text);
           const detectedCurrency = detectCurrency(text);
           const currency = detectedCurrency || 'SGD';

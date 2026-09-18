@@ -1,0 +1,55 @@
+<!doctype html>
+<html><body>
+<div id="out">running</div>
+<script type="module">
+// REBUILD-HOME item 5c flag-rate measurement (leftover (a), 2026-09-18):
+// runs the same OCR + extraction pipeline dev/ocr-recall-audit.html uses,
+// and reports what share of rows carry an actionable OCR flag
+// (low_confidence_ocr / sign_unclear) - "before" (the old, wider rule this
+// codebase used to ship: amount OR date token confidence under 70, no other
+// condition - see normalize.js's still-exported OCR_LOW_CONFIDENCE_THRESHOLD,
+// kept only as this historical reference point) vs "after" (item 5c's actual
+// rule already live in normalizeRecords: amount-only, <60, AND a concrete
+// reason to distrust the number). The "after" number is read straight off
+// real flags; "before" is recomputed here from the same raw per-record OCR
+// confidence normalizeRecords already carries (record._amountConfidence /
+// _dateConfidence) - never a second, separately-tuned heuristic.
+import { groupItemsIntoLines } from '../src/core/pdf.js';
+import { ocrDocument } from '../src/core/ocr.js';
+import { normalizeRecords } from '../src/core/normalize.js';
+import { buildAutoVersion, pdfPageWidthPt } from './auto-version.mjs';
+
+const OLD_THRESHOLD = 70; // normalize.js's OCR_LOW_CONFIDENCE_THRESHOLD
+
+const params = new URLSearchParams(location.search);
+const pdfUrl = params.get('pdf');
+
+async function run() {
+  const bytes = new Uint8Array(await (await fetch(pdfUrl)).arrayBuffer());
+  const { pages } = await ocrDocument(bytes);
+  const pagesLines = pages.map((p) => groupItemsIntoLines(p.items));
+  const pageWidthPt = await pdfPageWidthPt(bytes);
+  const { records, version } = buildAutoVersion(pagesLines, pageWidthPt);
+  const rows = normalizeRecords(records, version, { ocr: true, currency: 'SGD' })
+    .filter((r) => !r.skipped);
+
+  const total = rows.length;
+  const afterFlagged = rows.filter((r) => r.flags?.includes('low_confidence_ocr') || r.flags?.includes('sign_unclear')).length;
+  // "before": the old, wider rule - amount OR date token confidence < 70,
+  // with no digit-whitelist/sanity-check condition at all.
+  const beforeFlagged = records.filter((r) => {
+    const a = r._amountConfidence, d = r._dateConfidence;
+    return (a != null && a < OLD_THRESHOLD) || (d != null && d < OLD_THRESHOLD);
+  }).length;
+
+  document.getElementById('out').textContent = JSON.stringify({
+    total,
+    beforeFlagged,
+    beforePct: total ? Math.round((beforeFlagged / total) * 1000) / 10 : null,
+    afterFlagged,
+    afterPct: total ? Math.round((afterFlagged / total) * 1000) / 10 : null,
+  });
+}
+run().catch((e) => { document.getElementById('out').textContent = JSON.stringify({ error: String(e && e.stack || e) }); });
+</script>
+</body></html>

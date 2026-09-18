@@ -4,7 +4,7 @@
 // header row pickers, and a live 2-sample-row preview. Used by the Settings
 // screen and the Home "Change" drawer.
 
-import { fieldValue, formatDateOut, DATE_FORMATS } from '../core/export.js';
+import { fieldValue, formatDateOut, DATE_FORMATS, LAYOUT_PRESETS } from '../core/export.js';
 import { groupPlainNumber } from '../core/amount.js';
 
 // Fields whose export value is a plain number and reads better grouped
@@ -174,6 +174,26 @@ export function setOption(preset, key, value) {
   return { ...preset, [key]: value };
 }
 
+// --- Item 7 (REBUILD-HOME): layout radio cards --------------------------
+// Six built-in layouts (export.js's LAYOUT_PRESETS) replace the old dropdown
+// of saved presets; picking one resets `columns` to that layout's default
+// shape (any prior customisation is deliberately dropped - a fresh base to
+// customise from again). `layout` is stamped onto the preset so the right
+// card stays highlighted even after the columns are edited.
+
+/** Apply a layout by key: fresh columns (all enabled), same date/money/header options. */
+export function applyLayoutPreset(preset, layoutKey) {
+  const layout = LAYOUT_PRESETS.find((l) => l.key === layoutKey);
+  if (!layout) return preset;
+  return { ...preset, columns: layout.columns.map((c) => ({ ...c, enabled: true })) };
+}
+
+/** Which layout card should read as selected: whichever layout's field list the preset's own columns still exactly match, in order - never the (possibly stale) `.layout` stamp alone, since any later customisation (toggle/rename/reorder) can move a preset's columns away from the layout it started as without clearing that stamp. Null once customisation has moved it away from every layout's own field set - no card reads as active then, which is correct: it really is "Last used" now, not "Simple" or any other named shape. */
+export function matchLayoutKey(preset) {
+  const fields = (preset?.columns || []).map((c) => c.field).join(',');
+  return LAYOUT_PRESETS.find((l) => l.columns.map((c) => c.field).join(',') === fields)?.key || null;
+}
+
 /**
  * Item 5: "Two columns: Money out and Money in" needs two actual export
  * columns instead of one Amount column - switching the money-direction
@@ -234,18 +254,6 @@ const DATE_FORMAT_LABELS = {
   isoWithTime: 'ISO with time if available',
 };
 function dateFormatLabel(format) { return DATE_FORMAT_LABELS[format] || format; }
-
-function coverageText(cov) {
-  if (cov.kind === 'all') return 'All';
-  if (cov.kind === 'none') return 'None in this session';
-  return cov.labels.join(', ');
-}
-
-/** Same as coverageText, but "None" (not "None in this session") - the
- * disabled checklist's coverage cell is too narrow for the long form. */
-function shortCoverageText(cov) {
-  return cov.kind === 'none' ? 'None' : coverageText(cov);
-}
 
 /** @returns {{ok: boolean, reason?: string}} */
 export function validatePreset(preset) {
@@ -334,7 +342,12 @@ let instanceCounter = 0;
  * renderer - the export preview is already exactly "every active column,
  * formatted the way export.js would write it, 5 rows visible and scrolling".
  */
-export function renderPresetEditor({ container, preset, sampleRows = [], profiles = [], fileGroups, previewRows, previewPreset, onChange, tableOnly = false }) {
+export function renderPresetEditor({ container, preset, sampleRows = [], profiles = [], fileGroups, previewRows, previewPreset, onChange, tableOnly = false, showPreview = true }) {
+  // The container is fully re-rendered on every edit (a controlled
+  // component, like review.js) - remember whether Customise was left open so
+  // toggling a pill or reordering columns doesn't collapse it back closed
+  // out from under the person doing it.
+  const wasCustomiseOpen = container.querySelector('.columns-customise')?.open ?? false;
   container.innerHTML = '';
   if (!container.dataset.presetEditorId) container.dataset.presetEditorId = `pe${instanceCounter++}`;
   const uid = container.dataset.presetEditorId;
@@ -348,134 +361,118 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
   const allFields = [...STANDARD_FIELDS, ...SOURCE_FIELDS, ...extraFields];
   const byPresetIndex = new Map(preset.columns.map((c, i) => [c.field, i]));
 
-  const enabledEntries = preset.columns
-    .map((c, idx) => ({ field: c.field, name: c.name, idx }))
-    .filter((_, idx) => preset.columns[idx].enabled !== false);
-
-  const list = document.createElement('ul');
-  list.className = 'preset-columns';
-
   // tableOnly (Simple B's Home result table): skip every column-editing
-  // control below (the reorderable list, the disabled checklist, the date/
-  // money-direction pickers, the header-row toggle) - straight to the live
-  // preview table at the end of this function.
+  // control below (the layout cards, Customise, the date/money-direction
+  // pickers, the header-row toggle) - straight to the live preview table at
+  // the end of this function.
   if (tableOnly) {
     renderPreviewOnly({ container, previewRows, previewPreset: previewPreset || preset, sampleRows, tableOnly: true });
     return;
   }
 
-  // Item 2: native HTML5 drag-and-drop reorder, drag handle at the left of
-  // each row; the up/down buttons stay too (keyboard fallback - dragging
-  // isn't reachable from a keyboard), just smaller now the handle carries
-  // the primary affordance.
-  let dragFromPos = null;
-  enabledEntries.forEach(({ field, name, idx }, pos) => {
-    const li = document.createElement('li');
-    li.draggable = true;
-    li.dataset.pos = String(pos);
-
-    li.addEventListener('dragstart', (e) => {
-      dragFromPos = pos;
-      li.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(pos));
-    });
-    li.addEventListener('dragend', () => { li.classList.remove('dragging'); dragFromPos = null; });
-    li.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-    li.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const fromPos = dragFromPos ?? Number(e.dataTransfer.getData('text/plain'));
-      if (Number.isNaN(fromPos) || fromPos === pos) return;
-      onChange(moveColumn(preset, enabledEntries[fromPos].idx, enabledEntries[pos].idx));
-    });
-
-    const handle = document.createElement('span');
-    handle.className = 'col-drag-handle';
-    handle.setAttribute('aria-hidden', 'true');
-    handle.textContent = '⠿';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = true;
-    checkbox.title = 'Include this column in the export';
-    checkbox.setAttribute('aria-label', `Include ${name} column`);
-    checkbox.onchange = () => onChange(toggleColumn(preset, idx));
-
-    const fieldLabel = document.createElement('span');
-    fieldLabel.className = 'col-field';
-    fieldLabel.textContent = field;
-
-    const nameInput = document.createElement('input');
-    nameInput.value = name;
-    nameInput.setAttribute('aria-label', `Rename ${name} column`);
-    nameInput.oninput = () => onChange(renameColumn(preset, idx, nameInput.value));
-
-    // Item 3: Coverage - "All", the profile names that actually have this
-    // field, or "None in this session" (greyed, via the shared -dim colour).
-    const coverage = document.createElement('span');
-    coverage.className = 'col-coverage';
-    const cov = fieldCoverage(field, groups);
-    coverage.textContent = coverageText(cov);
-    if (cov.kind === 'none') coverage.classList.add('col-coverage-none');
-    coverage.title = 'Which files in this session provide this column';
-
-    const upBtn = document.createElement('button');
-    upBtn.className = 'icon-btn icon-btn-xs'; upBtn.type = 'button'; upBtn.textContent = '↑';
-    upBtn.disabled = pos === 0;
-    upBtn.setAttribute('aria-label', `Move ${name} up`);
-    upBtn.onclick = () => onChange(moveColumn(preset, idx, enabledEntries[pos - 1].idx));
-
-    const downBtn = document.createElement('button');
-    downBtn.className = 'icon-btn icon-btn-xs'; downBtn.type = 'button'; downBtn.textContent = '↓';
-    downBtn.disabled = pos === enabledEntries.length - 1;
-    downBtn.setAttribute('aria-label', `Move ${name} down`);
-    downBtn.onclick = () => onChange(moveColumn(preset, idx, enabledEntries[pos + 1].idx));
-
-    li.append(handle, checkbox, fieldLabel, nameInput, coverage, upBtn, downBtn);
-    list.appendChild(li);
-  });
-  container.appendChild(list);
-
-  // Disabled: every column not currently enabled - either never added, or
-  // added and toggled off (which keeps its custom name/position for revival).
-  const disabledFields = allFields.filter((f) => {
-    const idx = byPresetIndex.get(f.field);
-    return idx == null || preset.columns[idx].enabled === false;
-  });
-  if (disabledFields.length) {
-    // Item 2: disabled fields are a plain two-column checklist (label +
-    // coverage, no rename input - there's nothing to rename until a field
-    // is enabled and gets its own row above).
-    const disabledList = document.createElement('ul');
-    disabledList.className = 'preset-columns-disabled';
-    for (const f of disabledFields) {
-      const idx = byPresetIndex.get(f.field);
-      const name = idx != null ? preset.columns[idx].name : f.name;
-      const li = document.createElement('li');
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = false;
-      checkbox.title = 'Include this column in the export';
-      checkbox.setAttribute('aria-label', `Include ${name} column`);
-      checkbox.onchange = () => onChange(idx != null ? toggleColumn(preset, idx) : addColumn(preset, f.field, f.name));
-
-      const fieldLabel = document.createElement('span');
-      fieldLabel.className = 'col-name';
-      fieldLabel.textContent = name;
-
-      const coverage = document.createElement('span');
-      coverage.className = 'col-coverage';
-      const cov = fieldCoverage(f.field, groups);
-      coverage.textContent = shortCoverageText(cov);
-      if (cov.kind === 'some') coverage.title = coverageText(cov); // full profile-name list, on hover, when ellipsised
-      if (cov.kind === 'none') coverage.classList.add('col-coverage-none');
-
-      li.append(checkbox, fieldLabel, coverage);
-      disabledList.appendChild(li);
-    }
-    container.appendChild(disabledList);
+  // Item 7: six layout radio cards replace the old saved-preset dropdown.
+  // Picking one resets `columns` to that layout's own shape (see
+  // applyLayoutPreset) - Customise below is what re-personalises it.
+  const activeLayoutKey = matchLayoutKey(preset);
+  const cardGrid = document.createElement('div');
+  cardGrid.className = 'layout-cards';
+  cardGrid.setAttribute('role', 'radiogroup');
+  cardGrid.setAttribute('aria-label', 'Column layout');
+  for (const layout of LAYOUT_PRESETS) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `layout-card${layout.key === activeLayoutKey ? ' active' : ''}`;
+    card.setAttribute('role', 'radio');
+    card.setAttribute('aria-checked', String(layout.key === activeLayoutKey));
+    card.innerHTML = `
+      <span class="layout-card-name">${escapeHtml(layout.name)}</span>
+      <span class="layout-card-desc">${escapeHtml(layout.description)}</span>
+      <span class="layout-card-strip">${escapeHtml(layout.columns.map((c) => c.name).join(', '))}</span>`;
+    card.onclick = () => onChange(applyLayoutPreset(preset, layout.key));
+    cardGrid.appendChild(card);
   }
+  container.appendChild(cardGrid);
+
+  // Item 7: "Customise" is collapsed by default and lists ONLY columns that
+  // actually have data this session (or, with no live session, whatever
+  // fieldCoverage's sample-row fallback finds) - never a field with nothing
+  // to show. One row of toggle pills: click toggles the column on/off,
+  // double-click renames it in place, drag reorders it - replaces both the
+  // old reorderable enabled list and the disabled checklist with one control.
+  const availableFields = allFields.filter((f) => fieldCoverage(f.field, groups).kind !== 'none');
+  // Columns already on the preset keep their place even if (edge case) their
+  // field lost its only source of data since being enabled - a customisation
+  // never silently disappears out from under the person who made it.
+  const pillFields = [...preset.columns, ...availableFields.filter((f) => !byPresetIndex.has(f.field))];
+
+  const details = document.createElement('details');
+  details.className = 'columns-customise';
+  details.open = wasCustomiseOpen;
+  const summary = document.createElement('summary');
+  summary.textContent = 'Customise';
+  details.appendChild(summary);
+
+  const pillRow = document.createElement('div');
+  pillRow.className = 'column-pill-row';
+  let dragFromField = null;
+  pillFields.forEach((f) => {
+    const idx = byPresetIndex.get(f.field);
+    const enabled = idx != null && preset.columns[idx].enabled !== false;
+    const name = idx != null ? preset.columns[idx].name : f.name;
+
+    const pill = document.createElement('span');
+    pill.className = `column-pill${enabled ? ' enabled' : ''}`;
+    pill.draggable = true;
+    pill.tabIndex = 0;
+    pill.setAttribute('role', 'button');
+    pill.setAttribute('aria-pressed', String(enabled));
+    pill.title = 'Click to include or exclude; double-click to rename; drag to reorder';
+
+    const label = document.createElement('span');
+    label.className = 'column-pill-label';
+    label.textContent = name;
+    pill.appendChild(label);
+
+    const toggle = () => onChange(idx != null ? toggleColumn(preset, idx) : addColumn(preset, f.field, f.name));
+    pill.addEventListener('click', (e) => { if (e.target !== label || !label.isContentEditable) toggle(); });
+    pill.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+
+    label.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      label.contentEditable = 'true';
+      label.focus();
+      document.execCommand('selectAll', false, undefined);
+      const commit = () => {
+        label.contentEditable = 'false';
+        const value = label.textContent.trim();
+        if (value && idx != null) onChange(renameColumn(preset, idx, value));
+        else label.textContent = name;
+      };
+      label.addEventListener('blur', commit, { once: true });
+      label.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); label.blur(); } }, { once: true });
+    });
+
+    pill.addEventListener('dragstart', (e) => { dragFromField = f.field; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f.field); });
+    pill.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    pill.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const fromField = dragFromField ?? e.dataTransfer.getData('text/plain');
+      const fromIdx = byPresetIndex.get(fromField);
+      const toIdx = byPresetIndex.get(f.field);
+      if (fromIdx == null || toIdx == null || fromIdx === toIdx) return;
+      onChange(moveColumn(preset, fromIdx, toIdx));
+    });
+
+    pillRow.appendChild(pill);
+  });
+  if (!pillFields.length) {
+    const empty = document.createElement('p');
+    empty.className = 'pdf-anchor-hint';
+    empty.textContent = 'No columns with data yet.';
+    pillRow.appendChild(empty);
+  }
+  details.appendChild(pillRow);
+  container.appendChild(details);
 
   // Item 4: a live example next to the date format picker, computed from the
   // first real sample value on hand - "15 Sep 2026 → 2026-09-15" - not an
@@ -527,7 +524,12 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
   headerRowLine.append(headerCheckbox, headerLabel);
   container.appendChild(headerRowLine);
 
-  renderPreviewOnly({ container, previewRows, previewPreset: previewPreset || preset, sampleRows });
+  // Item 2 (REBUILD-HOME, 2026-09-18): Home's "Adjust what's exported" sheet
+  // passes showPreview:false - the ONE result table above it already shows
+  // exactly what a change here produces (renderExportPanel re-renders it live
+  // on every onChange), so the drawer's own column editor never draws a
+  // second copy of the same preview.
+  if (showPreview) renderPreviewOnly({ container, previewRows, previewPreset: previewPreset || preset, sampleRows });
 
   // Item 3: the normalisation note gets its own line beneath the preview.
   const moneyNote = document.createElement('p');

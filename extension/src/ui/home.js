@@ -14,13 +14,13 @@ import { ocrDocument } from '../core/ocr.js';
 import { suggestHeaderRow } from '../core/suggest.js';
 import { loadProfiles, matchProfile, learnSignatures, pdfAnchorCandidates, updateVersionLastUsed, guessProfileByFilename, setProfilePasswordHint } from '../core/profiles.js';
 import { resolvePreset, filterByRange, coverageWarnings, formatShortDate } from '../core/daterange.js';
-import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, suggestFilename } from '../core/export.js';
+import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, suggestFilename, LAYOUT_PRESETS } from '../core/export.js';
 import { checkFileSize, checkBatchSize } from '../core/limits.js';
 import { fileSummary, countCheckGrouped, groupedCountLabel, rowFlagLabel } from '../core/checks.js';
 import { mergeAcrossFiles, fingerprint, isExactDuplicateFile, sha256Hex, findDuplicateByHash } from '../core/dedupe.js';
 import { detectCurrency, convertToTarget, formatBothDirections } from '../core/currency.js';
 import { saveSession, sessionsNearingDeletion } from '../core/sessions.js';
-import { renderPresetEditor as renderPresetEditorInto, newPreset, validatePreset, presetSettingsEqual, presetPickerLabel, resolveWorkingPreset } from './preset-editor.js';
+import { renderPresetEditor as renderPresetEditorInto, newPreset, applyLayoutPreset, matchLayoutKey, resolveWorkingPreset } from './preset-editor.js';
 import { renderRowSnippet } from './pdf-render.js';
 import { resolveConfirm, resolveEdit } from './rowedit.js';
 import { parseAmount, decimalsFor } from '../core/amount.js';
@@ -44,7 +44,6 @@ const $ = (sel) => document.querySelector(sel);
 const SESSION_ID = 'current';
 const SETTINGS_KEY = 'settings';
 const RATES_KEY = 'rates';
-const PRESETS_KEY = 'presets';
 const LAST_EXPORTED_KEY = 'lastExported';
 
 export function createHome({ storage, state, sessionStore, onOpenWizard, onReviewFile, onFilesChanged, onShowHow, onFocusProfile, onOpenReport }) {
@@ -55,9 +54,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   let rateMode = 'flat'; // 'flat' one rate for all months, 'perMonth' D4
   let dateField = 'date';
   let customRange = null; // { startISO, endISO } when rangePreset === 'custom'
-  let presets = [];
-  let activePreset = DEFAULT_PRESET; // item 6: the persisted "Last used" working set once loadPrefs() runs
-  let presetBaseName = null; // the saved preset activePreset was loaded from this session, if any (drives "Revert to X")
+  // Item 7: the six built-in layouts, each already shaped as a full preset
+  // (dateFormat/signConvention/headerRow included) - "Start from" in Settings
+  // indexes into this same list. No user-named saved presets any more.
+  const presets = LAYOUT_PRESETS.map((l) => applyLayoutPreset(newPreset(l.name), l.key));
+  let activePreset = DEFAULT_PRESET; // item 6/7: the persisted "Last used" working set (layout + customisation) once loadPrefs() runs
   let includeSourceColumns = false;
   let drawerOpen = false;
   let dedupeNotice = null; // { removed: [], accountLabel } for the merged/Undo card
@@ -147,14 +148,13 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     targetCurrency = prefs.homeCurrency || 'SGD';
     rateMode = prefs.homeRateMode || 'flat';
     rates = (await storage.get(RATES_KEY)) || {};
-    presets = (await storage.get(PRESETS_KEY)) || [{ ...DEFAULT_PRESET, name: 'Default Statement Bridge columns' }];
-    // Item 6: the drawer's working set persists as-is across sessions ("Last
-    // used") - no "Save as preset" required for an edit to stick. With
-    // nothing persisted yet, prefs.defaultPreset is the "Start from"
-    // preference (an index into `presets`, or null/missing for "Last used",
-    // which - having nothing to resume - also just means presets[0]).
+    // Item 6/7: the drawer's working set (layout + customisation) persists
+    // as-is across sessions ("Last used") - no "Save as preset" needed for an
+    // edit to stick. With nothing persisted yet, prefs.defaultPreset is the
+    // "Start from" preference (an index into the six layouts in `presets`,
+    // or null/missing for "Last used", which - having nothing to resume -
+    // also just means presets[0], "Simple").
     activePreset = resolveWorkingPreset(prefs.workingPreset, presets, prefs.defaultPreset);
-    presetBaseName = presets.find((p) => presetSettingsEqual(activePreset, p))?.name || null;
   }
 
   async function saveLastUsedPrefs() {
@@ -1784,8 +1784,14 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   /** Item 5's page/line snippet: a small crop around the row's own page anchor for a PDF (pdf-render.js's renderRowSnippet), or the raw CSV source line in monospace when there's no page to crop (a columns-rowModel PDF, or any CSV/XLSX row). */
   async function loadDecisionSnippet(file, row, container) {
     try {
+      // Item 5a (root cause): source_y2 - the block's LAST line (e.g. the
+      // amount line, when the description spans lines above it) - was being
+      // dropped here, so the snippet crop only ever spanned one line around
+      // source_y and could miss the row's own amount line entirely, or show
+      // a neighbouring transaction's text instead. See pdf-render.js's
+      // blockLines/renderRowSnippet doc comments.
       const anchor = row.original?.source_page != null && row.original?.source_y != null
-        ? { page: row.original.source_page, y: row.original.source_y, h: row.original.source_h }
+        ? { page: row.original.source_page, y: row.original.source_y, h: row.original.source_h, y2: row.original.source_y2 ?? null }
         : null;
       if (file.type === 'pdf' && anchor && file.bytes) {
         const items = file.ocr ? file.ocrPages?.[anchor.page - 1]?.items : null;
@@ -2069,7 +2075,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     const headlineRange = dateRangeOfRows(rows);
     const headlineRangeLabel = headlineRange ? formatRangeLabel(headlineRange.startISO, headlineRange.endISO) : null;
     $('#export-summary').textContent = resultHeadlineLabel(rows.length, includedSources.length, headlineRangeLabel);
-    const settingsSummary = `${sourcesText}Columns: ${presetPickerLabel(activePreset, presets)} · ${rangeSummaryLabel()} · ${accountsSummaryLabel(rows.length, byAccount.size)}${notIncludedText} · ${currencyText}`;
+    const settingsSummary = `${sourcesText}Columns: ${columnsSummaryLabel()} · ${rangeSummaryLabel()} · ${accountsSummaryLabel(rows.length, byAccount.size)}${notIncludedText} · ${currencyText}`;
     const drawerTitle = $('#change-drawer-title');
     if (drawerTitle) drawerTitle.innerHTML = `Export settings<br><span class="drawer-settings-summary">${settingsSummary}</span>`;
     // Coordinator note (2026-09-17): renderExportPanel runs on every drawer
@@ -2122,20 +2128,19 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
 
   // --- Change drawer -----------------------------------------------------
 
-  function renderDrawer() {
-    const drawer = $('#change-drawer');
-    drawer.hidden = !drawerOpen;
-    if (!drawerOpen) return;
+  // Item 9: date range as one compact row of chips plus "Custom" - picking
+  // Custom reveals the two date inputs right under the chip row; any other
+  // chip hides them again.
+  const RANGE_OPTIONS = [
+    ['lastFullMonth', 'Last full month'], ['thisMonth', 'This month'],
+    ['sinceLastExport', 'Since last export'], ['last3Months', 'Last 3 months'],
+    ['ytd', 'Year to date'], ['all', 'All'], ['custom', 'Custom'],
+  ];
 
-    // Date range chips
+  function renderRangeChips() {
     const chipRow = $('#range-chip-row');
     chipRow.innerHTML = '';
-    const options = [
-      ['lastFullMonth', 'Last full month'], ['thisMonth', 'This month'],
-      ['sinceLastExport', 'Since last export'], ['last3Months', 'Last 3 months'],
-      ['ytd', 'Year to date'], ['all', 'All'],
-    ];
-    for (const [value, label] of options) {
+    for (const [value, label] of RANGE_OPTIONS) {
       const chip = document.createElement('button');
       chip.className = `chip${state.rangePreset === value ? ' active' : ''}`;
       chip.type = 'button'; chip.textContent = label;
@@ -2154,24 +2159,114 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       };
       chipRow.appendChild(chip);
     }
-
-    $('#date-field-select').value = dateField;
-
-    // Per-account coverage
-    const byAccount = accountsWithRows();
-    const range = currentRange();
-    const covBody = $('#account-coverage-body');
-    covBody.innerHTML = '';
-    for (const [label, rows] of byAccount) {
-      const { includedCount, excludedCount, included } = filterByRange(rows, range, dateField);
-      const dates = included.map((r) => r.date).filter(Boolean).sort();
-      const rangeLabel = dates.length ? formatRangeLabel(dates[0], dates[dates.length - 1]) : 'No rows in range';
-      covBody.insertAdjacentHTML('beforeend', `<tr><td>${label}</td><td class="num">${includedCount}</td><td class="num">${excludedCount}</td><td>${rangeLabel}</td></tr>`);
+    const customInputs = $('#range-custom-inputs');
+    customInputs.hidden = state.rangePreset !== 'custom';
+    if (state.rangePreset === 'custom') {
+      $('#range-custom-start').value = customRange?.startISO || '';
+      $('#range-custom-end').value = customRange?.endISO || '';
     }
+  }
+
+  // Item 8: "Your accounts" - one row per account (mapped files sharing an
+  // accountLabel), Statements listing the file names that make it up. Merges
+  // the old "Coverage by account" and "Sources" tables into one; nothing
+  // about accounts lives anywhere else in the sheet.
+  function accountGroupsForTable() {
+    const byAccount = new Map();
+    for (const entry of sourceFiles()) {
+      const label = entry.accountLabel || entry.name;
+      if (!byAccount.has(label)) byAccount.set(label, []);
+      byAccount.get(label).push(entry);
+    }
+    return [...byAccount.entries()].map(([label, files]) => ({ label, files }));
+  }
+
+  function renderAccountsTable() {
+    const body = $('#accounts-table-body');
+    body.innerHTML = '';
+    const groups = accountGroupsForTable();
+    if (!groups.length) {
+      body.innerHTML = '<tr><td colspan="5" class="pdf-anchor-hint">No statements mapped yet.</td></tr>';
+      return;
+    }
+    const range = currentRange();
+    for (const { label, files } of groups) {
+      const row = document.createElement('tr');
+
+      const acctCell = document.createElement('td');
+      acctCell.textContent = label;
+
+      const stmtCell = document.createElement('td');
+      stmtCell.className = 'acc-statements';
+      stmtCell.textContent = files.map((f) => f.name).join(', ');
+
+      let includedCount = 0, totalCount = 0;
+      for (const f of files) {
+        const activeRows = (f.rows || []).filter((r) => !r.excluded && !r.skipped);
+        totalCount += activeRows.length;
+        includedCount += filterByRange(activeRows, range, dateField).includedCount;
+      }
+      const rangeCell = document.createElement('td');
+      rangeCell.className = totalCount === 0 ? 'mr-count-zero' : '';
+      rangeCell.textContent = sourceRangeCountLabel(includedCount, totalCount);
+
+      const includeCell = document.createElement('td');
+      const switchLabel = document.createElement('label');
+      switchLabel.className = 'switch';
+      const switchInput = document.createElement('input');
+      switchInput.type = 'checkbox';
+      switchInput.checked = files.every((f) => f.includeInExport !== false);
+      switchInput.setAttribute('aria-label', `Include ${label} in the export`);
+      switchInput.onchange = () => {
+        for (const f of files) f.includeInExport = switchInput.checked;
+        renderAll();
+        onFilesChanged?.();
+        autosave();
+      };
+      switchLabel.append(switchInput, Object.assign(document.createElement('span'), { className: 'slider' }));
+      includeCell.appendChild(switchLabel);
+
+      // Actions act on the account's primary (most recently mapped) file -
+      // the common case is one statement per account; a multi-statement
+      // account still gets a per-file Remove via its Statements list below.
+      const primary = files[files.length - 1];
+      const actionsCell = document.createElement('td');
+      actionsCell.className = 'acc-actions';
+      const check = document.createElement('a');
+      check.href = '#'; check.textContent = 'Check';
+      check.onclick = (e) => { e.preventDefault(); onReviewFile?.(primary); };
+      const setup = document.createElement('a');
+      setup.href = '#'; setup.textContent = 'Set up again';
+      setup.onclick = (e) => { e.preventDefault(); onOpenWizard(primary); };
+      const remove = document.createElement('a');
+      remove.href = '#'; remove.textContent = 'Remove';
+      remove.onclick = (e) => { e.preventDefault(); files.forEach(removeFile); };
+      actionsCell.append(check, setup, remove);
+
+      row.append(acctCell, stmtCell, rangeCell, includeCell, actionsCell);
+      body.appendChild(row);
+    }
+  }
+
+  /** "With balance" (a matched built-in layout) or "Customised" (edited away from every layout's own shape). */
+  function columnsSummaryLabel() {
+    const key = matchLayoutKey(activePreset);
+    return key ? LAYOUT_PRESETS.find((l) => l.key === key)?.name : 'Customised';
+  }
+
+  function renderDrawer() {
+    const drawer = $('#change-drawer');
+    drawer.hidden = !drawerOpen;
+    if (!drawerOpen) return;
+
+    renderRangeChips();
+    $('#date-field-select').value = dateField;
+    renderAccountsTable();
 
     // Currency
-    $('#currency-mode-a').classList.toggle('active', currencyMode === 'A');
-    $('#currency-mode-b').classList.toggle('active', currencyMode === 'B');
+    $('#currency-mode-a input').checked = currencyMode === 'A';
+    $('#currency-mode-b input[type="radio"]').checked = currencyMode === 'B';
+    if (document.activeElement !== $('#target-currency-input')) $('#target-currency-input').value = targetCurrency;
     renderRateTable();
 
     // Preset editor. Item 1: the same rows/preset Copy for Sheets would
@@ -2187,84 +2282,16 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       previewPreset: exportPreset(),
       profiles: profilesCache,
       fileGroups: fileCoverageGroups(),
-      // Item 6: every edit updates the working set immediately and persists
-      // it - no "Save as preset" required for it to stick.
+      // Item 2 (REBUILD-HOME): no second preview inside the drawer - the
+      // ONE result table above it (renderResultTable) is what live-updates.
+      showPreview: false,
+      // Item 6/7: every edit (a new layout, or a Customise pill) updates the
+      // working set immediately and persists it as "Last used" - no "Save as
+      // preset" step exists any more.
       onChange: (next) => { activePreset = next; saveLastUsedPrefs(); renderExportPanel(); },
     });
-    // Item 6: "Revert to <preset>" only once the working set was loaded from
-    // one (this session or on resume) and has since drifted from it.
-    const originPreset = presetBaseName && presets.find((p) => p.name === presetBaseName);
-    const canRevert = !!originPreset && !presetSettingsEqual(activePreset, originPreset);
-    $('#preset-dirty-note-home').hidden = !canRevert;
-    if (canRevert) $('#preset-revert-link-home').textContent = `Revert to ${presetBaseName}`;
-    const presetSelect = $('#preset-select-home');
-    const pickerLabel = presetPickerLabel(activePreset, presets);
-    presetSelect.innerHTML = presets.map((p) => `<option>${p.name}</option>`).join('') + (pickerLabel === 'Last used' ? '<option selected>Last used</option>' : '');
-    presetSelect.value = pickerLabel;
 
     $('#source-cols-home').checked = includeSourceColumns;
-
-    // Item 14a: Sources - one row per mapped file, with an "Include"
-    // checkbox that pulls its rows out of the export composition (and the
-    // coverage table/preset preview) without removing the file itself, plus
-    // the same Review/Update mapping links the old Mapping list had.
-    const mappingList = $('#drawer-mapping-list');
-    mappingList.innerHTML = '';
-    const mapped = sourceFiles();
-    if (!mapped.length) {
-      mappingList.innerHTML = '<p class="fc-body">No files mapped yet.</p>';
-    } else {
-      const range = currentRange();
-      for (const entry of mapped) {
-        const row = document.createElement('div');
-        row.className = 'mapping-row';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'source-include-checkbox';
-        checkbox.checked = entry.includeInExport !== false;
-        checkbox.setAttribute('aria-label', `Include ${entry.accountLabel || entry.name} in the export`);
-        checkbox.onchange = () => {
-          entry.includeInExport = checkbox.checked;
-          renderAll();
-          onFilesChanged?.();
-          autosave();
-        };
-
-        const rangeInfo = dateRangeOfRows(entry.rows || []);
-        const rangeText = rangeInfo ? formatRangeLabel(rangeInfo.startISO, rangeInfo.endISO) : 'no dated rows';
-        const activeRows = (entry.rows || []).filter((r) => !r.excluded && !r.skipped);
-        const { includedCount } = filterByRange(activeRows, range, dateField);
-        const countLabel = sourceRangeCountLabel(includedCount, activeRows.length);
-
-        const info = document.createElement('span');
-        info.className = 'mr-info';
-        info.innerHTML = `<span class="mr-name">${entry.accountLabel || entry.name}</span><span class="mr-profile">${entry.profile.name}</span><span class="mr-range">${rangeText}</span><span class="mr-count${activeRows.length === 0 ? ' mr-count-zero' : ''}">${countLabel}</span>`;
-
-        // Item 7: each mapped file gets both links - Review to check the
-        // actual rows, Update mapping to reopen the wizard against this file.
-        const reviewLink = document.createElement('a');
-        reviewLink.className = 'rs-link'; reviewLink.href = '#'; reviewLink.textContent = 'Review';
-        reviewLink.style.color = 'var(--ink-dim)'; reviewLink.style.textDecoration = 'underline';
-        reviewLink.onclick = (e) => { e.preventDefault(); onReviewFile?.(entry); };
-        const link = document.createElement('a');
-        link.className = 'rs-link'; link.href = '#'; link.textContent = 'Set up again';
-        link.style.color = 'var(--ink-dim)'; link.style.textDecoration = 'underline';
-        link.onclick = (e) => { e.preventDefault(); onOpenWizard(entry); };
-        // Item: the drawer's Sources rows get the same Remove as every Home
-        // file row, so a statement can be dropped right from here too.
-        const removeLink = document.createElement('a');
-        removeLink.className = 'rs-link'; removeLink.href = '#'; removeLink.textContent = 'Remove';
-        removeLink.style.color = 'var(--ink-dim)'; removeLink.style.textDecoration = 'underline';
-        removeLink.onclick = (e) => { e.preventDefault(); removeFile(entry); };
-        const linkGroup = document.createElement('span');
-        linkGroup.className = 'mr-links';
-        linkGroup.append(reviewLink, link, removeLink);
-
-        row.append(checkbox, info, linkGroup);
-        mappingList.appendChild(row);
-      }
-    }
   }
 
   // D4: 'flat' keeps the original single-rate-per-pair table; 'perMonth'
@@ -2335,35 +2362,29 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       renderDrawer();
     });
     $('#date-field-select').addEventListener('change', (e) => { dateField = e.target.value; renderAll(); });
-    $('#currency-mode-a').addEventListener('click', () => { currencyMode = 'A'; renderAll(); });
-    $('#currency-mode-b').addEventListener('click', () => { currencyMode = 'B'; renderAll(); });
+    $('#range-custom-start').addEventListener('change', (e) => {
+      customRange = { ...customRange, startISO: e.target.value || null };
+      renderAll();
+    });
+    $('#range-custom-end').addEventListener('change', (e) => {
+      customRange = { ...customRange, endISO: e.target.value || null };
+      renderAll();
+    });
+    // Item 9: a single compact currency row - picking a mode is a plain radio
+    // choice; typing into the target-currency box also switches to Convert,
+    // since editing it only makes sense once that mode is chosen.
+    $('#currency-mode-a').addEventListener('click', () => { currencyMode = 'A'; saveLastUsedPrefs(); renderAll(); });
+    $('#currency-mode-b').addEventListener('click', () => { currencyMode = 'B'; saveLastUsedPrefs(); renderAll(); });
+    $('#target-currency-input').addEventListener('change', (e) => {
+      const value = e.target.value.trim().toUpperCase();
+      if (!value) return;
+      targetCurrency = value;
+      currencyMode = 'B';
+      saveLastUsedPrefs();
+      renderAll();
+    });
     $('#rate-mode-flat').addEventListener('click', () => { rateMode = 'flat'; renderAll(); });
     $('#rate-mode-permonth').addEventListener('click', () => { rateMode = 'perMonth'; renderAll(); });
-    $('#preset-select-home').addEventListener('change', (e) => {
-      const found = presets.find((p) => p.name === e.target.value);
-      if (!found) return;
-      activePreset = found; presetBaseName = found.name;
-      saveLastUsedPrefs();
-      renderExportPanel();
-    });
-    $('#preset-revert-link-home').addEventListener('click', () => {
-      activePreset = presets.find((p) => p.name === presetBaseName) || DEFAULT_PRESET;
-      saveLastUsedPrefs();
-      renderExportPanel();
-    });
-    $('#preset-save-as-home').addEventListener('click', async () => {
-      const name = prompt('Save this column layout as:', presetBaseName || activePreset.name);
-      if (!name) return;
-      const toSave = { ...activePreset, name };
-      const result = validatePreset(toSave);
-      if (!result.ok) { alert(result.reason); return; }
-      const existingIdx = presets.findIndex((p) => p.name === name);
-      if (existingIdx !== -1) presets[existingIdx] = toSave; else presets.push(toSave);
-      await storage.set(PRESETS_KEY, presets);
-      activePreset = toSave; presetBaseName = name;
-      await saveLastUsedPrefs();
-      renderExportPanel();
-    });
     $('#source-cols-home').addEventListener('change', (e) => { includeSourceColumns = e.target.checked; renderExportPanel(); });
   }
 

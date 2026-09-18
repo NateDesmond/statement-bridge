@@ -4,7 +4,7 @@
 // the mailto shape) lives in core/report.js and core/anonymize.js, both pure
 // and unit-tested; this file is only the DOM around them.
 
-import { all as allDebugLogEvents } from '../core/debuglog.js';
+import { all as allDebugLogEvents, asText as debugLogText } from '../core/debuglog.js';
 import { buildReport, buildMailto, reportToJson, SUPPORT_EMAIL } from '../core/report.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -92,6 +92,13 @@ export function createReportScreen({ getFiles }) {
     $('#report-copy-again-btn').addEventListener('click', async () => {
       try { await copyReport(); setStatus('Report copied again.'); }
       catch { setStatus("Couldn't copy - select the preview above to copy it by hand."); }
+    });
+    // Item 15 (coordinator, 2026-09-18): the full, un-anonymised debug log,
+    // for the owner's own troubleshooting - a separate action from the
+    // anonymised "Copy report" above it, never the same button.
+    $('#report-copy-debuglog-btn')?.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(debugLogText()); setStatus('Debug log copied.'); }
+      catch { setStatus('Clipboard access was denied.'); }
     });
   }
 

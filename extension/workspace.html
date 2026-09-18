@@ -18,8 +18,13 @@
       <div class="name">Statement Bridge</div>
     </div>
     <button type="button" class="shell-back-btn" id="shell-back-btn" hidden>&larr; Back</button>
-    <button class="gear-btn" type="button" id="gear-btn" aria-label="Menu">
-      <svg width="22" height="22" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 2.5v1.4M8 12.1v1.4M13.5 8h-1.4M3.9 8H2.5M11.7 4.3l-1 1M5.3 10.7l-1 1M11.7 11.7l-1-1M5.3 5.3l-1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <!-- Item 10 (REBUILD-HOME, 2026-09-18): a real gear/cog (teeth around the
+         rim), not the old sun-like circle-with-spokes icon. -->
+    <button class="gear-btn" type="button" id="gear-btn" aria-label="Settings" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
     </button>
   </header>
 
@@ -98,7 +103,10 @@
           <h2 class="result-heading">Your transactions are ready.</h2>
           <p class="export-summary" id="export-summary"></p>
           <div class="export-actions">
-            <button class="btn btn-brass btn-giant" type="button" id="copy-tsv-btn">Copy to Google Sheets</button>
+            <button class="btn btn-brass btn-copy" type="button" id="copy-tsv-btn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 10.5h-1A1 1 0 0 1 1.5 9.5v-7a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="1.4"/></svg>
+              Copy to Google Sheets
+            </button>
             <button class="btn btn-ghost" type="button" id="download-csv-btn">Download CSV</button>
           </div>
           <span class="export-warn-note" id="export-warn-note"></span>
@@ -113,8 +121,15 @@
 
           <div class="drawer-body" id="change-drawer" hidden>
             <h2 class="section-title" id="change-drawer-title">Export settings</h2>
+
             <h2 class="section-title">Date range</h2>
             <div class="chip-row" id="range-chip-row"></div>
+            <div class="range-custom-inputs" id="range-custom-inputs" hidden>
+              <label class="pg-label" for="range-custom-start">From</label>
+              <input type="date" id="range-custom-start">
+              <label class="pg-label" for="range-custom-end">To</label>
+              <input type="date" id="range-custom-end">
+            </div>
             <p class="pdf-anchor-hint" id="since-export-overlap" style="color:var(--warn);"></p>
             <div class="picker-row">
               <div class="picker-group">
@@ -123,22 +138,26 @@
               </div>
             </div>
 
-            <h2 class="section-title">Coverage by account</h2>
-            <table class="account-cov">
-              <thead><tr><th>Account</th><th>Included</th><th>Excluded</th><th>Range in export</th></tr></thead>
-              <tbody id="account-coverage-body"></tbody>
+            <!-- Item 8 (REBUILD-HOME, 2026-09-18): one table, Coverage by
+                 account and Sources merged - nothing about accounts anywhere
+                 else in the sheet. -->
+            <h2 class="section-title">Your accounts</h2>
+            <table class="accounts-table">
+              <thead><tr><th>Account</th><th>Statements</th><th>Rows in range</th><th>Include</th><th>Actions</th></tr></thead>
+              <tbody id="accounts-table-body"></tbody>
             </table>
 
             <h2 class="section-title">Currency</h2>
-            <div class="currency-modes">
-              <div class="mode-card" id="currency-mode-a">
-                <h3>A: Keep original currencies</h3>
-                <p>Rows keep their own currency. Totals per currency are never added together.</p>
-              </div>
-              <div class="mode-card" id="currency-mode-b">
-                <h3>B: Convert to a target currency</h3>
-                <p>Every row is converted using the rate below. Export is blocked until every pair has a rate.</p>
-              </div>
+            <div class="currency-row" role="radiogroup" aria-label="Currency">
+              <label class="currency-option" id="currency-mode-a">
+                <input type="radio" name="currency-mode" value="A">
+                Keep each account's currency
+              </label>
+              <label class="currency-option" id="currency-mode-b">
+                <input type="radio" name="currency-mode" value="B">
+                Convert everything to
+                <input type="text" class="target-currency-input" id="target-currency-input" maxlength="3" aria-label="Target currency">
+              </label>
             </div>
             <div id="rate-table-wrap" hidden>
               <div class="chip-row" id="rate-mode-row">
@@ -152,31 +171,10 @@
             </div>
 
             <h2 class="section-title">Columns</h2>
-            <div class="picker-row" style="align-items:center;">
-              <div class="picker-group">
-                <label class="pg-label" for="preset-select-home">Column layout</label>
-                <select id="preset-select-home"></select>
-              </div>
-            </div>
             <div id="home-preset-editor"></div>
-            <div class="export-actions" style="margin-top:8px;">
-              <div class="toggle-line">
-                <input type="checkbox" id="source-cols-home">
-                <label for="source-cols-home">Include original source columns</label>
-              </div>
-            </div>
-
-            <!-- Item 7: Mapping sits above the drawer's closing action bar,
-                 each mapped file getting both a Review and an Update mapping
-                 link (previously "Update mapping" alone, at the very bottom). -->
-            <h2 class="section-title drawer-mapping-title">Sources</h2>
-            <div id="drawer-mapping-list" class="mapping-list"></div>
-
-            <div class="drawer-footer-actions">
-              <span class="preset-unsaved" id="preset-dirty-note-home" hidden>
-                <button type="button" class="first-run-how-link" id="preset-revert-link-home"></button>
-              </span>
-              <button type="button" class="btn btn-brass btn-sm" id="preset-save-as-home" style="margin-left:auto;">Save this column layout</button>
+            <div class="toggle-line" style="margin-top:8px;">
+              <input type="checkbox" id="source-cols-home">
+              <label for="source-cols-home">Include original source columns</label>
             </div>
           </div>
         </div>
@@ -340,26 +338,6 @@
                   <input id="pref-home-currency" value="SGD" size="6">
                 </div>
               </div>
-
-              <div class="toolbar-row" style="margin-top:16px;">
-                <h3 class="section-title" style="margin:0;">Columns</h3>
-                <span id="preset-dirty-note" class="pdf-anchor-hint" style="margin:0;" hidden>Custom (unsaved) &middot; <button type="button" class="first-run-how-link" id="preset-revert-link" style="margin:0;"></button></span>
-              </div>
-              <div class="picker-row">
-                <div class="picker-group">
-                  <label class="pg-label" for="preset-select">Editing column layout</label>
-                  <select id="preset-select"></select>
-                </div>
-                <div class="picker-group">
-                  <label class="pg-label" for="preset-name">Column layout name</label>
-                  <input id="preset-name">
-                </div>
-              </div>
-              <div id="preset-editor-container"></div>
-              <div class="topbar-actions" style="margin-top:12px;">
-                <button class="btn btn-ghost btn-sm" type="button" id="preset-new-btn">New column layout</button>
-                <button class="btn btn-brass btn-sm" type="button" id="preset-save-btn">Save column layout</button>
-              </div>
             </div>
           </div>
 
@@ -440,9 +418,17 @@
         </div>
       </section>
 
-      <!-- ============ REPORT A PROBLEM (gear menu, Settings, wizard errors, "could not read" cards) ============ -->
+      <!-- ============ REPORT A PROBLEM: a right-side sheet over the current
+           screen (item 11, REBUILD-HOME 2026-09-18) - opened from the
+           persistent bottom-right button, Settings, wizard errors, or a
+           "could not read" card. Never a separate page any more. ============ -->
       <!-- Section D (report agent) -->
-      <section class="screen" id="screen-report">
+      <div class="side-sheet-backdrop" id="report-backdrop"></div>
+      <section class="side-sheet" id="screen-report" aria-label="Report a problem">
+        <div class="side-sheet-head">
+          <h1>Report a problem</h1>
+          <button class="close-btn" type="button" id="report-close-btn" aria-label="Close">&times;</button>
+        </div>
         <p class="pdf-anchor-hint" data-test="report-intro">Tell us what happened. Nothing about your files leaves this device except what you choose to send in this email.</p>
         <div class="panel">
           <h2 class="section-title">What happened?</h2>
@@ -464,10 +450,17 @@
           <p class="pdf-anchor-hint" style="margin:0 0 8px;">Descriptions, statement types and amounts are masked or stripped before this ever leaves the device. This is exactly what will be copied:</p>
           <pre class="signatures-preview" id="report-preview" style="max-height:220px;overflow:auto;"></pre>
 
+          <!-- Item 15 (coordinator, 2026-09-18): the anonymised report above
+               is for sending to us; "Copy debug log" here is the full,
+               un-anonymised log, for the owner's own on-device debugging -
+               a visible secondary action, never removed again, with a
+               one-line note on the difference. -->
           <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;">
             <button class="btn btn-brass btn-sm" type="button" id="report-send-btn">Copy report and open email</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="report-copy-debuglog-btn">Copy debug log</button>
             <span id="report-status" class="pdf-anchor-hint" role="status" aria-live="polite" style="margin:0;"></span>
           </div>
+          <p class="pdf-anchor-hint" style="margin:6px 0 0;">"Copy report" is anonymised, for sending to us. "Copy debug log" is the full log, for your own troubleshooting - it can include statement descriptions and amounts.</p>
 
           <div id="report-done" hidden style="margin-top:14px;">
             <p class="pdf-anchor-hint">Copied. An email draft should be open, addressed to <strong id="report-email"></strong>. If it did not open, write to that address from any email app and paste the report from your clipboard.</p>
@@ -477,6 +470,16 @@
         </div>
       </section>
       <!-- /Section D -->
+
+      <!-- Item 11: persistent quiet "Report a problem" button, bottom-right
+           of every screen. -->
+      <button type="button" class="report-fab" id="report-fab" aria-label="Report a problem" title="Report a problem">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="5" y="4" width="6" height="8" rx="3" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M8 2.3v1.4M5.3 3l.7 1M10.7 3l-.7 1M2.5 8h2.5M11 8h2.5M3.3 12l1.7-1.2M12.7 12l-1.7-1.2M6 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        Report a problem
+      </button>
 
       <!-- ============ MAPPING WIZARD (opened from Home or Profiles) ============ -->
       <!-- Section A (wizard agent) -->
@@ -660,42 +663,17 @@
     </main>
   </div>
 
-  <!-- ============ GEAR MENU (the only door outside the drop-to-copy path) ============ -->
-  <div class="gear-overlay" id="gear-overlay">
-    <div class="gear-head">
-      <h1>Menu</h1>
-      <button class="close-btn" id="gear-close-btn" type="button" aria-label="Close menu">&times;</button>
-    </div>
-    <div class="tile-grid">
-      <button class="tile" type="button" id="tile-export">
-        <span class="t-title">Adjust what's exported</span>
-        <span class="t-sub">Date range, columns, currency and where rows come from.</span>
-      </button>
-      <button class="tile" type="button" data-screen="profiles">
-        <span class="t-title">Statement types</span>
-        <span class="t-sub">One entry per bank statement you've set up. Manage or add one.</span>
-      </button>
-      <button class="tile" type="button" data-screen="review">
-        <span class="t-title">Check a statement</span>
-        <span class="t-sub">Look at any row next to the original page.</span>
-      </button>
-      <button class="tile" type="button" data-screen="settings">
-        <span class="t-title">Settings</span>
-        <span class="t-sub">Defaults, storage and privacy, and a few advanced things.</span>
-      </button>
-      <button class="tile" type="button" data-screen="how">
-        <span class="t-title">How it works</span>
-        <span class="t-sub">A plain-language walkthrough of the three steps.</span>
-      </button>
-      <button class="tile" type="button" id="tile-clear">
-        <span class="t-title">Clear statements</span>
-        <span class="t-sub">Removes statements from this tab. Statement types are kept.</span>
-      </button>
-      <button class="tile" type="button" data-screen="report">
-        <span class="t-title">Report a problem</span>
-        <span class="t-sub">Tell us what went wrong, with a preview of exactly what gets sent.</span>
-      </button>
-    </div>
+  <!-- ============ GEAR MENU: compact dropdown anchored to the gear button
+       (item 10, REBUILD-HOME 2026-09-18). "Adjust what's exported" and
+       "Check a statement" live on Home now, not here; "Report a problem" is
+       the persistent bottom-right button (item 11), not a menu item. ============ -->
+  <div class="gear-overlay" id="gear-overlay" role="menu" aria-label="Menu">
+    <button class="dropdown-item" type="button" data-screen="profiles" role="menuitem">Statement types</button>
+    <button class="dropdown-item" type="button" data-screen="settings" role="menuitem">Settings</button>
+    <button class="dropdown-item" type="button" data-screen="how" role="menuitem">How it works</button>
+    <button class="dropdown-item" type="button" id="tile-show-tour" role="menuitem">Show welcome tour</button>
+    <div class="dropdown-sep"></div>
+    <button class="dropdown-item" type="button" id="tile-clear" role="menuitem">Clear statements</button>
   </div>
 </div>
 

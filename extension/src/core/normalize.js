@@ -88,6 +88,20 @@ function resolveAmount(record, fieldsCfg, signConvention, numberFormat, currency
 // that wasn't actually wrong. 70, not 80, per the same feedback.
 export const OCR_LOW_CONFIDENCE_THRESHOLD = 70;
 
+// REBUILD-HOME item 5c (2026-09-18): the 70-threshold rule above still flagged
+// far too many rows - a merely-low-but-plausible Tesseract confidence with
+// nothing actually wrong. Now scoped to the AMOUNT token alone (never date -
+// a misread date-group word is a different, rarer problem) at a stricter <60,
+// AND only when there is a concrete reason to distrust the number: either
+// core/ocr.js's digit-whitelist retry already disagreed with the first pass
+// (it stamps confidence exactly 0 for that - see ocr.js's
+// applyAmountRetryResults doc comment) or the value itself is out of family
+// for this file (no decimal point where the file's other amounts have one, or
+// over 100x the file's own median amount - a shape a real statement almost
+// never produces, but a dropped digit/decimal misread does).
+export const OCR_LOW_CONFIDENCE_AMOUNT_THRESHOLD = 60;
+const OUTLIER_MULTIPLE = 100;
+
 /**
  * Normalize raw records into standard transaction rows.
  * @param {object[]} records - row objects keyed by source header (from csv.js), or pdf row objects.
@@ -101,6 +115,26 @@ export function normalizeRecords(records, version, meta = {}) {
   const numberFormat = version.numberFormat;
   const signConvention = version.signConvention || 'signed';
   const seen = new Map(); // fingerprint -> count, for possible-duplicate flag
+
+  // Item 5c: batch context for the low-confidence sanity checks below - the
+  // file's own median amount (of everything that parsed at all) and whether
+  // most of its amounts carry real cents, computed once up front. Reuses
+  // meta.currency as a stand-in for each row's own detected currency (a
+  // per-record detectCurrency pass just for this median would cost more than
+  // it's worth for a same-file sanity check).
+  let fileMedianAbsMinor = null;
+  let fileMostlyHasDecimals = false;
+  if (meta.ocr) {
+    const parsedAbsMinors = records
+      .map((r) => resolveAmount(r, fieldsCfg, signConvention, numberFormat, meta.currency))
+      .filter((a) => a.ok && a.minor != null)
+      .map((a) => Math.abs(a.minor));
+    if (parsedAbsMinors.length) {
+      const sorted = [...parsedAbsMinors].sort((a, b) => a - b);
+      fileMedianAbsMinor = sorted[Math.floor(sorted.length / 2)];
+      fileMostlyHasDecimals = parsedAbsMinors.filter((m) => m % 100 !== 0).length / parsedAbsMinors.length > 0.5;
+    }
+  }
 
   const rows = records.map((record, idx) => {
     const flags = [];
@@ -228,27 +262,35 @@ export function normalizeRecords(records, version, meta = {}) {
     let low_confidence_hint = null;
     if (meta.ocr) {
       flags.push('ocr');
-      const worstConfidence = [record._amountConfidence, record._dateConfidence]
-        .filter((v) => v != null)
-        .reduce((min, v) => (min == null ? v : Math.min(min, v)), null);
-      if (!skipped && worstConfidence != null && worstConfidence < OCR_LOW_CONFIDENCE_THRESHOLD) {
-        flags.push('low_confidence_ocr');
-        // Follow-up (2026-09-17): core/ocr.js's safety net (see
-        // findAmountRetryCandidates/applyAmountRetryResults) stamps
-        // confidence exactly 0 on ONE specific situation - an amount token
-        // that still has no decimal point in a file where most amounts do -
-        // never on a merely-uncertain read. That's almost always a decimal
-        // point dropped in OCR (e.g. "173" for "1.73"), a single, reversible
-        // shift, so surface the likely correct value directly instead of
-        // leaving the user to guess: record._amountConfidence === 0 is the
-        // exact signal ocr.js reserves for this case, and a whole-number
-        // amount (no cents) is the corroborating shape.
-        if (record._amountConfidence === 0 && amountResult.ok && amountResult.minor % 100 === 0) {
-          const readAsDollars = Math.abs(amountResult.minor) / 100;
-          const altMinor = Math.round(amountResult.minor / 100);
-          const likelyDollars = (Math.abs(altMinor) / 100).toFixed(2);
-          amount_alt = altMinor;
-          low_confidence_hint = `Amount read as ${readAsDollars} with no decimal point. Likely ${likelyDollars}. Check against the page.`;
+      // Item 5c: amount-token confidence alone (never the date token), below
+      // the stricter 60 threshold, AND a concrete reason to distrust the
+      // number - retry disagreement (ocr.js's confidence-0 signal) or an
+      // out-of-family shape for this file - not confidence alone.
+      const amountConf = record._amountConfidence;
+      if (!skipped && amountConf != null && amountConf < OCR_LOW_CONFIDENCE_AMOUNT_THRESHOLD && amountResult.ok) {
+        const retryDisagreed = amountConf === 0; // ocr.js's applyAmountRetryResults reserves exactly 0 for this
+        const noDecimalAnomaly = fileMostlyHasDecimals && amountResult.minor % 100 === 0;
+        const outlierAnomaly = fileMedianAbsMinor != null && fileMedianAbsMinor > 0
+          && Math.abs(amountResult.minor) > fileMedianAbsMinor * OUTLIER_MULTIPLE;
+        if (retryDisagreed || noDecimalAnomaly || outlierAnomaly) {
+          flags.push('low_confidence_ocr');
+          // Follow-up (2026-09-17): core/ocr.js's safety net (see
+          // findAmountRetryCandidates/applyAmountRetryResults) stamps
+          // confidence exactly 0 on ONE specific situation - an amount token
+          // that still has no decimal point in a file where most amounts do -
+          // never on a merely-uncertain read. That's almost always a decimal
+          // point dropped in OCR (e.g. "173" for "1.73"), a single, reversible
+          // shift, so surface the likely correct value directly instead of
+          // leaving the user to guess: record._amountConfidence === 0 is the
+          // exact signal ocr.js reserves for this case, and a whole-number
+          // amount (no cents) is the corroborating shape.
+          if (retryDisagreed && amountResult.minor % 100 === 0) {
+            const readAsDollars = Math.abs(amountResult.minor) / 100;
+            const altMinor = Math.round(amountResult.minor / 100);
+            const likelyDollars = (Math.abs(altMinor) / 100).toFixed(2);
+            amount_alt = altMinor;
+            low_confidence_hint = `Amount read as ${readAsDollars} with no decimal point. Likely ${likelyDollars}. Check against the page.`;
+          }
         }
       }
     }

@@ -103,126 +103,117 @@ export function canvasLeftToPdfX(left, viewport) {
   return x;
 }
 
-const CARD_W = 320, CARD_H = 96, CARD_DPR = 2; // decision-card snippet's fixed CSS box (workspace.css .decision-snippet), rendered at 2x for a crisp bitmap
-const LINE_PAD_PX = 24; // padding either side of the flagged line's own text span, in page-render canvas px
-const SUB_CROP_GAP = 14 * CARD_DPR; // 14 CSS px between the two sub-crops when a line is too wide for one - wide enough to read as a deliberate seam, not a hairline
-const SUB_CROP_INSET = 6; // page-render px of whitespace trimmed off each sub-crop's cut edge, so the seam never slices a glyph
-// A crop that's exactly 3 lines tall, contain-fit into the card, always
-// displays at CARD_H/3 CSS px per line regardless of render scale (the fit
-// is height-limited, so width cancels out of that math). That's comfortably
-// above the 9px x-height floor. It only breaks when the crop is so WIDE that
-// the fit becomes width-limited instead - past this width/height ratio, a
-// single crop can no longer hit that floor, so two sub-crops are used
-// instead (see below). 54 is the crop height (CSS px) that gives exactly a
-// 9px x-height at a typical ~0.5 x-height/font-size ratio.
-const MAX_SINGLE_ASPECT = CARD_W / 54;
+const CARD_MAX_W = 360; // widest a snippet ever renders (CSS px) - a long line shrinks slightly rather than ever being cut into two pieces
+const CARD_DPR = 2; // rendered at 2x for a crisp bitmap
+const LINE_TARGET_PX = 16; // a legible line height (CSS px) the crop is scaled to hit, when width isn't the binding constraint
+const LINE_PAD_PX = 24; // horizontal padding either side of the block's own text span, in page-render canvas px
 
-/** Contain-fit an `sw x sh` region of `src` into the `boxW x boxH` box at (boxX, boxY) on `ctx` - centred, never stretched. */
-function drawContain(ctx, src, sx, sy, sw, sh, boxX, boxY, boxW, boxH) {
-  const scale = Math.min(boxW / sw, boxH / sh);
-  const dw = sw * scale, dh = sh * scale;
-  const dx = boxX + (boxW - dw) / 2, dy = boxY + (boxH - dh) / 2;
-  ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
-  return { dx, dy, dw, dh, scale };
+/**
+ * Item 5a/5b (REBUILD-HOME, 2026-09-18): the block of lines a row's snippet
+ * should cover - every line whose y falls between the block's top (the
+ * anchor's own first line, anchor.y + anchor.h) and its bottom (anchor.y2,
+ * the LAST line of the block - e.g. the amount line, when the description
+ * spans lines above it - or anchor.y itself for a single-line block).
+ * Exported so it's testable without a canvas/DOM: the root cause of "a card
+ * shows a snippet from a different transaction" was that the snippet only
+ * ever looked at ONE line (matched loosely by `Math.abs(l.y - anchor.y) <=
+ * anchor.h`), never anchor.y2 - a multi-line block's amount line (often
+ * several lines below the block's own anchor) fell outside that single-line
+ * window entirely, and the wide loose match could pick up a neighbouring
+ * transaction's line instead.
+ * @param {{y:number, items:object[]}[]} lines - one page's groupItemsIntoLines() output
+ * @param {{y:number, h?:number, y2?:number|null}} anchor
+ */
+export function blockLines(lines, anchor) {
+  const top = anchor.y + (anchor.h || 10);
+  const bottom = anchor.y2 ?? anchor.y;
+  return (lines || []).filter((l) => l.y <= top + 0.5 && l.y >= bottom - 0.5);
 }
 
 /**
- * Simple B's decision-card snippet: a small crop of the rendered page around
- * one row's own anchor (source_page/source_y/source_h, same fields
- * review.js's source-pane outline already reads), 3 text lines tall so the
- * card shows enough context to judge the row without opening full Review.
- * Renders the whole page first (renderPdfPage/opts.items for an OCR'd file,
- * same contract as review.js's source pane) then copies just the anchor's
- * neighbourhood out of that canvas into a small one - no separate "render
- * only this region" path in pdf.js to keep in sync with the real one.
- *
- * Fix item 3 part 2 (2026-09-18): part 1 cropped to a fixed page-left column,
- * which was still often the full flagged MERCHANT NAME running past it at a
- * ~180px display width - illegible. Crops to the flagged LINE's own text
- * span now (leftmost to rightmost item on that line, from core/pdf.js's own
- * line grouping - the same y-clustering the row parser itself uses), fit
- * into the card's fixed 320x96 CSS box at 2x so the bitmap itself is crisp
- * (workspace.css sizes .decision-snippet/its canvas to match). A span too
- * wide to stay legible at that size (a long merchant name) is shown as two
- * sub-crops side by side - description start, amount end - instead of
- * shrinking the whole line past reading size.
+ * Simple B's decision-card snippet: a crop of the rendered page covering the
+ * row's own FULL transaction block (source_page/source_y/source_h/source_y2 -
+ * the same fields review.js's source-pane outline reads), plus half a line of
+ * context above and below, in ONE crop - never split into pieces, the card
+ * grows to fit instead (item 5b). Renders the whole page first (renderPdfPage/
+ * opts.items for an OCR'd file, same contract as review.js's source pane)
+ * then copies just the block's neighbourhood out of that canvas into a small
+ * one - no separate "render only this region" path in pdf.js to keep in sync
+ * with the real one.
  * @param {ArrayBuffer} bytes
- * @param {{page:number, y:number, h?:number}} anchor - PDF-space anchor (row.original.source_page/source_y/source_h)
- * @param {{items?: object[], scale?: number, contextLines?: number, cropWidthPx?: number}} [opts] - `items` for an OCR'd file (see renderPdfPage); `cropWidthPx` is only the no-matching-line fallback width
+ * @param {{page:number, y:number, h?:number, y2?:number|null}} anchor - PDF-space anchor (row.original.source_page/source_y/source_h/source_y2)
+ * @param {{items?: object[], scale?: number, cropWidthPx?: number}} [opts] - `items` for an OCR'd file (see renderPdfPage); `cropWidthPx` is only the no-matching-line fallback width
  * @returns {Promise<HTMLCanvasElement|null>} null when the row has no page anchor to crop (e.g. a columns-rowModel PDF, or a CSV row - callers fall back to a text snippet there)
  */
 export async function renderRowSnippet(bytes, anchor, opts = {}) {
   if (!anchor || anchor.page == null || anchor.y == null) return null;
-  const scale = opts.scale ?? 2; // page-render resolution; the card's own display size is fixed below, independent of this
+  const scale = opts.scale ?? 2; // page-render resolution; the card's own display size is computed below, independent of this
   const { canvas, viewport, items } = await renderPdfPage(bytes, anchor.page, scale, opts.items ? { items: opts.items } : {});
   const pageCtx = canvas.getContext('2d');
 
   const lineH = Math.max(1, (anchor.h || 10) * scale);
-  const textTop = pdfYToCanvasPixel(anchor.y + (anchor.h || 10), viewport);
-  const textBottom = pdfYToCanvasPixel(anchor.y, viewport);
-  const contextLines = opts.contextLines ?? 1; // one line above/below the flagged one = 3 lines total
-  const cropTop = Math.max(0, textTop - lineH * contextLines);
-  const cropBottom = Math.min(canvas.height, textBottom + lineH * contextLines);
+  const allLines = groupItemsIntoLines(items || []);
+  const block = blockLines(allLines, anchor);
+  const blockTopY = anchor.y + (anchor.h || 10);
+  const blockBottomY = anchor.y2 ?? anchor.y;
+  const textTop = pdfYToCanvasPixel(blockTopY, viewport);
+  const textBottom = pdfYToCanvasPixel(blockBottomY, viewport);
+  // Item 5b: half a line of context above and below the block, not a whole
+  // extra line either side.
+  const pad = lineH * 0.5;
+  const cropTop = Math.max(0, textTop - pad);
+  const cropBottom = Math.min(canvas.height, textBottom + pad);
   const cropHeight = Math.max(1, cropBottom - cropTop);
 
-  // The flagged line's own text span, not the full page width.
-  const line = groupItemsIntoLines(items || []).find((l) => Math.abs(l.y - anchor.y) <= (anchor.h || 10));
+  // Horizontal span across EVERY line in the block, not just one - the
+  // amount is often on a different line than the block's own anchor line.
   let left = 0, right = Math.min(canvas.width, opts.cropWidthPx ?? 480);
-  if (line?.items.length) {
+  if (block.length) {
     pageCtx.font = `${lineH}px sans-serif`;
-    const lastItem = line.items[line.items.length - 1];
-    const lastRight = pdfXToCanvasLeft(lastItem.x, viewport) + pageCtx.measureText(lastItem.str).width;
-    left = Math.max(0, pdfXToCanvasLeft(line.items[0].x, viewport) - LINE_PAD_PX);
-    right = Math.min(canvas.width, lastRight + LINE_PAD_PX);
+    let minLeft = Infinity, maxRight = -Infinity;
+    for (const line of block) {
+      if (!line.items.length) continue;
+      const lastItem = line.items[line.items.length - 1];
+      minLeft = Math.min(minLeft, pdfXToCanvasLeft(line.items[0].x, viewport));
+      maxRight = Math.max(maxRight, pdfXToCanvasLeft(lastItem.x, viewport) + pageCtx.measureText(lastItem.str).width);
+    }
+    if (minLeft !== Infinity) {
+      left = Math.max(0, minLeft - LINE_PAD_PX);
+      right = Math.min(canvas.width, maxRight + LINE_PAD_PX);
+    }
   }
   const cropWidth = Math.max(1, right - left);
 
+  // Item 5b: ONE crop, sized to the block itself - no fixed box, no split.
+  // Scaled so a line of text renders at a legible LINE_TARGET_PX CSS height,
+  // capped to CARD_MAX_W CSS px wide (a very long line shrinks slightly
+  // instead of ever being cut into two pieces); the card grows to fit
+  // whatever height that produces for a multi-line block.
+  const lineCount = Math.max(1, Math.round(cropHeight / lineH));
+  const targetHeightPx = lineCount * LINE_TARGET_PX * CARD_DPR;
+  const fit = Math.min((CARD_MAX_W * CARD_DPR) / cropWidth, targetHeightPx / cropHeight);
   const snippet = document.createElement('canvas');
-  snippet.width = CARD_W * CARD_DPR;
-  snippet.height = CARD_H * CARD_DPR;
+  snippet.width = Math.max(1, Math.round(cropWidth * fit));
+  snippet.height = Math.max(1, Math.round(cropHeight * fit));
+  // The card grows to fit (item 5b): CSS display size is the bitmap's own
+  // pixel size divided back down by CARD_DPR, so a taller multi-line block
+  // renders taller on screen instead of being squeezed into a fixed box.
+  snippet.style.width = `${snippet.width / CARD_DPR}px`;
+  snippet.style.height = `${snippet.height / CARD_DPR}px`;
   const ctx = snippet.getContext('2d');
   ctx.fillStyle = '#e8e4d8'; // matches .decision-snippet's own background so any letterboxing is invisible
   ctx.fillRect(0, 0, snippet.width, snippet.height);
+  ctx.drawImage(canvas, left, cropTop, cropWidth, cropHeight, 0, 0, snippet.width, snippet.height);
 
-  const boxes = [{ sx: left, sw: cropWidth, boxX: 0, boxW: snippet.width }];
-  if (line?.items.length > 1 && cropWidth / cropHeight > MAX_SINGLE_ASPECT) {
-    // Too wide to stay legible as one crop: split into two sub-crops side by
-    // side - the START of the description and the amount in full (never
-    // clipped - trimming a description's tail is fine, trimming a digit off
-    // an amount is not) - each in its own half-box instead of one half
-    // spanning the whole (still-too-wide) description.
-    const lastItem = line.items[line.items.length - 1];
-    const splitX = Math.max(left, pdfXToCanvasLeft(lastItem.x, viewport) - LINE_PAD_PX);
-    const halfW = (snippet.width - SUB_CROP_GAP) / 2;
-    const capW = halfW * (cropHeight / snippet.height); // widest the description sub-crop can be and still land height-limited (full line-height)
-    // Trim SUB_CROP_INSET of page whitespace off each side of the cut, so the
-    // seam sits inside the gap between words rather than against a glyph.
-    const leftW = Math.min(splitX - SUB_CROP_INSET - left, capW);
-    const rightSx = splitX + SUB_CROP_INSET;
-    boxes[0] = { sx: left, sw: leftW, boxX: 0, boxW: halfW };
-    boxes.push({ sx: rightSx, sw: right - rightSx, boxX: halfW + SUB_CROP_GAP, boxW: halfW });
-  }
-
-  // A wide-enough, unmistakably-deliberate seam between the two sub-crops
-  // (a faint "..." centred on the paper-coloured gap) - not just a thin line
-  // that reads as one clipped word running across it.
-  if (boxes.length === 2) {
-    const gapX = boxes[0].boxX + boxes[0].boxW;
-    ctx.fillStyle = '#a89a7d';
-    ctx.font = `${9 * CARD_DPR}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('· · ·', gapX + SUB_CROP_GAP / 2, snippet.height / 2);
-  }
-
-  // Highlight the flagged line itself within each crop (a soft brass wash,
-  // not a hard box, so the text underneath stays readable).
-  for (const b of boxes) {
-    if (b.sw <= 0) continue;
-    const { dx, dy, dw, dh, scale: fit } = drawContain(ctx, canvas, b.sx, cropTop, b.sw, cropHeight, b.boxX, 0, b.boxW, snippet.height);
-    const tintTop = dy + (textTop - cropTop) * fit;
+  // Highlight every line of the block (a soft brass wash, not a hard box, so
+  // the text underneath stays readable).
+  for (const line of block) {
+    const lTop = pdfYToCanvasPixel(line.y + (anchor.h || 10), viewport);
+    const lBottom = pdfYToCanvasPixel(line.y, viewport);
+    const y0 = (lTop - cropTop) * fit;
+    const y1 = (lBottom - cropTop) * fit;
     ctx.fillStyle = 'rgba(198, 161, 91, 0.28)';
-    ctx.fillRect(dx, Math.max(dy, tintTop), dw, Math.min((textBottom - textTop) * fit, dy + dh - tintTop));
+    ctx.fillRect(0, Math.max(0, y0), snippet.width, Math.max(1, y1 - Math.max(0, y0)));
   }
 
   return snippet;

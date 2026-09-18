@@ -653,8 +653,19 @@ export function resolveGroupedSign(match, x, signConvention = 'signed', columnBa
     const sign = signConvention === 'positiveIsOut' ? (match.markerSign === '+' ? '-' : '+') : match.markerSign;
     return { sign, unclear: false };
   }
-  if (signConvention === 'positiveIsOut') return { sign: '-', unclear: true };
-  if (signConvention === 'positiveIsIn') return { sign: '+', unclear: true };
+  // 'positiveIsOut'/'positiveIsIn' on a marker-less line is NOT a guess: this
+  // convention only gets picked (detectGroupedSignConvention, the
+  // crCount>=drCount branch) when the file's own marked lines establish that
+  // an unmarked amount reliably means the OTHER direction - a card export
+  // that marks every credit "CR" and leaves every debit bare. The absence of
+  // a marker there is itself the signal, same confidence as a marker would
+  // give; flagging it 'sign_unclear' just because a bare-amount debit is 90%+
+  // of the file's rows is the false trigger behind item 5c's Summit Bank
+  // regression (92.1% flagged, see dev/flag-rate-audit.mjs). Only 'signed'/
+  // 'crdr' (where EVERY line is expected to carry its own marker) and no
+  // convention at all fall through to a real guess below.
+  if (signConvention === 'positiveIsOut') return { sign: '-', unclear: false };
+  if (signConvention === 'positiveIsIn') return { sign: '+', unclear: false };
   return { sign: '+', unclear: true };
 }
 

@@ -1,81 +1,30 @@
-// Settings screen: preferences, saved exchange rates, storage usage split,
-// Clear sessions / Erase everything, and the export column-layout editor.
+// Settings screen: preferences (including the "Start from" column-layout
+// picker), saved exchange rates, storage usage split, Clear sessions / Erase
+// everything. The column layout itself is edited on Home, against a live
+// preview - see preset-editor.js.
 
 import { clearAllSessions } from '../core/sessions.js';
 import { computeStorageSplit, formatBytes } from './storage-usage.js';
-import { newPreset, validatePreset, dedupeColumns, renderPresetEditor as renderPresetEditorInto } from './preset-editor.js';
-import { DEFAULT_PRESET } from '../core/export.js';
-import { loadProfiles } from '../core/profiles.js';
+import { LAYOUT_PRESETS } from '../core/export.js';
 import { asText as debugLogText, clear as clearDebugLog, log } from '../core/debuglog.js';
 import { announce, fitTwoColumnGrid } from './nav.js';
 
 const $ = (sel) => document.querySelector(sel);
-const PRESETS_KEY = 'presets';
 const SETTINGS_KEY = 'settings';
 const RATES_KEY = 'rates';
 
-export function createSettingsScreen({ storage, sessionStore, getSampleRows, onCleared, onOpenReport }) {
-  let presets = [];
-  let editingIdx = 0; // which saved preset the working draft is based on
-  let working = null; // the live-edited preset (controlled by preset-editor.js)
-  let dirty = false;
-  let profilesCache = []; // for the preset editor's extra_* column discovery
-
-  async function loadPresets() {
-    const stored = await storage.get(PRESETS_KEY);
-    presets = stored
-      ? stored.map((p) => ({ ...p, columns: dedupeColumns(p.columns) }))
-      : [{ ...DEFAULT_PRESET, columns: dedupeColumns(DEFAULT_PRESET.columns), name: 'Default Statement Bridge columns' }];
-  }
-
+export function createSettingsScreen({ storage, sessionStore, onCleared, onOpenReport }) {
+  // Item 7 (REBUILD-HOME, 2026-09-18): Settings holds preferences only - the
+  // "Start from" picker lists the same six layouts Home's drawer offers, plus
+  // "Last used" (the default: Home always reopens with the persisted working
+  // set once one exists). No column editor, no saved-preset dropdown here -
+  // customising columns happens on Home, in the moment there's something to
+  // preview against.
   function renderPresetSelect() {
-    const select = $('#preset-select');
-    select.innerHTML = '';
-    presets.forEach((p, idx) => {
-      const opt = document.createElement('option');
-      opt.value = String(idx); opt.textContent = p.name;
-      if (idx === editingIdx && !dirty) opt.selected = true;
-      select.appendChild(opt);
-    });
-    if (dirty) {
-      const opt = document.createElement('option');
-      opt.value = 'custom'; opt.textContent = 'Custom (unsaved)'; opt.selected = true;
-      select.appendChild(opt);
-    }
-    // Item 6: "Start from" only matters the first time there's no working
-    // set to resume yet (a fresh install, or after Delete everything) - Home
-    // otherwise always reopens with the persisted "Last used" working set.
     const prefSelect = $('#pref-default-preset');
     prefSelect.innerHTML = '<option value="">Last used (default)</option>'
-      + presets.map((p, idx) => `<option value="${idx}">${p.name}</option>`).join('');
+      + LAYOUT_PRESETS.map((l, idx) => `<option value="${idx}">${l.name}</option>`).join('');
   }
-
-  function markDirty() {
-    dirty = true;
-    $('#preset-dirty-note').hidden = false;
-    $('#preset-revert-link').textContent = `Revert to ${presets[editingIdx].name}`;
-    renderPresetSelect();
-  }
-
-  function setWorking(next) {
-    working = next;
-    if (!dirty) markDirty();
-    renderPresetEditor();
-  }
-
-  function renderPresetEditor() {
-    $('#preset-name').value = working.name;
-    renderPresetEditorInto({
-      container: $('#preset-editor-container'),
-      preset: working,
-      sampleRows: getSampleRows?.() || [],
-      profiles: profilesCache,
-      onChange: setWorking,
-    });
-    fitTwoColumnGrid(document.querySelector('#screen-settings .settings-grid'));
-  }
-
-  async function savePresets() { await storage.set(PRESETS_KEY, presets); }
 
   async function renderRates() {
     const rates = (await storage.get(RATES_KEY)) || {};
@@ -122,13 +71,7 @@ export function createSettingsScreen({ storage, sessionStore, getSampleRows, onC
   }
 
   async function render() {
-    await loadPresets();
-    profilesCache = await loadProfiles(storage);
-    editingIdx = 0; dirty = false;
-    working = { ...presets[editingIdx] };
-    $('#preset-dirty-note').hidden = true;
     renderPresetSelect();
-    renderPresetEditor();
     await renderPreferences();
     await renderRates();
     await renderStorage();
@@ -136,42 +79,6 @@ export function createSettingsScreen({ storage, sessionStore, getSampleRows, onC
   }
 
   function wire() {
-    $('#preset-select').addEventListener('change', (e) => {
-      if (e.target.value === 'custom') return; // synthetic option, not a real choice
-      editingIdx = Number(e.target.value);
-      dirty = false;
-      working = { ...presets[editingIdx] };
-      $('#preset-dirty-note').hidden = true;
-      renderPresetSelect();
-      renderPresetEditor();
-    });
-    $('#preset-name').addEventListener('input', (e) => { setWorking({ ...working, name: e.target.value }); });
-    $('#preset-revert-link').addEventListener('click', () => {
-      dirty = false;
-      working = { ...presets[editingIdx] };
-      $('#preset-dirty-note').hidden = true;
-      renderPresetSelect();
-      renderPresetEditor();
-    });
-    $('#preset-new-btn').addEventListener('click', () => {
-      setWorking(newPreset(`Column layout ${presets.length + 1}`));
-    });
-    $('#preset-save-btn').addEventListener('click', async () => {
-      const result = validatePreset(working);
-      if (!result.ok) { alert(result.reason); return; }
-      const existingIdx = presets.findIndex((p) => p.name === working.name);
-      if (existingIdx !== -1) presets[existingIdx] = working;
-      else presets.push(working);
-      await savePresets();
-      editingIdx = existingIdx !== -1 ? existingIdx : presets.length - 1;
-      dirty = false;
-      $('#preset-dirty-note').hidden = true;
-      renderPresetSelect();
-      renderPresetEditor();
-      announce(`Column layout "${working.name}" saved.`);
-      alert('Column layout saved.');
-    });
-
     $('#rate-add-btn').addEventListener('click', async () => {
       const pair = $('#rate-pair').value.trim().toUpperCase();
       const value = Number($('#rate-value').value);
@@ -234,7 +141,7 @@ export function createSettingsScreen({ storage, sessionStore, getSampleRows, onC
     });
     $('#delete-everything-btn').addEventListener('click', async () => {
       await storage.remove('profiles');
-      await storage.remove(PRESETS_KEY);
+      await storage.remove('presets');
       await storage.remove(SETTINGS_KEY);
       await storage.remove(RATES_KEY);
       await clearAllSessions(sessionStore);

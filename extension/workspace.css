@@ -92,30 +92,42 @@ button,select,input{font-family:inherit;}
 .step-line{flex:1;height:3px;background:var(--ink-700);border-radius:2px;margin:0 -4px 18px;}
 .step-line.filled{background:var(--ok);}
 
-/* ---------- Gear menu overlay ---------- */
+/* ---------- Gear menu: compact dropdown, anchored under the gear button
+   (item 10, REBUILD-HOME 2026-09-18) - not a full-screen tile list. ---------- */
 .gear-overlay{
-  display:none;position:fixed;inset:0;background:var(--ink-900);z-index:60;
-  color:var(--ink-text);flex-direction:column;pointer-events:none;
+  display:none;position:fixed;top:58px;right:20px;z-index:60;min-width:220px;
+  background:var(--ink-800);border:1px solid var(--ink-line);border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);padding:6px;flex-direction:column;gap:2px;
 }
-.gear-overlay.open{display:flex;pointer-events:auto;}
-.gear-head{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;border-bottom:1px solid var(--ink-line);}
-.gear-head h1{font-size:17px;margin:0;}
-.close-btn{
-  appearance:none;border:none;background:none;margin:0;cursor:pointer;width:38px;height:38px;
-  border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-text-dim);font-size:20px;
+.gear-overlay.open{display:flex;}
+.dropdown-item{
+  appearance:none;cursor:pointer;background:none;border:none;color:var(--ink-text);
+  font:inherit;font-size:13.5px;font-weight:600;text-align:left;padding:10px 12px;border-radius:8px;
 }
-.close-btn:hover{background:var(--ink-700);color:var(--ink-text);}
-.tile-grid{
-  flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;
-  padding:36px 48px;align-content:center;max-width:960px;margin:0 auto;width:100%;
+.dropdown-item:hover,.dropdown-item:focus-visible{background:var(--ink-700);}
+.dropdown-sep{height:1px;background:var(--ink-line);margin:4px 2px;}
+
+/* ---------- Report a problem: right-side sheet + persistent bottom-right
+   button (items 11/15, REBUILD-HOME 2026-09-18) ---------- */
+.side-sheet{
+  display:none;position:fixed;top:0;right:0;bottom:0;width:min(440px,92vw);
+  background:var(--paper);border-left:1px solid var(--paper-line);
+  box-shadow:-12px 0 32px rgba(0,0,0,.22);z-index:70;overflow-y:auto;
+  padding:20px 24px 80px;
 }
-.tile{
-  appearance:none;cursor:pointer;background:var(--ink-800);border:1px solid var(--ink-line);color:inherit;
-  border-radius:12px;padding:22px 20px;display:flex;flex-direction:column;gap:8px;text-align:left;font:inherit;
+.side-sheet.open{display:block;}
+.side-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.side-sheet-head h1{font-size:16px;margin:0;}
+.side-sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(13,26,23,.35);z-index:65;}
+.side-sheet-backdrop.open{display:block;}
+.report-fab{
+  appearance:none;cursor:pointer;position:fixed;right:20px;bottom:20px;z-index:40;
+  background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:100px;
+  color:var(--ink-dim);font:inherit;font-size:12.5px;font-weight:600;
+  padding:9px 14px;display:inline-flex;align-items:center;gap:7px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
 }
-.tile:hover{background:var(--ink-700);border-color:var(--brass);}
-.tile .t-title{font-size:15.5px;font-weight:700;}
-.tile .t-sub{font-size:12.5px;color:var(--ink-text-dim);line-height:1.5;}
+.report-fab:hover{color:var(--ink);border-color:var(--brass);}
 
 .content-col{min-width:0;}
 .topbar-actions{display:flex;gap:10px;align-items:center;}
@@ -123,7 +135,7 @@ button,select,input{font-family:inherit;}
 .btn{
   appearance:none;-webkit-appearance:none;border:none;background:none;margin:0;color:inherit;
   font:inherit;cursor:pointer;border-radius:var(--radius);font-size:13px;font-weight:600;
-  padding:9px 16px;min-height:38px;display:inline-flex;align-items:center;gap:7px;box-sizing:border-box;
+  padding:9px 16px;min-height:38px;display:inline-flex;align-items:center;justify-content:center;gap:7px;box-sizing:border-box;
 }
 .btn-brass{background:var(--brass);color:var(--brass-ink);}
 .btn-brass:hover{background:var(--brass-hover);}
@@ -163,6 +175,11 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
    summary (columns/date range/currency) that used to sit under the result
    card's headline - normal case/weight, not the section-title's own caps. */
 .drawer-settings-summary{display:inline-block;margin-top:4px;font-size:12.5px;text-transform:none;letter-spacing:normal;font-weight:400;color:var(--ink-dim);}
+/* Item 4/13 (REBUILD-HOME, 2026-09-18): a consistent 24px rhythm between the
+   sheet's sections, regardless of what each section's own last element's
+   bottom margin happens to be - one rule instead of tuning every block. */
+.drawer-body > h2.section-title{margin-top:24px;}
+.drawer-body > h2.section-title:first-child{margin-top:0;}
 
 .badge{
   display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
@@ -195,7 +212,13 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
 }
 .dropzone-hero .drop-icon{margin:0 auto 16px;display:block;}
 .dropzone-hero strong{font-size:22px;margin-bottom:14px;}
-.dropzone-hero .choose-wrap{max-width:280px;margin:0 auto;}
+/* Item 1 (REBUILD-HOME, 2026-09-18): a normal centred pill, not a full-width
+   giant button - root cause of the off-centre label was .btn lacking
+   justify-content:center (fixed above); this also drops btn-giant's
+   width:100% here so the button itself is auto width, centred by this
+   wrap's margin:0 auto. */
+.dropzone-hero .choose-wrap{display:flex;justify-content:center;}
+.dropzone-hero .choose-wrap .btn-giant{width:auto;min-width:220px;}
 .dropzone-hero p{margin:16px 0 0;max-width:440px;margin-left:auto;margin-right:auto;line-height:1.6;}
 
 /* Single column, full content width: a card is a clear stop, not a tile in a
@@ -248,15 +271,18 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
   background:#fff;border:1px solid #ecd7a8;border-radius:var(--radius);padding:12px 16px;
   display:flex;align-items:stretch;gap:16px;flex-wrap:wrap;
 }
-/* Fix item 3 part 2: a fixed 320x96 card (pdf-render.js's renderRowSnippet
-   renders its bitmap to exactly this box at 2x) - not the old 180px box
-   that squeezed a full page width down to unreadable text. */
+/* Item 5b (REBUILD-HOME, 2026-09-18): the card grows to fit the block's own
+   crop - pdf-render.js's renderRowSnippet sets the canvas's own CSS width/
+   height inline (its bitmap's pixel size / CARD_DPR), so a taller multi-line
+   transaction renders taller here instead of being squeezed into one fixed
+   box or split into two pieces. max-width caps how wide a single very long
+   line ever gets (CARD_MAX_W in pdf-render.js). */
 .decision-snippet{
-  flex:0 0 320px;width:320px;height:96px;background:#e8e4d8;
+  flex:0 0 auto;max-width:360px;background:#e8e4d8;
   border:1px solid var(--paper-line);border-radius:6px;
   overflow:hidden;display:flex;align-items:center;justify-content:center;
 }
-.decision-snippet canvas{display:block;width:100%;height:100%;}
+.decision-snippet canvas{display:block;}
 .decision-snippet-text{
   padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
   font-size:13px;color:#333;line-height:1.5;
@@ -309,23 +335,6 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
 .btn-expander .chevron{transition:transform .15s ease;flex-shrink:0;}
 .btn-expander[aria-expanded="true"] .chevron{transform:rotate(180deg);}
 
-.mapping-list{display:flex;flex-direction:column;gap:6px;}
-/* Item 14a: Sources row - Include checkbox, then account/profile/range/count
-   info (wraps as a group before the row's own links do), then Review/Update
-   mapping, all on one line where it fits. */
-.mapping-row{
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-  font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--paper-line);
-}
-.mapping-row:last-child{border-bottom:none;}
-.mapping-row .source-include-checkbox{flex-shrink:0;}
-.mapping-row .mr-info{display:flex;align-items:center;gap:12px;flex:1 1 auto;min-width:0;flex-wrap:wrap;}
-.mapping-row .mr-name{font-weight:600;}
-.mapping-row .mr-profile{color:var(--ink-dim);}
-.mapping-row .mr-range{color:var(--ink-dim);font-size:11.5px;}
-.mapping-row .mr-count{font-size:11.5px;font-variant-numeric:tabular-nums;}
-.mapping-row .mr-count-zero{color:var(--ink-dim);font-style:italic;}
-.mapping-row .mr-links{display:flex;gap:14px;flex-shrink:0;margin-left:auto;}
 .icon-btn{appearance:none;border:none;background:none;margin:0;font:inherit;cursor:pointer;font-size:11.5px;color:var(--ink-dim);padding:4px 7px;border-radius:4px;}
 .icon-btn:hover{background:var(--paper);color:var(--ink);}
 .icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
@@ -336,15 +345,24 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
    these are present; :empty/[hidden] collapse to 0 so the gap never doubles
    up when a group has nothing to show. Section titles all open the same way. */
 #screen-home .file-list{gap:16px;margin-bottom:0;}
-#screen-home #attention-heading{margin:16px 0 12px;}
+#screen-home #attention-heading{margin:24px 0 12px;}
 #screen-home .file-grid{margin-bottom:0;}
-#screen-home .file-grid:not(:empty){margin-bottom:16px;}
-#screen-home .export-panel{margin-top:16px;}
+#screen-home .file-grid:not(:empty){margin-bottom:24px;}
+#screen-home .export-panel{margin-top:24px;}
+/* Item 13 (REBUILD-HOME, 2026-09-18): file rows read as ONE card (a single
+   list inside one bordered box, divided by rules) instead of one bordered
+   card per file - fewer bordered boxes, same information. Consistent 24px
+   rhythm between Home's major sections (file list / needs-a-look / result). */
+#screen-home .file-list:not(:empty){
+  gap:0;background:var(--paper-raised);border:1px solid var(--paper-line);
+  border-radius:var(--radius);overflow:hidden;margin-bottom:24px;
+}
+#screen-home .file-list .file-row{border:none;border-radius:0;border-bottom:1px solid var(--paper-line);margin:0;}
+#screen-home .file-list .file-row:last-child{border-bottom:none;}
 /* Item 1: the drawer is the same "Ready to copy" card growing, not a second
    box - a top rule + margin marks where the expansion begins, but it's still
    one .panel's own padding/background throughout. */
 .drawer-body{margin-top:16px;padding-top:16px;border-top:1px solid var(--paper-line);}
-.drawer-footer-actions{display:flex;align-items:center;gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--paper-line);}
 /* /Section C */
 
 /* --------- Review --------- */
@@ -779,33 +797,32 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .danger-confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .danger-confirm input{font-family:inherit;font-size:12.5px;padding:8px 10px;border-radius:5px;border:1px solid #e3bcb0;width:140px;}
 
-/* --------- Settings: preset editor --------- */
-/* Item 2: compact rows - enabled columns are 32px, one line (drag handle,
-   checkbox, internal id caption, rename input); the whole editor fits in
-   about half its old height at 1440. */
-.preset-columns{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:4px;}
-.preset-columns li{
-  display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--paper-line);
-  border-radius:5px;padding:0 8px;height:32px;font-size:12px;
+/* --------- Home/Settings: column layout (REBUILD-HOME item 7, 2026-09-18) --------- */
+/* Six layout radio cards, each with a name, a one-line description, and a
+   tiny strip naming its columns - replaces the old dropdown + checkbox list. */
+.layout-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+.layout-card{
+  display:flex;flex-direction:column;gap:4px;text-align:left;font:inherit;
+  border:1px solid var(--paper-line);border-radius:var(--radius);padding:12px 14px;
+  background:#fff;cursor:pointer;min-width:0;
 }
-.preset-columns li input{font:inherit;font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid var(--paper-line);flex:1;height:22px;}
-.preset-columns li .col-field{color:var(--ink-dim);font-size:10.5px;min-width:88px;}
-/* Item 2: disabled fields are a two-column checklist (label + coverage, no
-   rename input), 28px rows - half the row count fits per pixel of height. */
-.preset-columns-disabled{list-style:none;margin:0 0 8px;padding:0;
-  display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;}
-.preset-columns-disabled li{display:flex;align-items:center;gap:6px;height:28px;font-size:11.5px;
-  color:var(--ink-dim);min-width:0;}
-.preset-columns-disabled li .col-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.preset-columns-disabled li .col-coverage{flex:0 1 96px;min-width:60px;}
-/* Item 2: drag handle + smaller up/down buttons now the handle is primary. */
-.col-drag-handle{cursor:grab;color:var(--ink-dim);font-size:13px;line-height:1;flex-shrink:0;user-select:none;}
-.preset-columns li.dragging{opacity:.4;}
-.icon-btn-xs{font-size:10px;padding:2px 5px;}
-/* Item 3: Coverage column - "All" reads plain, a partial file list or "None
-   in this session" reads muted (same disabled-column colour). */
-.col-coverage{font-size:11px;color:var(--ink-dim);flex:1 1 120px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.col-coverage-none{font-style:italic;}
+.layout-card.active{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass);}
+.layout-card-name{font-size:13px;font-weight:600;}
+.layout-card-desc{font-size:11.5px;color:var(--ink-dim);}
+.layout-card-strip{font-size:10.5px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* "Customise": collapsed by default, one row of toggle pills for whichever
+   columns actually have data this session - click toggles, double-click
+   renames in place, drag reorders. */
+.columns-customise{margin-bottom:14px;}
+.columns-customise summary{cursor:pointer;font-size:12.5px;color:var(--ink-dim);padding:6px 0;}
+.column-pill-row{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;}
+.column-pill{
+  display:inline-flex;align-items:center;border:1px solid var(--paper-line);border-radius:100px;
+  padding:6px 12px;font-size:12px;background:#fff;color:var(--ink-dim);cursor:grab;
+}
+.column-pill.enabled{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
+.column-pill-label[contenteditable="true"]{outline:none;border-bottom:1px dashed currentColor;cursor:text;}
 /* Item 4: the date format picker's live example, right next to its select. */
 .pg-example{display:block;margin-top:4px;font-size:11px;color:var(--ink-dim);}
 .money-direction-note{margin-top:10px;grid-column:1/-1;}
@@ -823,7 +840,14 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .preset-preview-table{width:max-content;min-width:100%;}
 .preset-preview-table th:first-child,
 .preset-preview-table td:first-child{position:sticky;left:0;background:#fff;z-index:1;}
-.preset-preview-table thead th:first-child{background:var(--paper);}
+/* Item 3 (REBUILD-HOME, 2026-09-18): the top-left cell is sticky on BOTH axes
+   (top:0 from table.txn-table th above, left:0 from the rule just above) -
+   it needs a higher z-index than either a plain sticky header cell or a
+   plain sticky first-column cell so it always paints above both while
+   scrolling in either direction, plus its own opaque background (the sticky
+   header's var(--paper), not the body column's #fff, since it's a header
+   cell) so cells scrolling underneath never show through. */
+.preset-preview-table thead th:first-child{background:var(--paper);z-index:2;}
 /* Item 1: fixed row height (not just min-height) so the box's height always
    equals exactly one header + PREVIEW_VISIBLE_ROWS data rows - a value that
    would otherwise wrap (a long description) just widens its column instead,
@@ -837,12 +861,7 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .preset-preview-scroll-live{overflow-y:auto;max-height:calc((var(--preview-rows, 5) + 1) * 32px);}
 .preset-preview-caption{margin:12px 0 4px;}
 .preset-preview-footcaption{margin:6px 0 0;}
-#home-preset-editor,#preset-editor-container,.drawer-body,.export-panel{min-width:0;}
-/* Home drawer: standard 16px gap above the Mapping section, same as every
-   other picker-row/preview block in this drawer, so it doesn't collide with
-   the "Include header row" checkbox line above it. */
-h2.drawer-mapping-title{margin-top:16px;}
-.preset-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+#home-preset-editor,.drawer-body,.export-panel{min-width:0;}
 
 /* --------- Home fast path: dropzone states, file rows, attention cards, export --------- */
 .dropzone.dragover{background:#efe9d9;border-color:var(--brass);}
@@ -886,7 +905,10 @@ h2.drawer-mapping-title{margin-top:16px;}
 .merge-notice a{font-weight:600;text-decoration:underline;color:#255239;cursor:pointer;}
 
 .export-panel .export-summary{font-size:13px;color:var(--ink-dim);margin:0 0 14px;}
-.export-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+/* Item 4 (REBUILD-HOME, 2026-09-18): centred row, both buttons a normal
+   comfortable size - never one giant/full-width button beside a small one. */
+.export-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;}
+.btn-copy{width:auto;min-width:220px;}
 .export-warn-note{font-size:12.5px;color:var(--warn);}
 .toggle-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-dim);}
 
@@ -896,25 +918,47 @@ h2.drawer-mapping-title{margin-top:16px;}
   font-size:12.5px;cursor:pointer;color:var(--ink);
 }
 .chip.active{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
+/* Item 9: "Custom" reveals two date inputs right under the chip row. */
+.range-custom-inputs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-6px 0 18px;}
+.range-custom-inputs input[type="date"]{font:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);}
 
-table.account-cov{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px;}
-table.account-cov th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;
+/* Item 8: "Your accounts" - one merged table (Coverage by account + Sources). */
+table.accounts-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px;}
+table.accounts-table th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;
   letter-spacing:.04em;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
-table.account-cov td{padding:9px 10px;border-bottom:1px solid #f0ede2;}
+table.accounts-table td{padding:9px 10px;border-bottom:1px solid #f0ede2;vertical-align:top;}
+table.accounts-table .acc-statements{color:var(--ink-dim);}
+table.accounts-table .acc-actions{display:flex;gap:12px;flex-wrap:wrap;}
+table.accounts-table .acc-actions a{color:var(--ink-dim);text-decoration:underline;cursor:pointer;}
+table.accounts-table .mr-count-zero{color:var(--ink-dim);font-style:italic;}
 
-.currency-modes{display:flex;gap:12px;margin-bottom:16px;}
-.mode-card{flex:1;border:1px solid var(--paper-line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;background:#fff;}
-.mode-card.active{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass);}
-.mode-card h3{margin:0 0 4px;font-size:13px;}
-.mode-card p{margin:0;font-size:12px;color:var(--ink-dim);}
+/* A plain CSS switch for the accounts table's Include column. */
+.switch{position:relative;display:inline-block;width:34px;height:20px;flex-shrink:0;}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}
+.switch .slider{position:absolute;inset:0;background:#ccc;border-radius:100px;transition:background .15s ease;pointer-events:none;}
+.switch .slider::before{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:transform .15s ease;}
+.switch input:checked + .slider{background:var(--brass);}
+.switch input:checked + .slider::before{transform:translateX(14px);}
+
+/* Item 9: currency as one compact row - two plain radio "chips", the second
+   carrying its own inline target-currency box. */
+.currency-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.currency-option{
+  display:inline-flex;align-items:center;gap:6px;border:1px solid var(--paper-line);background:#fff;
+  border-radius:100px;padding:8px 15px;font-size:12.5px;cursor:pointer;color:var(--ink);
+}
+.currency-option:has(input:checked){background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
+.currency-option input[type="radio"]{margin:0;}
+.currency-option .target-currency-input{
+  width:44px;font:inherit;font-size:12px;padding:3px 5px;border-radius:4px;border:1px solid var(--paper-line);
+  text-transform:uppercase;background:#fff;color:var(--ink);
+}
 
 .rate-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;}
 .rate-table th{text-align:left;padding:7px 10px;font-size:11px;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
 .rate-table td{padding:7px 10px;border-bottom:1px solid #f0ede2;}
 .rate-table input{font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);width:90px;}
 
-.preset-unsaved{display:flex;align-items:center;gap:12px;font-size:12px;margin-left:4px;}
-.preset-unsaved .tag-unsaved{background:var(--warn-bg);color:var(--warn);font-weight:600;font-size:11px;padding:3px 8px;border-radius:100px;}
 
 .home-toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);

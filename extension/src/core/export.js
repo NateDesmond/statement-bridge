@@ -197,3 +197,86 @@ export function isDefaultPresetColumns(preset) {
   const fields = (preset?.columns || []).map((c) => c.field).join(',');
   return fields === DEFAULT_PRESET.columns.map((c) => c.field).join(',');
 }
+
+// Item 7 (REBUILD-HOME): the six built-in column layouts, offered as radio
+// cards instead of a dropdown + checkbox list. Each `columns` entry is a
+// fresh, independent array (never DEFAULT_PRESET's own) so picking a layout
+// can freely become the working preset's `.columns` without aliasing.
+export const LAYOUT_PRESETS = [
+  {
+    key: 'simple',
+    name: 'Simple',
+    description: 'Just the date, description and amount.',
+    columns: [
+      { field: 'date', name: 'Date' },
+      { field: 'description_raw', name: 'Description' },
+      { field: 'amount', name: 'Amount' },
+    ],
+  },
+  {
+    key: 'withAccount',
+    name: 'With account',
+    description: 'Adds which account each row came from, and its currency.',
+    columns: [
+      { field: 'date', name: 'Date' },
+      { field: 'account_label', name: 'Account' },
+      { field: 'description_raw', name: 'Description' },
+      { field: 'amount', name: 'Amount' },
+      { field: 'currency', name: 'Currency' },
+    ],
+  },
+  {
+    key: 'withBalance',
+    name: 'With balance',
+    description: 'With account, plus the running balance after each row.',
+    columns: [
+      { field: 'date', name: 'Date' },
+      { field: 'account_label', name: 'Account' },
+      { field: 'description_raw', name: 'Description' },
+      { field: 'amount', name: 'Amount' },
+      { field: 'currency', name: 'Currency' },
+      { field: 'balance', name: 'Balance' },
+    ],
+  },
+  {
+    key: 'budgetApp',
+    name: 'Budget app',
+    description: 'Payee and amount, with an empty category column to fill in yourself.',
+    columns: [
+      { field: 'date', name: 'Date' },
+      { field: 'description_raw', name: 'Payee' },
+      { field: 'amount', name: 'Amount' },
+      { field: 'category', name: 'Category' },
+    ],
+  },
+  {
+    key: 'accounting',
+    name: 'Accounting',
+    description: 'Money in and out as separate debit and credit columns.',
+    columns: [
+      { field: 'date', name: 'Date' },
+      { field: 'description_raw', name: 'Description' },
+      { field: 'money_out', name: 'Debit' },
+      { field: 'money_in', name: 'Credit' },
+      { field: 'balance', name: 'Balance' },
+    ],
+  },
+  {
+    key: 'everything',
+    name: 'Everything',
+    description: 'Every column this app can produce.',
+    columns: [
+      { field: 'date', name: 'Date' },
+      { field: 'post_date', name: 'Posting date' },
+      { field: 'account_label', name: 'Account' },
+      { field: 'description_raw', name: 'Description' },
+      { field: 'amount', name: 'Amount' },
+      { field: 'currency', name: 'Currency' },
+      { field: 'balance', name: 'Balance' },
+      { field: 'bank', name: 'Bank' },
+      { field: 'statement_type', name: 'Statement type' },
+      { field: 'reference', name: 'Reference' },
+      { field: 'flags', name: 'Flags' },
+    ],
+  },
+];

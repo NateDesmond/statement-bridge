@@ -79,8 +79,8 @@ async function dropAndOpenWizard(page, fixturePath) {
     await mapBtn.click();
   } else {
     await page.click('#change-link');
-    await page.waitForSelector('#drawer-mapping-list .mapping-row', { timeout: 10000 });
-    await page.click('#drawer-mapping-list .mapping-row a:has-text("Set up again")');
+    await page.waitForSelector('#accounts-table-body tr');
+    await page.click('#accounts-table-body a:has-text("Set up again")');
   }
   await page.waitForSelector('#screen-wizard.active', { timeout: 10000 });
 }
@@ -209,8 +209,8 @@ async function runFlagResolutionScenario() {
 
   console.log('2. reopen via the Change drawer\'s "Update mapping" link...');
   await page.click('#change-link');
-  await page.waitForSelector('#drawer-mapping-list .mapping-row', { timeout: 10000 });
-  await page.click('#drawer-mapping-list .mapping-row a:has-text("Set up again")');
+  await page.waitForSelector('#accounts-table-body tr');
+  await page.click('#accounts-table-body a:has-text("Set up again")');
   await page.waitForSelector('#screen-wizard.active', { timeout: 10000 });
   await shotStep('01-confirm-a');
   await skipConfirmToFullWizard(page);

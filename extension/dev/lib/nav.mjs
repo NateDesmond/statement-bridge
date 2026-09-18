@@ -18,7 +18,7 @@
 export async function gotoScreen(page, screenName) {
   await page.click('#gear-btn');
   await page.waitForSelector('#gear-overlay.open');
-  await page.click(`#gear-overlay .tile[data-screen="${screenName}"]`);
+  await page.click(`#gear-overlay .dropdown-item[data-screen="${screenName}"]`);
   await page.waitForSelector(`#screen-${screenName}.active`);
 }
 

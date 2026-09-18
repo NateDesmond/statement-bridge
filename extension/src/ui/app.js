@@ -5,7 +5,7 @@
 
 import { createChromeStorage } from '../core/storage.js';
 import { createIndexedDbSessionStore, cleanupOldSessions } from '../core/sessions.js';
-import { createNav } from './nav.js';
+import { createNav, registerBackHandler, closeGearMenu } from './nav.js';
 import { createHome } from './home.js';
 import { createReview } from './review.js';
 import { createProfilesScreen } from './profiles.js';
@@ -27,24 +27,32 @@ const nav = createNav({
     if (name === 'profiles') profiles.render();
     if (name === 'settings') settings.render();
     if (name === 'home') { home.render(); nav.renderStorageMeter({ storage, sessionStore }); }
-    // Section D: reached directly via the gear-menu tile (bypassing
-    // openReport() below, which is only for entry points that carry a
-    // specific file) - re-render with no file prefilled either way.
-    if (name === 'report') report.open();
   },
 });
 
 let wizardReturnScreen = 'home';
 
-// Section D: every entry point into "Report a problem" (the gear menu,
-// Settings, the wizard's error state, Home's "Could not read" cards) goes
-// through this one function - it prefills the screen from whichever file
-// (if any) prompted the report, then shows it. No return-screen bookkeeping
-// like the wizard's: the shell's own Back always goes to Home from here.
-// showScreen's own onShow('report') already calls report.open() with no
-// file (see above, for the plain gear-menu entry point) - open() again
-// afterwards so a specific caller's file wins over that default.
-const openReport = (fileName) => { nav.showScreen('report'); report.open(fileName); };
+// Item 11 (REBUILD-HOME, 2026-09-18): "Report a problem" is a right-side
+// sheet over whatever screen is currently showing, never a separate page -
+// opened from the persistent bottom-right button, Settings, the wizard's
+// error state, or a "could not read" card, all through this one function.
+const REPORT_SHEET_ID = 'screen-report';
+function openReportSheet(fileName) {
+  report.open(fileName);
+  document.getElementById(REPORT_SHEET_ID).classList.add('open');
+  document.getElementById('report-backdrop').classList.add('open');
+}
+function closeReportSheet() {
+  document.getElementById(REPORT_SHEET_ID).classList.remove('open');
+  document.getElementById('report-backdrop').classList.remove('open');
+}
+const openReport = (fileName) => openReportSheet(fileName);
+// Item 12: Back closes the report sheet first, same as the gear dropdown,
+// before it ever falls through to changing screens underneath it.
+registerBackHandler(() => {
+  if (document.getElementById(REPORT_SHEET_ID).classList.contains('open')) { closeReportSheet(); return true; }
+  return false;
+});
 
 const home = createHome({
   storage,
@@ -133,6 +141,14 @@ async function init() {
   const openTour = () => chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/onboarding.html') });
   document.getElementById('settings-show-tour-link').addEventListener('click', openTour);
   document.getElementById('how-show-tour-link').addEventListener('click', openTour);
+  // Item 10: the gear dropdown's own "Show welcome tour" item.
+  document.getElementById('tile-show-tour')?.addEventListener('click', () => { closeGearMenu(); openTour(); });
+
+  // Item 11: the persistent bottom-right button, the sheet's own close
+  // button, and clicking the backdrop all close/open the same report sheet.
+  document.getElementById('report-fab')?.addEventListener('click', () => openReportSheet());
+  document.getElementById('report-close-btn')?.addEventListener('click', closeReportSheet);
+  document.getElementById('report-backdrop')?.addEventListener('click', closeReportSheet);
 
   home.render();
   await nav.renderStorageMeter({ storage, sessionStore });

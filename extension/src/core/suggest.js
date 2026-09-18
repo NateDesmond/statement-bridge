@@ -236,7 +236,7 @@ export function suggestMapping(header, sampleRows = []) {
   // entirely on the header dictionary left such a column suggested as
   // nothing at all ("Ignore this column"), even with an otherwise-unclaimed,
   // all-numeric column sitting right there.
-  const SHAPE_ONLY_FIELDS = new Set(['amount', 'debit', 'credit', 'balance']);
+  const SHAPE_ONLY_FIELDS = new Set(['amount', 'debit', 'credit', 'balance', 'date']);
 
   for (const field of Object.keys(HEADER_DICTIONARY)) {
     let best = null;
@@ -245,6 +245,20 @@ export function suggestMapping(header, sampleRows = []) {
       const values = columns[colIdx] || [];
       if (headerScore === 0) {
         if (!SHAPE_ONLY_FIELDS.has(field) || !values.length) return;
+        // A bank-specific header word the dictionary has never heard of
+        // ("When", "Txn Date") still carries the same strong shape signal a
+        // headerless amount column does - every sample value reads as a
+        // date. Root cause of a real first-timer defect: a generic-header
+        // CSV ("When,What,Value") matched Amount by shape but left Date
+        // (and therefore Description, via the fallback below) completely
+        // unmapped, so Screen A showed a table 2/3 blank with no warning.
+        if (field === 'date') {
+          const shapeScore = values.filter(isDateLike).length / values.length;
+          if (shapeScore < 0.8) return;
+          const confidence = shapeScore * 0.34; // stays below any real header match
+          if (!best || confidence > best.confidence) best = { field, source: h, confidence };
+          return;
+        }
         // Item 9: a mostly-blank, currency-coded column (an original/foreign
         // amount, see detectOrigAmountColumn) never wins 'debit'/'credit' via
         // this header-less fallback - a real bug used to let it silently
@@ -313,6 +327,29 @@ export function suggestMapping(header, sampleRows = []) {
   if (!suggestions.some((s) => s.field === 'description_raw')) {
     const refIdx = suggestions.findIndex((s) => s.field === 'reference');
     if (refIdx !== -1) suggestions[refIdx] = { ...suggestions[refIdx], field: 'description_raw' };
+  }
+  // Same root cause as the date shape-fallback above: a generic header
+  // ("What") the dictionary has never heard of, with no reference column to
+  // borrow either, left description_raw completely unmapped. There is no
+  // reliable shape test for "is this a narrative" the way there is for a
+  // date or a number, so this only fires as a last resort (still nothing
+  // mapped to description_raw) and picks the least numeric/date-like,
+  // longest-average-text unclaimed column - a real narrative column is
+  // reliably both, and a real bank statement always has one.
+  if (!suggestions.some((s) => s.field === 'description_raw')) {
+    const usedSources = new Set(suggestions.map((s) => s.source));
+    let best = null;
+    header.forEach((h, colIdx) => {
+      if (usedSources.has(h)) return;
+      const values = (columns[colIdx] || []).filter((v) => v != null && String(v).trim() !== '');
+      if (!values.length) return;
+      const textLikeFrac = values.filter((v) => !isAmountLike(v) && !isDateLike(v)).length / values.length;
+      if (textLikeFrac < 0.8) return;
+      const avgLen = values.reduce((sum, v) => sum + String(v).trim().length, 0) / values.length;
+      if (avgLen < 2) return;
+      if (!best || avgLen > best.avgLen) best = { field: 'description_raw', source: h, confidence: 0.3, avgLen };
+    });
+    if (best) suggestions.push({ field: best.field, source: best.source, confidence: best.confidence });
   }
   // Corpus fix (2026-09-18): with only ONE numeric column and no header word
   // for either, the shape-only fallback above scores 'debit' AND 'credit'

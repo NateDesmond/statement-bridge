@@ -19,31 +19,53 @@ const dbsVersion = {
   transforms: [{ field: 'description_raw', op: 'trim' }],
 };
 
-test('meta.ocr tags every non-skipped row with flag "ocr"; low_confidence_ocr only fires on the amount/date tokens, at the 70 threshold', () => {
+// REBUILD-HOME item 5c (2026-09-18): low_confidence_ocr now needs the amount
+// token below 60 AND a concrete reason to distrust it (retry disagreement -
+// confidence forced to exactly 0 by ocr.js's safety net - or an out-of-family
+// shape for the file: no decimal where the file's other amounts have one, or
+// over 100x the file's own median amount). A merely-low-but-plausible
+// confidence with nothing else wrong no longer flags at all.
+test('meta.ocr tags every non-skipped row with flag "ocr"; low_confidence_ocr needs amount confidence 0 (retry disagreement) or an anomalous value', () => {
   const records = [
     { 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '990.00', _amountConfidence: 92, _dateConfidence: 95 },
-    { 'Transaction Date': '02/06/2026', Reference: 'SALARY', 'Debit Amount': '', 'Credit Amount': '5000.00', Balance: '5990.00', _amountConfidence: 55, _dateConfidence: 95 },
+    { 'Transaction Date': '02/06/2026', Reference: 'SALARY', 'Debit Amount': '', 'Credit Amount': '5000.00', Balance: '5990.00', _amountConfidence: 0, _dateConfidence: 95 },
   ];
   const rows = normalizeRecords(records, dbsVersion, { bank: 'DBS', currency: 'SGD', sourceFile: 'a.pdf', ocr: true });
   assert.ok(rows[0].flags.includes('ocr'));
   assert.ok(!rows[0].flags.includes('low_confidence_ocr'));
   assert.ok(rows[1].flags.includes('ocr'));
-  assert.ok(rows[1].flags.includes('low_confidence_ocr'));
+  assert.ok(rows[1].flags.includes('low_confidence_ocr'), 'confidence exactly 0 is ocr.js\'s own retry-disagreement signal');
 });
 
-test('low_confidence_ocr ignores description/type confidence entirely - only _amountConfidence/_dateConfidence matter', () => {
-  // A misread merchant name must never flag the row when the amount and date
-  // both read back confidently (the old whole-line version was "too
-  // eager", 2026-09-16).
+test('a merely-low (not zero) amount confidence with no anomaly no longer flags low_confidence_ocr (item 5c: far fewer flags)', () => {
+  const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '990.00', _amountConfidence: 55, _dateConfidence: 95 }];
+  const rows = normalizeRecords(records, dbsVersion, { bank: 'DBS', currency: 'SGD', sourceFile: 'a.pdf', ocr: true });
+  assert.ok(!rows[0].flags.includes('low_confidence_ocr'));
+});
+
+test('low_confidence_ocr ignores description/type confidence entirely - only _amountConfidence matters', () => {
+  // A misread merchant name must never flag the row when the amount reads
+  // back confidently (the old whole-line version was "too eager", 2026-09-16).
   const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '990.00', _amountConfidence: 96, _dateConfidence: 97, _someUnrelatedWordConfidence: 12 }];
   const rows = normalizeRecords(records, dbsVersion, { bank: 'DBS', currency: 'SGD', sourceFile: 'a.pdf', ocr: true });
   assert.ok(!rows[0].flags.includes('low_confidence_ocr'));
 });
 
-test('low_confidence_ocr fires when only the date token is below threshold, even with a confident amount', () => {
-  const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '990.00', _amountConfidence: 96, _dateConfidence: 40 }];
+test('low_confidence_ocr never fires from the date token alone, even at a very low confidence, with a confident amount', () => {
+  const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '990.00', _amountConfidence: 96, _dateConfidence: 5 }];
   const rows = normalizeRecords(records, dbsVersion, { bank: 'DBS', currency: 'SGD', sourceFile: 'a.pdf', ocr: true });
-  assert.ok(rows[0].flags.includes('low_confidence_ocr'));
+  assert.ok(!rows[0].flags.includes('low_confidence_ocr'));
+});
+
+test('low_confidence_ocr fires on a low-confidence amount that is an outlier over 100x the file median, even without retry disagreement', () => {
+  const records = [
+    { 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '990.00', _amountConfidence: 90, _dateConfidence: 95 },
+    { 'Transaction Date': '02/06/2026', Reference: 'COFFEE', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '980.00', _amountConfidence: 90, _dateConfidence: 95 },
+    { 'Transaction Date': '03/06/2026', Reference: 'LUNCH', 'Debit Amount': '10.00', 'Credit Amount': '', Balance: '970.00', _amountConfidence: 90, _dateConfidence: 95 },
+    { 'Transaction Date': '04/06/2026', Reference: 'ODD', 'Debit Amount': '', 'Credit Amount': '50000.00', Balance: '50970.00', _amountConfidence: 50, _dateConfidence: 95 },
+  ];
+  const rows = normalizeRecords(records, dbsVersion, { bank: 'DBS', currency: 'SGD', sourceFile: 'a.pdf', ocr: true });
+  assert.ok(rows[3].flags.includes('low_confidence_ocr'));
 });
 
 test('without meta.ocr, no ocr-related flags appear even if a record happens to carry confidence fields', () => {
@@ -106,6 +128,22 @@ test('possible duplicate flagged on repeated fingerprint', () => {
   const rows = normalizeRecords(records, dbsVersion, {});
   assert.deepEqual(rows[0].flags, []);
   assert.ok(rows[1].flags.includes('possible_duplicate'));
+});
+
+// REBUILD-HOME item 6 (2026-09-18): the within-file possible_duplicate flag's
+// fingerprint already keys on account+date+amount+currency+description (see
+// the fingerprint construction just above this flag in normalizeRecords) -
+// this test pins down the reported bug (same vendor/amount on two different
+// dates wrongly flagged) never regresses: two coffee purchases, same
+// merchant/amount, different dates, must NOT be flagged as duplicates.
+test('possible_duplicate needs the SAME date too - two coffee purchases on different dates are never flagged (item 6)', () => {
+  const records = [
+    { 'Transaction Date': '01/06/2026', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+    { 'Transaction Date': '02/06/2026', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+  ];
+  const rows = normalizeRecords(records, dbsVersion, {});
+  assert.deepEqual(rows[0].flags, []);
+  assert.deepEqual(rows[1].flags, [], 'same vendor and amount on a different date is not a duplicate');
 });
 
 test('crdr sign convention', () => {

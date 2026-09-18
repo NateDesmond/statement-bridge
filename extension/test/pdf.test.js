@@ -533,16 +533,44 @@ test('resolveGroupedSign: positiveIsOut flips an explicit sign (credit-card conv
   assert.deepEqual(resolveGroupedSign({ markerType: 'SIGN', markerSign: '-' }, null, 'positiveIsOut'), { sign: '+', unclear: false });
 });
 
-test('resolveGroupedSign: no marker at all is a guess, flagged unclear, never null/dropped', () => {
+test('resolveGroupedSign: no marker at all under signed/crdr is a real guess, flagged unclear, never null/dropped', () => {
   assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, null, 'signed'), { sign: '+', unclear: true });
-  assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, null, 'positiveIsOut'), { sign: '-', unclear: true });
-  assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, null, 'positiveIsIn'), { sign: '+', unclear: true });
+  assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, null), { sign: '+', unclear: true });
+});
+
+// Item 5c regression (Summit Bank, 92.1% false-flagged): positiveIsOut/
+// positiveIsIn only gets picked when the file's marked lines establish that
+// an unmarked line reliably means the OTHER direction (e.g. every credit
+// prints "CR", every debit is bare) - the absence of a marker there IS the
+// signal, not a guess, so it must never carry 'unclear'.
+test('resolveGroupedSign: positiveIsOut/positiveIsIn on a marker-less line is the convention itself, not a guess', () => {
+  assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, null, 'positiveIsOut'), { sign: '-', unclear: false });
+  assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, null, 'positiveIsIn'), { sign: '+', unclear: false });
 });
 
 test('resolveGroupedSign: columnBands decides by x-position, even with no marker', () => {
   const bands = { debit: { x0: 0, x1: 300 }, credit: { x0: 300, x1: 600 } };
   assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, 100, 'signed', bands), { sign: '-', unclear: false });
   assert.deepEqual(resolveGroupedSign({ markerType: null, markerSign: null }, 400, 'signed', bands), { sign: '+', unclear: false });
+});
+
+// Item 5c regression, end-to-end: Summit Bank's own shape (2-line grouped,
+// currency printed AFTER the amount, credits marked "CR", debits bare) drove
+// 92.1% of its rows into 'sign_unclear' before the resolveGroupedSign fix
+// above - every bare debit line, which is most of the file, was flagged.
+test('extractGroupedRows + positiveIsOut: a file of mostly-bare debit lines and one CR credit line marks none of them sign-unclear', () => {
+  const items = [
+    { str: '11', x: 40, y: 700 }, { str: 'Sep', x: 60, y: 700 }, { str: '2026', x: 90, y: 700 },
+    { str: 'DECATHLON', x: 40, y: 686 }, { str: '178.78', x: 400, y: 686 }, { str: 'SGD', x: 450, y: 686 },
+    { str: 'KOPITIAM', x: 40, y: 672 }, { str: '158.80', x: 400, y: 672 }, { str: 'SGD', x: 450, y: 672 },
+    { str: 'SHOPEE', x: 40, y: 658 }, { str: 'REFUND', x: 100, y: 658 }, { str: '244.36', x: 400, y: 658 }, { str: 'SGD', x: 450, y: 658 }, { str: 'CR', x: 480, y: 658 },
+  ];
+  const rows = extractGroupedRows(groupItemsIntoLines(items), { grouped: { signConvention: 'positiveIsOut' } });
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].amount, '-178.78');
+  assert.equal(rows[1].amount, '-158.80');
+  assert.equal(rows[2].amount, '244.36');
+  assert.ok(!rows.some((r) => r._signUnclear), 'bare debit lines under a detected positiveIsOut convention are not a guess');
 });
 
 test('learnAmountXBands: two clearly separated x-clusters are learned as debit/credit bands', () => {

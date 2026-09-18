@@ -131,7 +131,7 @@ async function main() {
     const { context, page } = await launchExtensionContext();
     await page.click('#gear-btn');
     await page.waitForSelector('#gear-overlay.open', { timeout: 5000 });
-    await page.click('#gear-overlay .tile[data-screen="profiles"]');
+    await page.click('#gear-overlay .dropdown-item[data-screen="profiles"]');
     await page.waitForSelector('#screen-profiles.active', { timeout: 5000 });
     await shotBoth(page, 'secondary-screen-back');
     await context.close();
@@ -192,7 +192,7 @@ async function main() {
     const { context, page } = await launchExtensionContext();
     await page.click('#gear-btn');
     await page.waitForSelector('#gear-overlay.open', { timeout: 5000 });
-    await page.click('#gear-overlay .tile[data-screen="settings"]');
+    await page.click('#gear-overlay .dropdown-item[data-screen="settings"]');
     await page.waitForSelector('#screen-settings.active', { timeout: 5000 });
     await shotBoth(page, 'settings');
     await context.close();
@@ -203,7 +203,7 @@ async function main() {
     const { context, page } = await launchExtensionContext();
     await page.click('#gear-btn');
     await page.waitForSelector('#gear-overlay.open', { timeout: 5000 });
-    await page.click('#gear-overlay .tile[data-screen="how"]');
+    await page.click('#gear-overlay .dropdown-item[data-screen="how"]');
     await page.waitForSelector('#screen-how.active', { timeout: 5000 });
     await shotBoth(page, 'how-it-works');
     await context.close();

@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Turn bank statements (CSV/TSV/PDF) into clean transaction exports. Fully offline.",
   "permissions": ["storage", "unlimitedStorage", "clipboardWrite"],
-  "background": { "service_worker": "src/background.js" },
+  "background": { "service_worker": "src/background.js", "type": "module" },
   "action": { "default_title": "Statement Bridge" },
   "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
   "content_security_policy": {

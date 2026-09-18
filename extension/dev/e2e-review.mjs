@@ -12,7 +12,21 @@ import os from 'node:os';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { assertCleanLog } from './lib/assert-clean-log.mjs';
-import { gotoScreen } from './lib/nav.mjs';
+
+// Item 10 (REBUILD-HOME, 2026-09-18): "Check a statement" is no longer a
+// gear-menu tile - Review is reached from Home now, via the "Adjust what's
+// exported" drawer's "Your accounts" table (item 8, REBUILD-HOME 2026-09-18),
+// whose per-account "Check" action opens it (dev/lib/nav.mjs's gotoScreen
+// only covers screens still reachable through the gear dropdown).
+async function openReviewFromHome(page) {
+  await page.click('#change-link');
+  await page.waitForSelector('#change-drawer:not([hidden])', { timeout: 10000 });
+  // .first(): a session with several mapped accounts has one "Check" link
+  // per account row - any of them opens the same Review screen (it defaults
+  // to the first mapped file, same as the old gear-menu tile did).
+  await page.locator('#accounts-table-body a:has-text("Check")').first().click();
+  await page.waitForSelector('#screen-review.active', { timeout: 10000 });
+}
 import { withPdfjs, groupItemsIntoLines, lineText, loadPdfPages } from '../src/core/pdf.js';
 import { filenameSignature } from '../src/core/profiles.js';
 import { buildAutoVersion, pdfPageWidthPt } from './auto-version.mjs';
@@ -73,7 +87,7 @@ async function main() {
     await page.waitForTimeout(500);
 
     console.log('2. opening Review...');
-    await gotoScreen(page, 'review');
+    await openReviewFromHome(page);
     await page.waitForSelector('#review-body:not([hidden])', { timeout: 10000 });
     await page.waitForTimeout(600); // pdf render + anchor build
 
@@ -310,7 +324,7 @@ async function main() {
     await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
     const restoreBtn = await page.$('#restore-yes');
     if (restoreBtn) { await restoreBtn.click(); await page.waitForTimeout(300); }
-    await gotoScreen(page, 'review');
+    await openReviewFromHome(page);
     await page.waitForSelector('#review-body:not([hidden])', { timeout: 10000 });
     await page.waitForTimeout(600);
     const reloadedDesc = await page.$eval('#review-table tbody tr:first-child td:nth-child(2)', (td) => td.textContent).catch(() => '');
@@ -430,7 +444,7 @@ async function openInReview(page, fixturePaths) {
     if (allBadged) break;
     await page.waitForTimeout(300);
   }
-  await gotoScreen(page, 'review');
+  await openReviewFromHome(page);
   await page.waitForSelector('#review-body:not([hidden])', { timeout: 10000 });
   await page.waitForTimeout(600);
 }

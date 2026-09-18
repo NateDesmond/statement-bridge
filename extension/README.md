@@ -387,18 +387,20 @@ the dev server running): drop, the image-only card, click "Read it with on-devic
 recognition", the resulting healthy row, Review, and Copy for Sheets, screenshotting each
 step into `dev/shots/ocr-*.png`. `dev/ocr-vs-csv.mjs` compares OCR accuracy against real
 ground truth (see "OCR for image-only PDFs" above); it reads only from `test/private/`
-and prints aggregate numbers only, never transaction text. `dev/final-verify.mjs` walks
-the wizard against the two synthetic fixtures that exercise the paths the real files
-above don't (`summit_card_sample.pdf`, a PDF columns-rowModel credit card; `harbour_card_crdr.csv`,
-a CSV with CR/DR markers), screenshotting each step into `dev/shots/final-*.png`.
+and prints aggregate numbers only, never transaction text. (The one-off `dev/final-verify.mjs`,
+`dev/home3-check.mjs`, `dev/wiz2-check.mjs`, `dev/e2e-A-verify.mjs` and `dev/dedupe-badges-check.mjs`
+screenshot drivers from past fix rounds were deleted 2026-09-18 - superseded by the gated
+`dev/e2e-extension.mjs`/`e2e-review.mjs`/`e2e-review-source-anchors.mjs`/`e2e-presets.mjs`/
+`e2e-remove-statements.mjs`/`e2e-stale-profile.mjs`/`e2e-altfix-check.mjs` suite, which covers
+the same wizard walks, CR/DR and columns-rowModel fixtures, cross-file dedupe badges, and
+Home v3 UI they each checked.)
 
 Every `dev/*.mjs` Playwright driver launches the browser with a plain `chromium.launch()`
 (no `channel: 'chrome'`) - bundled headless Chromium only, always in a `try`/`finally` so
 it closes even on failure, and none of them ever `pkill`/`killall`/inspect `ps` for a real
-Chrome process. `dev/gen-dbs-transaction-history-image.mjs`, `dev/ocr-vs-csv.mjs`,
-`dev/ocr-e2e-check.mjs` and `dev/wiz2-check.mjs` used to launch the user's own installed
-Chrome (`channel: 'chrome'`) - fixed 2026-09-16; `dev/home3-check.mjs` was already correct
-and is the pattern the others now follow. Running any of them needs the `playwright` npm
+Chrome process. `dev/gen-dbs-transaction-history-image.mjs`, `dev/ocr-vs-csv.mjs` and
+`dev/ocr-e2e-check.mjs` used to launch the user's own installed
+Chrome (`channel: 'chrome'`) - fixed 2026-09-16. Running any of them needs the `playwright` npm
 package on the module path (it is intentionally not a project dependency - see
 `dev/gen-dbs-transaction-history-image.mjs`'s header comment - so point `NODE_PATH` at an
 existing Playwright install, or symlink one in as `extension/node_modules` for the

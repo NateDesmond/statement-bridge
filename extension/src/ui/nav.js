@@ -56,12 +56,34 @@ export function closeGearMenu() {
   document.getElementById('gear-overlay')?.classList.remove('open');
 }
 
+// Item 12 (REBUILD-HOME, 2026-09-18): a real navigation stack, not a single
+// hardcoded "Back always goes Home". Every showScreen call (except one
+// driven by goBack itself) pushes the screen it's leaving onto this stack, so
+// Back returns to wherever the person actually came from. Other modules
+// (the gear dropdown, the Report sheet) register a handler here too - goBack
+// tries each one first and only moves screens once none of them had
+// something open to close instead (a sheet/dropdown always closes before a
+// screen changes underneath it).
+const historyStack = [];
+const backHandlers = [];
+/** Register a "close what I have open, if anything" handler for the shared Back button. Returns true from `fn` to consume the Back press (nothing else runs); false/undefined to let Back fall through to screen navigation. */
+export function registerBackHandler(fn) {
+  backHandlers.push(fn);
+}
+
 export function createNav({ onShow }) {
   function closeMenu() {
     closeGearMenu();
   }
 
-  function showScreen(name) {
+  function activeScreenName() {
+    const active = document.querySelector('.screen.active');
+    return active ? active.id.replace(/^screen-/, '') : null;
+  }
+
+  function showScreen(name, opts = {}) {
+    const current = activeScreenName();
+    if (!opts.skipHistoryPush && current && current !== name) historyStack.push(current);
     document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === `screen-${name}`));
     $('#shell-back-btn').hidden = NO_SHELL_BACK.has(name);
     // The Drop/Read/Copy strip narrates Home's own flow - it has nothing to
@@ -71,6 +93,16 @@ export function createNav({ onShow }) {
     if (progressStrip) progressStrip.hidden = name !== 'home' && name !== 'wizard';
     closeMenu();
     onShow?.(name);
+  }
+
+  /** Item 12: Back closes an open sheet/dropdown first (registered handlers, then the gear menu), and only navigates screens once nothing was open to close. */
+  function goBack() {
+    for (const fn of backHandlers) {
+      if (fn()) return;
+    }
+    if (document.getElementById('gear-overlay')?.classList.contains('open')) { closeMenu(); return; }
+    const prev = historyStack.pop() || 'home';
+    showScreen(prev, { skipHistoryPush: true });
   }
 
   // Item E6: the wizard (opened from Home/Profiles) and How it works (opened
@@ -95,23 +127,40 @@ export function createNav({ onShow }) {
 
   function wireGearMenu() {
     const overlay = $('#gear-overlay');
-    $('#gear-btn').addEventListener('click', () => overlay.classList.add('open'));
-    $('#gear-close-btn').addEventListener('click', closeMenu);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeMenu(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeMenu(); });
-    // Generic tiles: a plain screen switch. "Adjust what's exported" and
-    // "Clear statements" open a Home action instead of a screen - home.js's
-    // own wire() attaches those two (#tile-export, #tile-clear), since only
-    // home.js holds the drawer/clear-statements state to drive.
-    overlay.querySelectorAll('.tile[data-screen]').forEach((tile) => {
-      tile.addEventListener('click', () => showScreen(tile.dataset.screen));
+    // Item 10: a compact dropdown anchored to the gear button, not a
+    // full-screen overlay - clicking outside it or Escape closes it, same as
+    // before, just a much smaller hit area to click outside of.
+    $('#gear-btn').addEventListener('click', (e) => { e.stopPropagation(); overlay.classList.toggle('open'); });
+    document.addEventListener('click', (e) => {
+      if (overlay.classList.contains('open') && !overlay.contains(e.target) && e.target !== $('#gear-btn')) closeMenu();
     });
-    $('#shell-back-btn').addEventListener('click', () => showScreen('home'));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeMenu(); });
+    // Generic items: a plain screen switch. "Clear statements" and "Show
+    // welcome tour" open a Home/app action instead of a screen - home.js's
+    // own wire() attaches #tile-clear, app.js attaches #tile-show-tour.
+    overlay.querySelectorAll('.dropdown-item[data-screen]').forEach((item) => {
+      item.addEventListener('click', () => showScreen(item.dataset.screen));
+    });
+  }
+
+  /** Item 12: the brand name/logo click always goes Home (pushing wherever you were onto the back stack, same as any other navigation). */
+  function wireBrandHome() {
+    const brand = $('.brand-left');
+    if (!brand) return;
+    brand.style.cursor = 'pointer';
+    brand.setAttribute('role', 'button');
+    brand.setAttribute('tabindex', '0');
+    brand.setAttribute('aria-label', 'Home');
+    const go = () => showScreen('home');
+    brand.addEventListener('click', go);
+    brand.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   }
 
   function wire() {
     wireGearMenu();
+    wireBrandHome();
     observeScreenChanges();
+    $('#shell-back-btn').addEventListener('click', goBack);
   }
 
   // Item 10: the two-colour bar now shows what actually counts against the
