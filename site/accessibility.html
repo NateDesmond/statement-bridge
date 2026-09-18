@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accessibility: Statement Bridge</title>
+<meta name="description" content="Statement Bridge is built to work with a keyboard, a screen reader, and a browser zoomed in.">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="icon" href="img/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="theme-color" content="#0d1a17">
+<script defer src="https://umami-analytics-puce.vercel.app/script.js" data-website-id="bb2d5d39-a77f-4865-8ae4-b71fa36a5dd0"></script>
+<style>
+  :root{
+    --ink-900:#0d1a17; --ink-line:#2c463e; --ink-text:#e7efe9; --ink-text-dim:#9db3ab;
+    --brass:#c6a15b; --brass-ink:#2a2109;
+    --paper:#f3efe6; --paper-raised:#ffffff; --paper-line:#e3ddcd;
+    --ink:#20241f; --ink-dim:#666a5f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--paper);color:var(--ink);line-height:1.6;}
+  a{color:var(--ink);}
+  :focus-visible{outline:2px solid #7fb8ff;outline-offset:2px;}
+  .skip-link{position:absolute;left:-9999px;top:0;background:var(--brass);color:var(--brass-ink);padding:12px 20px;font-weight:700;border-radius:0 0 8px 0;z-index:100;text-decoration:none;}
+  .skip-link:focus{left:0;}
+  .wrap{max-width:720px;margin:0 auto;padding:0 24px;}
+  header.brand-bar{background:var(--ink-900);color:var(--ink-text);padding:18px 24px;border-bottom:1px solid var(--ink-line);}
+  header.brand-bar .wrap{display:flex;align-items:center;gap:12px;}
+  header.brand-bar img{width:32px;height:32px;border-radius:7px;}
+  header.brand-bar .name{font-size:16px;font-weight:700;}
+  main{padding:48px 0 72px;}
+  h1{font-size:28px;margin:0 0 8px;}
+  h2{font-size:18px;margin:32px 0 10px;}
+  p,li{font-size:15px;color:var(--ink-dim);}
+  ul{padding-left:20px;}
+  .card{background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:12px;padding:24px 28px;}
+  footer{background:var(--ink-900);color:var(--ink-text-dim);padding:28px 0;font-size:13.5px;}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  footer a{color:var(--ink-text-dim);text-decoration:underline;}
+  footer nav{display:flex;gap:16px;flex-wrap:wrap;}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important;}
+  }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="brand-bar">
+  <div class="wrap">
+    <img src="img/logo.png" alt="Statement Bridge logo" width="32" height="32">
+    <a class="name" href="index.html" style="text-decoration:none;color:inherit;">Statement Bridge</a>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <h1>Accessibility</h1>
+    <div class="card">
+      <p>We want Statement Bridge and this website to work for everyone, including people using a keyboard, a screen reader, or a browser zoomed in well past normal size.</p>
+      <h2>What we build toward</h2>
+      <ul>
+        <li>Every control reachable and operable by keyboard alone</li>
+        <li>Clear labels on every button, field, and link</li>
+        <li>Text that stays readable against its background</li>
+        <li>Layouts that hold together when zoomed in or reflowed</li>
+        <li>Motion that respects a reduced-motion setting</li>
+      </ul>
+      <p>This is a direction we hold ourselves to, not a claim that every corner is perfect. A small studio built this, and we keep improving it.</p>
+      <h2>Something not working for you?</h2>
+      <p>Tell us what you ran into through the <a href="https://urbanalgorithm.com" target="_blank" rel="noopener">Urban Algorithm contact page</a>, and we will look at it.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>Made by <a href="https://urbanalgorithm.com" target="_blank" rel="noopener">Urban Algorithm</a></div>
+    <nav aria-label="Footer">
+      <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="support.html">Support</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Summit Bank card (grouped, 2-line, currency-after-amount, CR)",
+    "pdf": "test/fixtures/summit_grouped_2line_image.pdf",
+    "truth": "test/fixtures/summit_grouped_2line.truth.json"
+  },
+  {
+    "name": "Riverside Bank 360 (columns, 5-col table, wrapped desc)",
+    "pdf": "test/fixtures/riverside_columns_image.pdf",
+    "truth": "test/fixtures/riverside_columns.truth.json"
+  },
+  {
+    "name": "Anchor Bank (columns, US MM/DD/YYYY, mid-group page break)",
+    "pdf": "test/fixtures/anchor_columns_image.pdf",
+    "truth": "test/fixtures/anchor_columns.truth.json"
+  },
+  {
+    "name": "Palisade Bank (columns, DR/CR + balance column, no-decimal amounts)",
+    "pdf": "test/fixtures/palisade_columns_image.pdf",
+    "truth": "test/fixtures/palisade_columns.truth.json"
+  },
+  {
+    "name": "Worst case (grouped, 3-line, light-grey credits, per-page footer)",
+    "pdf": "test/fixtures/worstcase_grouped_3line_image.pdf",
+    "truth": "test/fixtures/worstcase_grouped_3line.truth.json"
+  }
+]

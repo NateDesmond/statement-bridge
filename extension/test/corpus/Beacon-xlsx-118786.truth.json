@@ -1,0 +1,97 @@
+{
+  "axes": {
+    "fileType": "xlsx",
+    "bank": "Beacon",
+    "lang": "ms",
+    "dateFormat": "DD MMM YYYY",
+    "numberFormat": "jpy",
+    "signConvention": "signed",
+    "preamble": "keyvalue",
+    "footer": "totals",
+    "encoding": "windows-1252",
+    "hasBalance": false,
+    "currency": "JPY"
+  },
+  "truth": [
+    {
+      "date": "2026-06-04",
+      "minor": -1595,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": -966,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": 1911,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -1955,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": 1052,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": 580,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": 1556,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -1422,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": -1720,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": -1326,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-19",
+      "minor": -1339,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": -1627,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-23",
+      "minor": 1539,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-24",
+      "minor": -722,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-26",
+      "minor": 1100,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-27",
+      "minor": -301,
+      "description": "Transfer From Savings"
+    }
+  ]
+}

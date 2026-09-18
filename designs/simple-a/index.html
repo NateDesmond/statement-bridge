@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statement Bridge: Simple, one calm column</title>
+<style>
+  :root{
+    --ink-900:#0d1a17;
+    --ink-800:#132420;
+    --ink-700:#1a302a;
+    --ink-line:#2c463e;
+    --ink-text:#e7efe9;
+    --ink-text-dim:#9db3ab;
+    --brass:#c6a15b;
+    --brass-hover:#d6b06a;
+    --brass-ink:#2a2109;
+    --paper:#f3efe6;
+    --paper-raised:#ffffff;
+    --paper-line:#e3ddcd;
+    --ink:#20241f;
+    --ink-dim:#666a5f;
+    --ink-faint:#8b8f80;
+    --ok:#3f7856;
+    --ok-bg:#e7f1e9;
+    --warn:#9a6a1f;
+    --warn-bg:#f7ecd6;
+    --danger:#a1402f;
+    --danger-bg:#f8e6e1;
+    --radius:10px;
+    --focus:2px solid #7fb8ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    min-width:360px;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+  :focus-visible{outline:var(--focus);outline-offset:2px;}
+  [hidden]{display:none!important;}
+
+  /* ---------- Top bar: brand + gear only, no sidebar ---------- */
+  header.topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 24px;border-bottom:1px solid var(--paper-line);
+    background:var(--paper-raised);
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand img{width:28px;height:28px;border-radius:6px;display:block;}
+  .brand .logo-fallback{
+    width:28px;height:28px;border-radius:6px;background:var(--brass);
+    color:var(--brass-ink);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:12px;flex-shrink:0;
+  }
+  .brand-name{font-size:14.5px;font-weight:600;color:var(--ink);}
+  .gear-btn{
+    all:unset;cursor:pointer;width:36px;height:36px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;color:var(--ink-dim);
+  }
+  .gear-btn:hover{background:var(--paper);color:var(--ink);}
+
+  /* dev-only nav strip to jump between mocked surfaces, not part of the product UI */
+  .dev-nav{
+    display:flex;gap:6px;flex-wrap:wrap;padding:10px 24px;background:var(--ink-900);
+  }
+  .dev-nav button{
+    all:unset;cursor:pointer;font-size:11.5px;color:var(--ink-text-dim);
+    padding:6px 12px;border-radius:100px;border:1px solid var(--ink-line);
+  }
+  .dev-nav button:hover{background:var(--ink-700);color:var(--ink-text);}
+  .dev-nav button.active{background:var(--brass);color:var(--brass-ink);border-color:var(--brass);font-weight:600;}
+  .dev-nav .dn-label{font-size:11px;color:var(--ink-text-dim);align-self:center;margin-right:4px;text-transform:uppercase;letter-spacing:.05em;}
+
+  /* ---------- The one calm column ---------- */
+  main{padding:56px 24px 96px;}
+  .column{max-width:760px;margin:0 auto;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  h1.page-title{font-size:26px;margin:0 0 8px;font-weight:650;color:var(--ink);text-align:center;}
+  p.page-sub{font-size:14.5px;color:var(--ink-dim);text-align:center;margin:0 0 40px;line-height:1.6;}
+
+  /* ---------- Empty state ---------- */
+  .dropzone{
+    border:2px dashed var(--paper-line);border-radius:16px;background:var(--paper-raised);
+    padding:64px 40px;text-align:center;
+  }
+  .drop-icon{width:52px;height:52px;margin:0 auto 20px;color:var(--ink-faint);}
+  .dropzone strong{font-size:20px;display:block;margin-bottom:10px;font-weight:650;color:var(--ink);}
+  .dropzone p.hint{margin:0 0 26px;font-size:14px;color:var(--ink-dim);}
+  .btn{
+    all:unset;cursor:pointer;border-radius:10px;font-size:15px;font-weight:650;
+    padding:14px 28px;display:inline-flex;align-items:center;gap:8px;
+    box-sizing:border-box;
+  }
+  .btn-brass{background:var(--brass);color:var(--brass-ink);}
+  .btn-brass:hover{background:var(--brass-hover);}
+  .btn-ghost{background:transparent;color:var(--ink-dim);border:1px solid var(--paper-line);font-weight:600;font-size:13.5px;padding:10px 18px;}
+  .btn-ghost:hover{background:var(--paper);color:var(--ink);}
+  .btn-quiet{all:unset;cursor:pointer;font-size:13.5px;color:var(--ink-dim);text-decoration:underline;text-underline-offset:2px;}
+  .btn-quiet:hover{color:var(--ink);}
+
+  .privacy-line{margin:22px 0 0;font-size:12.5px;color:var(--ink-faint);}
+
+  .steps-row{display:flex;justify-content:center;gap:44px;margin-top:48px;}
+  .step-item{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:120px;}
+  .step-item .si-icon{
+    width:40px;height:40px;border-radius:50%;background:var(--paper);
+    display:flex;align-items:center;justify-content:center;color:var(--ink-dim);
+  }
+  .step-item span.si-label{font-size:12.5px;color:var(--ink-dim);text-align:center;line-height:1.4;}
+
+  /* ---------- Processing ---------- */
+  .drop-strip{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:12px 18px;border:1px solid var(--paper-line);border-radius:10px;
+    background:var(--paper-raised);margin-bottom:28px;color:var(--ink-dim);font-size:13px;
+  }
+  .drop-strip strong{color:var(--ink);font-weight:600;font-size:13.5px;}
+
+  .file-list{display:flex;flex-direction:column;gap:10px;}
+  .file-row{
+    background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:10px;
+    padding:16px 20px;
+  }
+  .file-row .fr-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:12px;}
+  .file-row .fr-name{font-size:14.5px;font-weight:600;color:var(--ink);}
+  .file-row .fr-status{font-size:13px;color:var(--ink-dim);flex-shrink:0;}
+  .prog{width:100%;height:6px;border-radius:3px;background:#ece6d6;overflow:hidden;}
+  .prog span{display:block;height:100%;background:var(--brass);}
+  .prog.done span{background:var(--ok);}
+
+  /* ---------- Result card, the one strong element ---------- */
+  .result-card{
+    background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:18px;
+    padding:44px 40px;box-shadow:0 6px 24px rgba(20,30,25,.06);
+  }
+  .result-card h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--brass);margin:0 0 12px;font-weight:700;text-align:center;}
+  .result-headline{font-size:22px;font-weight:650;color:var(--ink);text-align:center;margin:0 0 36px;line-height:1.4;}
+  .result-actions{display:flex;justify-content:center;gap:14px;margin-bottom:34px;flex-wrap:wrap;}
+  .result-actions .btn-brass{font-size:16px;padding:16px 34px;}
+
+  table.txn-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.txn-table th{
+    text-align:left;padding:10px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--ink-dim);border-bottom:1px solid var(--paper-line);font-weight:600;
+  }
+  table.txn-table td{padding:10px 10px;border-bottom:1px solid #f0ede2;vertical-align:top;color:var(--ink);}
+  .amount-out{color:var(--danger);}
+  .amount-in{color:var(--ok);}
+  .table-scroll{max-height:230px;overflow-y:auto;border:1px solid var(--paper-line);border-radius:10px;}
+  .table-scroll table.txn-table th{position:sticky;top:0;background:var(--paper-raised);}
+
+  .result-links{display:flex;justify-content:center;gap:28px;margin-top:26px;}
+
+  /* ---------- Needs a decision, quiet card above result ---------- */
+  .decision-card{
+    border:1px solid #ecd7a8;background:var(--warn-bg);border-radius:14px;
+    padding:20px 24px;margin-bottom:24px;
+  }
+  .decision-card summary{
+    cursor:pointer;font-size:15px;font-weight:650;color:var(--ink);list-style:none;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .decision-card summary::-webkit-details-marker{display:none;}
+  .decision-card summary .dc-chev{color:var(--warn);font-size:13px;}
+  .decision-card[open] summary{margin-bottom:16px;}
+  .decision-row{
+    display:flex;gap:16px;align-items:center;background:var(--paper-raised);border-radius:10px;
+    padding:14px 16px;margin-bottom:10px;
+  }
+  .decision-row:last-child{margin-bottom:0;}
+  .decision-snip{
+    width:96px;height:56px;flex-shrink:0;border-radius:6px;background:#e8e4d8;border:1px solid var(--paper-line);
+    font-family:Georgia,serif;font-size:8px;line-height:1.4;color:#555;padding:6px;overflow:hidden;
+  }
+  .decision-detail{flex:1;font-size:13.5px;color:var(--ink);}
+  .decision-detail .dd-sub{font-size:12.5px;color:var(--ink-dim);margin-top:2px;}
+  .decision-actions{display:flex;gap:8px;flex-shrink:0;}
+  .btn-tiny{
+    all:unset;cursor:pointer;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;
+  }
+  .btn-tiny.ok{background:var(--ok-bg);color:var(--ok);}
+  .btn-tiny.ok:hover{background:#d9ecdf;}
+  .btn-tiny.fix{background:#fff;color:var(--ink);border:1px solid var(--paper-line);}
+  .btn-tiny.fix:hover{background:var(--paper);}
+
+  .new-bank-row{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    background:var(--paper-raised);border-radius:10px;padding:16px 18px;
+  }
+  .new-bank-row .nb-text{font-size:13.5px;color:var(--ink);}
+  .new-bank-row .nb-text strong{display:block;font-size:14.5px;margin-bottom:2px;}
+
+  /* ---------- Confirm-first setup, full screen one question ---------- */
+  .setup-tabs{display:flex;justify-content:center;gap:8px;margin-bottom:36px;}
+  .setup-tabs button{
+    all:unset;cursor:pointer;font-size:11.5px;color:var(--ink-faint);padding:5px 12px;border-radius:100px;
+    border:1px solid var(--paper-line);
+  }
+  .setup-tabs button.active{background:var(--ink-900);color:var(--ink-text);border-color:var(--ink-900);}
+  .setup-screen{display:none;}
+  .setup-screen.active{display:block;}
+
+  .setup-question{font-size:24px;font-weight:650;color:var(--ink);text-align:center;margin:0 0 32px;line-height:1.4;}
+  .totals-row{display:flex;justify-content:center;gap:40px;margin:28px 0 32px;}
+  .total-item{text-align:center;}
+  .total-item .ti-num{font-size:20px;font-weight:700;color:var(--ink);display:block;}
+  .total-item.in .ti-num{color:var(--ok);}
+  .total-item.out .ti-num{color:var(--danger);}
+  .total-item .ti-label{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+
+  .setup-actions{display:flex;justify-content:center;gap:16px;margin-top:36px;flex-wrap:wrap;}
+  .btn-huge{font-size:17px;padding:18px 40px;}
+
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px;}
+  .choice-card{
+    all:unset;cursor:pointer;background:var(--paper-raised);border:1px solid var(--paper-line);
+    border-radius:12px;padding:24px 20px;text-align:center;font-size:15px;font-weight:600;color:var(--ink);
+  }
+  .choice-card:hover{border-color:var(--brass);background:#fffdf8;}
+
+  .setup-field{max-width:400px;margin:0 auto 32px;}
+  .setup-field label{display:block;font-size:12.5px;color:var(--ink-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;text-align:center;}
+  .setup-field input{
+    display:block;width:100%;font-family:inherit;font-size:17px;padding:14px 16px;border-radius:10px;
+    border:1px solid var(--paper-line);text-align:center;background:#fff;color:var(--ink);
+  }
+  .setup-back{display:block;text-align:center;margin-top:20px;}
+
+  /* ---------- Result greyed out under decision or behind sheet ---------- */
+  .greyed{opacity:.55;filter:saturate(.7);}
+
+  /* ---------- Right-side sheet (gear menu) ---------- */
+  .sheet-backdrop{
+    position:fixed;inset:0;background:rgba(13,26,23,.32);z-index:40;
+  }
+  .sheet{
+    position:fixed;top:0;right:0;bottom:0;width:360px;max-width:88vw;background:var(--paper-raised);
+    z-index:41;box-shadow:-8px 0 28px rgba(20,30,25,.18);
+    display:flex;flex-direction:column;
+    animation:slide-in .18s ease-out;
+  }
+  @keyframes slide-in{from{transform:translateX(16px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+  .sheet-head{
+    display:flex;align-items:center;justify-content:space-between;padding:20px 22px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .sheet-head h3{margin:0;font-size:15.5px;font-weight:650;}
+  .sheet-close{all:unset;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-dim);}
+  .sheet-close:hover{background:var(--paper);color:var(--ink);}
+  .sheet-body{padding:10px 12px;overflow-y:auto;flex:1;}
+  .sheet-item{
+    all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;
+    padding:14px 14px;border-radius:10px;font-size:14.5px;color:var(--ink);
+  }
+  .sheet-item:hover{background:var(--paper);}
+  .sheet-item .si-sub{display:block;font-size:12px;color:var(--ink-dim);margin-top:2px;font-weight:400;}
+  .sheet-item strong{font-weight:600;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <img src="../logos/logo-final.png" alt="Statement Bridge logo" width="28" height="28"
+         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    <div class="logo-fallback" style="display:none;">SB</div>
+    <span class="brand-name">Statement Bridge</span>
+  </div>
+  <button class="gear-btn" type="button" aria-label="Menu" onclick="openSheet();">
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 2.5v1.4M8 12.1v1.4M13.5 8h-1.4M3.9 8H2.5M11.7 4.3l-1 1M5.3 10.7l-1 1M11.7 11.7l-1-1M5.3 5.3l-1-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+  </button>
+</header>
+
+<!-- dev-only surface picker, not part of the product -->
+<nav class="dev-nav" aria-label="Mock surface picker">
+  <span class="dn-label">Surfaces</span>
+  <button data-screen="empty" class="active">1 Empty</button>
+  <button data-screen="processing">2 Processing</button>
+  <button data-screen="result">3 Result</button>
+  <button data-screen="decision">4 Needs a decision</button>
+  <button data-screen="setup">5 Confirm-first setup</button>
+  <button id="gear-nav-btn" type="button" onclick="showScreen('result');openSheet();document.querySelectorAll('.dev-nav button').forEach(function(b){b.classList.remove('active');});this.classList.add('active');">6 Gear over result</button>
+</nav>
+
+<main>
+  <div class="column">
+
+    <!-- ============ 1: EMPTY ============ -->
+    <section class="screen active" id="screen-empty">
+      <div class="dropzone">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none"><path d="M12 15V4m0 0l-4 4m4-4l4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <strong>Drop your bank statements here</strong>
+        <p class="hint">Works with the CSV or PDF your bank gives you. Nothing leaves your computer.</p>
+        <button class="btn btn-brass" type="button" onclick="showScreen('processing');">Choose files</button>
+      </div>
+
+      <div class="steps-row">
+        <div class="step-item">
+          <div class="si-icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+          <span class="si-label">Drop</span>
+        </div>
+        <div class="step-item">
+          <div class="si-icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+          <span class="si-label">We read them</span>
+        </div>
+        <div class="step-item">
+          <div class="si-icon"><svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3.5" width="8" height="9" rx="1.2" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 3.5V2.5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-1" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <span class="si-label">Copy to your sheet</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2: PROCESSING ============ -->
+    <section class="screen" id="screen-processing">
+      <h1 class="page-title">Reading your statements</h1>
+      <p class="page-sub">This stays on your computer the whole time.</p>
+
+      <div class="drop-strip">
+        <strong>Drop more statements</strong>
+        <button class="btn btn-ghost" type="button">Choose files</button>
+      </div>
+
+      <div class="file-list">
+        <div class="file-row">
+          <div class="fr-top"><span class="fr-name">Meridian Bank savings.csv</span><span class="fr-status">Done, 142 transactions</span></div>
+          <div class="prog done"><span style="width:100%;"></span></div>
+        </div>
+        <div class="file-row">
+          <div class="fr-top"><span class="fr-name">Summit Bank One.csv</span><span class="fr-status">Done, 91 transactions</span></div>
+          <div class="prog done"><span style="width:100%;"></span></div>
+        </div>
+        <div class="file-row">
+          <div class="fr-top"><span class="fr-name">ocbc_statement_aug.pdf</span><span class="fr-status">Reading page 2 of 3</span></div>
+          <div class="prog"><span style="width:58%;"></span></div>
+        </div>
+        <div class="file-row">
+          <div class="fr-top"><span class="fr-name">chase_sapphire_aug.pdf</span><span class="fr-status">Waiting</span></div>
+          <div class="prog"><span style="width:6%;"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3: RESULT ============ -->
+    <section class="screen" id="screen-result">
+      <div class="result-card">
+        <h2>Ready</h2>
+        <p class="result-headline">Your transactions are ready.<br>546 transactions from 3 statements &middot; 1 Jun to 15 Sep 2026</p>
+        <div class="result-actions">
+          <button class="btn btn-brass" type="button">Copy to Google Sheets</button>
+          <button class="btn btn-ghost" type="button">Download CSV</button>
+        </div>
+        <div class="table-scroll">
+          <table class="txn-table">
+            <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Amount</th><th>Currency</th></tr></thead>
+            <tbody>
+              <tr><td>15 Sep</td><td>Meridian Bank</td><td>NTUC FairPrice, Tampines</td><td class="num amount-out">-48.20</td><td>SGD</td></tr>
+              <tr><td>14 Sep</td><td>Summit Bank One</td><td>Grab</td><td class="num amount-out">-14.60</td><td>SGD</td></tr>
+              <tr><td>12 Sep</td><td>Meridian Bank</td><td>GIRO salary, Horizon Tech Pte Ltd</td><td class="num amount-in">+4,820.00</td><td>SGD</td></tr>
+              <tr><td>10 Sep</td><td>Riverside Bank 360</td><td>Shopee SG</td><td class="num amount-out">-216.30</td><td>SGD</td></tr>
+              <tr><td>08 Sep</td><td>Summit Bank One</td><td>Amazon.com</td><td class="num amount-out">-30.71</td><td>USD</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="result-links">
+          <button class="btn-quiet" type="button" onclick="openSheet();">Adjust what's exported</button>
+          <button class="btn-quiet" type="button" onclick="showScreen('empty');">Add more statements</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4: NEEDS A DECISION ============ -->
+    <section class="screen" id="screen-decision">
+      <details class="decision-card" open>
+        <summary>3 rows need a quick look <span class="dc-chev">&#9662;</span></summary>
+
+        <div class="decision-row">
+          <div class="decision-snip">SHOPEE SG *8823&nbsp;&nbsp;216.30<br>Balance: 12,803.22</div>
+          <div class="decision-detail">Shopee SG, 09 Aug &middot; -216.30 SGD
+            <div class="dd-sub">Balance after this row does not add up. Off by 12.00.</div>
+          </div>
+          <div class="decision-actions">
+            <button class="btn-tiny ok" type="button">Looks right</button>
+            <button class="btn-tiny fix" type="button">Fix</button>
+          </div>
+        </div>
+
+        <div class="decision-row">
+          <div class="decision-snip">AMAZON.COM USD 22.40&nbsp;&nbsp;30.71<br>Balance: 12,772.51</div>
+          <div class="decision-detail">Amazon.com, 14 Aug &middot; -30.71 SGD
+            <div class="dd-sub">Description was hard to read, we guessed at it.</div>
+          </div>
+          <div class="decision-actions">
+            <button class="btn-tiny ok" type="button">Looks right</button>
+            <button class="btn-tiny fix" type="button">Fix</button>
+          </div>
+        </div>
+
+        <div class="decision-row">
+          <div class="decision-snip">GRAB* A-2910384&nbsp;&nbsp;9.80<br>Balance: 12,686.66</div>
+          <div class="decision-detail">Grab, 29 Aug &middot; -9.80 SGD
+            <div class="dd-sub">This row's date is close to another one, just checking.</div>
+          </div>
+          <div class="decision-actions">
+            <button class="btn-tiny ok" type="button">Looks right</button>
+            <button class="btn-tiny fix" type="button">Fix</button>
+          </div>
+        </div>
+      </details>
+
+      <div class="decision-card" style="background:#e4e9f5;border-color:#c7d0ec;">
+        <div class="new-bank-row">
+          <div class="nb-text"><strong>New bank statement.</strong>Let's set it up, takes about a minute.</div>
+          <button class="btn btn-brass" type="button" onclick="showScreen('setup');">Set up</button>
+        </div>
+      </div>
+
+      <div class="result-card greyed">
+        <h2>Ready</h2>
+        <p class="result-headline">546 transactions from 3 statements &middot; 1 Jun to 15 Sep 2026</p>
+        <div class="result-actions">
+          <button class="btn btn-brass" type="button" disabled>Copy to Google Sheets</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 5: CONFIRM-FIRST SETUP A/B/C ============ -->
+    <section class="screen" id="screen-setup">
+      <div class="setup-tabs">
+        <button data-setup="a" class="active">A</button>
+        <button data-setup="b">B</button>
+        <button data-setup="c">C</button>
+      </div>
+
+      <div class="setup-screen active" id="setup-a">
+        <p class="setup-question">We found 205 transactions from 1 Jun to 31 Aug. Does this look right?</p>
+        <div class="totals-row">
+          <div class="total-item in"><span class="ti-num num">+8,240.00 SGD</span><span class="ti-label">Money in</span></div>
+          <div class="total-item out"><span class="ti-num num">-6,118.40 SGD</span><span class="ti-label">Money out</span></div>
+        </div>
+        <div class="table-scroll">
+          <table class="txn-table">
+            <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+            <tbody>
+              <tr><td>03 Jun</td><td>Palisade Bank Save Up transfer</td><td class="num amount-in">+800.00</td></tr>
+              <tr><td>17 Jun</td><td>Cold Storage, Novena</td><td class="num amount-out">-62.15</td></tr>
+              <tr><td>01 Jul</td><td>GIRO salary, Horizon Tech Pte Ltd</td><td class="num amount-in">+4,820.00</td></tr>
+              <tr><td>22 Jul</td><td>Singtel bill</td><td class="num amount-out">-58.00</td></tr>
+              <tr><td>14 Aug</td><td>Grab</td><td class="num amount-out">-11.40</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="setup-actions">
+          <button class="btn btn-brass btn-huge" type="button" onclick="showScreen('decision');">Yes, looks right</button>
+          <button class="btn btn-ghost" type="button" onclick="switchSetup('b');">Something's off</button>
+        </div>
+      </div>
+
+      <div class="setup-screen" id="setup-b">
+        <p class="setup-question">What's wrong?</p>
+        <div class="choice-grid">
+          <button class="choice-card" type="button" onclick="switchSetup('c');">Dates are wrong</button>
+          <button class="choice-card" type="button" onclick="switchSetup('c');">Amounts or +/&minus; are wrong</button>
+          <button class="choice-card" type="button" onclick="switchSetup('c');">Rows are missing or extra</button>
+          <button class="choice-card" type="button" onclick="switchSetup('c');">Something else</button>
+        </div>
+        <a class="setup-back btn-quiet" href="#" onclick="switchSetup('a');return false;">Back</a>
+      </div>
+
+      <div class="setup-screen" id="setup-c">
+        <p class="setup-question">Name this statement</p>
+        <div class="setup-field">
+          <label for="setup-name">Statement name</label>
+          <input id="setup-name" type="text" value="Meridian Bank savings">
+        </div>
+        <div class="setup-actions">
+          <button class="btn btn-brass btn-huge" type="button" onclick="showScreen('decision');">Save and finish</button>
+        </div>
+        <a class="setup-back btn-quiet" href="#" onclick="switchSetup('a');return false;">Back</a>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ============ 6: GEAR SHEET, overlays whatever screen is active ============ -->
+<div class="sheet-backdrop" id="sheet-backdrop" hidden onclick="closeSheet();"></div>
+<aside class="sheet" id="sheet" hidden aria-label="Menu">
+  <div class="sheet-head">
+    <h3>Menu</h3>
+    <button class="sheet-close" type="button" aria-label="Close" onclick="closeSheet();">&#10005;</button>
+  </div>
+  <div class="sheet-body">
+    <button class="sheet-item" type="button"><strong>Adjust what's exported</strong><span class="si-sub">Date range, columns, currency</span></button>
+    <button class="sheet-item" type="button"><strong>Statement types</strong><span class="si-sub">Meridian Bank, Summit Bank, Riverside Bank and 1 more</span></button>
+    <button class="sheet-item" type="button"><strong>Check a statement</strong><span class="si-sub">Compare rows against the original page</span></button>
+    <button class="sheet-item" type="button"><strong>Settings</strong><span class="si-sub">Storage, saved rates, delete everything</span></button>
+    <button class="sheet-item" type="button"><strong>How it works</strong><span class="si-sub">What happens on this device</span></button>
+  </div>
+</aside>
+
+<script>
+  var screens = document.querySelectorAll('.screen');
+  var navButtons = document.querySelectorAll('.dev-nav button');
+  function showScreen(target){
+    screens.forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('screen-' + target).classList.add('active');
+    navButtons.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-screen') === target); });
+    closeSheet();
+  }
+  navButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      showScreen(btn.getAttribute('data-screen'));
+    });
+  });
+  if (location.hash && document.getElementById('screen-' + location.hash.slice(1))) {
+    showScreen(location.hash.slice(1));
+  }
+
+  var setupTabs = document.querySelectorAll('.setup-tabs button');
+  var setupScreens = document.querySelectorAll('.setup-screen');
+  function switchSetup(id){
+    setupScreens.forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('setup-' + id).classList.add('active');
+    setupTabs.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-setup') === id); });
+  }
+  setupTabs.forEach(function(btn){
+    btn.addEventListener('click', function(){ switchSetup(btn.getAttribute('data-setup')); });
+  });
+
+  function openSheet(){
+    document.getElementById('sheet-backdrop').hidden = false;
+    document.getElementById('sheet').hidden = false;
+  }
+  function closeSheet(){
+    document.getElementById('sheet-backdrop').hidden = true;
+    document.getElementById('sheet').hidden = true;
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeSheet();
+  });
+</script>
+</body>
+</html>

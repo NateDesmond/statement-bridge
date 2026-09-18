@@ -1,0 +1,131 @@
+<!doctype html>
+<html><body>
+<div id="out">running</div>
+<script type="module">
+// COPY of dev/ocr-recall-audit.html with scale/psm/preprocess query params
+// added (same params dev/ocr-vs-csv.html already accepts), for the
+// audit/REPORT-OCR-PSM.md sweep. Measurement only - src/ is untouched; this
+// file just swaps ocrDocument's single fixed call for a per-page render +
+// OCR loop so psm/preprocess can be injected, then feeds the exact same
+// buildAutoVersion() auto-detection path the original file uses.
+import { withPdfjs, groupItemsIntoLines } from '../src/core/pdf.js';
+import { renderPageToCanvas } from '../src/core/pdf-image.js';
+import { ocrPageCanvas } from '../src/core/ocr.js';
+import { normalizeRecords } from '../src/core/normalize.js';
+import { buildAutoVersion, pdfPageWidthPt } from './auto-version.mjs';
+
+const params = new URLSearchParams(location.search);
+const pdfUrl = params.get('pdf');
+const truthUrl = params.get('truth');
+const scale = Number(params.get('scale') || '2.5');
+const psm = params.get('psm') || null;
+const preprocess = params.get('preprocess') === '1';
+
+function grayscaleThreshold(canvas, thresh = 180) {
+  const ctx = canvas.getContext('2d');
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const v = gray > thresh ? 255 : 0;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+function ocrConfidenceStats(pages) {
+  const confidences = [];
+  for (const p of pages) for (const it of p.items) if (typeof it.confidence === 'number') confidences.push(it.confidence);
+  if (!confidences.length) return { count: 0 };
+  confidences.sort((a, b) => a - b);
+  const sum = confidences.reduce((a, b) => a + b, 0);
+  const pct = (p) => confidences[Math.min(confidences.length - 1, Math.floor((p / 100) * confidences.length))];
+  return {
+    count: confidences.length,
+    mean: Math.round((sum / confidences.length) * 10) / 10,
+    p10: pct(10), p50: pct(50), p90: pct(90),
+    min: confidences[0], max: confidences[confidences.length - 1],
+  };
+}
+
+function normDesc(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+async function ocrPages(bytes) {
+  return withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
+    const doc = await pdfjsLib.getDocument({ data: bytes.slice(0), standardFontDataUrl }).promise;
+    const pages = [];
+    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      let { canvas } = await renderPageToCanvas(page, scale);
+      if (preprocess) canvas = grayscaleThreshold(canvas);
+      const items = await ocrPageCanvas(canvas, { scale, restrictNumbers: true, tesseractParams: psm ? { tessedit_pageseg_mode: psm } : undefined, page });
+      pages.push({ pageNum, items });
+    }
+    return pages;
+  });
+}
+
+async function run() {
+  const t0 = performance.now();
+  const truth = await (await fetch(truthUrl)).json();
+  const bytes = new Uint8Array(await (await fetch(pdfUrl)).arrayBuffer());
+
+  const pages = await ocrPages(bytes);
+  const pagesLines = pages.map((p) => groupItemsIntoLines(p.items));
+  const elapsedMs = performance.now() - t0;
+
+  const pageWidthPt = await pdfPageWidthPt(bytes);
+  const { detected, version, records } = buildAutoVersion(pagesLines, pageWidthPt);
+  const rows = normalizeRecords(records, version, { ocr: true, currency: 'SGD' })
+    .filter((r) => !r.skipped);
+
+  const key = (dateISO, amountMinor) => `${dateISO}|${Math.round(amountMinor)}`;
+  const truthByKey = new Map();
+  truth.forEach((t, i) => {
+    const k = key(t.date, Math.round(t.amount * 100));
+    if (!truthByKey.has(k)) truthByKey.set(k, []);
+    truthByKey.get(k).push(i);
+  });
+
+  const matchedTruthIdx = new Set();
+  const extras = [];
+  let descAgree = 0, descComparable = 0;
+  rows.forEach((row) => {
+    const k = key(row.date, row.amount);
+    const bucket = truthByKey.get(k);
+    if (bucket && bucket.length) {
+      const ti = bucket.shift();
+      matchedTruthIdx.add(ti);
+      const a = normDesc(row.description_raw).slice(0, 12);
+      const b = normDesc(truth[ti].description).slice(0, 12);
+      if (a && b) { descComparable += 1; if (a === b) descAgree += 1; }
+    } else {
+      extras.push({ date: row.date, amount: row.amount, description_raw: row.description_raw });
+    }
+  });
+
+  const misses = truth
+    .map((t, i) => ({ ...t, idx: i }))
+    .filter((t) => !matchedTruthIdx.has(t.idx));
+
+  document.getElementById('out').textContent = JSON.stringify({
+    detected,
+    truthCount: truth.length,
+    rowsExtracted: rows.length,
+    exactMatches: matchedTruthIdx.size,
+    misses,
+    extras,
+    descComparable, descAgree,
+    descAgreePct: descComparable ? Math.round((descAgree / descComparable) * 1000) / 10 : null,
+    ocrConfidence: ocrConfidenceStats(pages),
+    version: { rowModel: version.pdf.rowModel, signConvention: version.signConvention, dateFormat: version.dateFormat },
+    elapsedMs: Math.round(elapsedMs),
+    pageCount: pages.length,
+  });
+}
+run().catch((e) => { document.getElementById('out').textContent = JSON.stringify({ error: String(e && e.stack || e) }); });
+</script>
+</body></html>

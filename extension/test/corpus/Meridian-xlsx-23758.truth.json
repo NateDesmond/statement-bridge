@@ -1,0 +1,102 @@
+{
+  "axes": {
+    "fileType": "xlsx",
+    "bank": "Meridian",
+    "lang": "nl",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "space-thousands",
+    "signConvention": "debitCredit",
+    "preamble": "tabpadded",
+    "footer": "none",
+    "encoding": "utf-16le",
+    "hasBalance": false,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -13480,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -84222,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": 197698,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 157788,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -170785,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": -3722,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": 9827,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": 193300,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-18",
+      "minor": -136153,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": 83164,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": -38489,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-25",
+      "minor": 102494,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-28",
+      "minor": -144914,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-07-01",
+      "minor": -151444,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-07-02",
+      "minor": 158568,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-07-05",
+      "minor": -34888,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-07-07",
+      "minor": 194798,
+      "description": "Bookstore"
+    }
+  ]
+}

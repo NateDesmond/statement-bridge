@@ -1,0 +1,67 @@
+{
+  "axes": {
+    "fileType": "pdf-columns",
+    "bank": "Harbour",
+    "lang": "it",
+    "dateFormat": "DD MMM YYYY",
+    "numberFormat": "no-decimal",
+    "signConvention": "positiveIsOut",
+    "preamble": "keyvalue",
+    "footer": "pagemarkers",
+    "encoding": "windows-1252",
+    "hasBalance": false,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-04",
+      "minor": 113400,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -182200,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 199600,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -10300,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": -130000,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-14",
+      "minor": -21000,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": -66300,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": 152300,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-18",
+      "minor": 141700,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-21",
+      "minor": 155200,
+      "description": "Grab Ride"
+    }
+  ]
+}

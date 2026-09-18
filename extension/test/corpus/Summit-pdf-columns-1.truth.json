@@ -1,0 +1,77 @@
+{
+  "axes": {
+    "fileType": "pdf-columns",
+    "bank": "Summit",
+    "lang": "es",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "jpy",
+    "signConvention": "crdr-suffix",
+    "preamble": "tabpadded",
+    "footer": "balances",
+    "encoding": "utf-8-bom",
+    "hasBalance": false,
+    "currency": "JPY"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": -496,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -790,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": -86,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": 590,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -1517,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": -1541,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": 307,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -305,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": -530,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-19",
+      "minor": 477,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": -605,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-25",
+      "minor": 1386,
+      "description": "Refund"
+    }
+  ]
+}

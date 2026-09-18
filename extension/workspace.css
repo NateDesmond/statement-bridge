@@ -1,0 +1,941 @@
+/* Statement Bridge: The Vault. Tokens and component styles copied from
+   designs/option-5-v1/index.html (the approved mockup) rather than reinvented.
+   Additions below the mockup-derived block cover pieces the mockup only
+   mocked as static markup: row actions, the transforms editor, and the PDF
+   anchor/column picker. */
+
+:root{
+  --ink-900:#0d1a17;
+  --ink-800:#132420;
+  --ink-700:#1a302a;
+  --ink-600:#254038;
+  --ink-line:#2c463e;
+  --ink-text:#e7efe9;
+  --ink-text-dim:#9db3ab;
+  --brass:#c6a15b;
+  --brass-hover:#d6b06a;
+  --brass-ink:#2a2109;
+  --paper:#f3efe6;
+  --paper-raised:#ffffff;
+  --paper-line:#e3ddcd;
+  --ink:#20241f;
+  --ink-dim:#666a5f;
+  --ok:#3f7856;
+  --ok-bg:#e7f1e9;
+  --warn:#9a6a1f;
+  --warn-bg:#f7ecd6;
+  --danger:#a1402f;
+  --danger-bg:#f8e6e1;
+  --radius:6px;
+  --focus:2px solid var(--brass);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  min-width:1024px;
+}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+/* Item E2/E3: every amount/balance cell right-aligns so figures line up on
+   their ones digit - scoped to table cells (and their inline edit inputs),
+   not every ".num" use (e.g. the Review summary's standalone rs-item
+   figures are block captions, not a table column, and stay left as-is). */
+td.num,th.num{text-align:right;}
+td.num input{text-align:right;}
+a{color:inherit;}
+button,select,input{font-family:inherit;}
+:focus-visible{outline:var(--focus);outline-offset:2px;}
+[hidden]{display:none!important;}
+/* Item A2: visually hidden but still reachable by assistive tech - the
+   shared #sr-status live region. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+
+/* ---------- App shell: Simple B ----------
+   No sidebar, no persistent nav: a dark brand bar (logo, name, gear) and a
+   Drop/Read/Copy progress strip carry the whole flow. The gear overlay is
+   the only door to anything outside drop-to-copy (Review, Statement types,
+   Settings, How it works, Clear statements) - see SIMPLE-BUILD.md Section 1. */
+.app{display:block;min-height:100vh;}
+
+.brand-bar{
+  background:var(--ink-900);color:var(--ink-text);display:flex;align-items:center;
+  justify-content:space-between;gap:16px;padding:14px 28px;border-bottom:1px solid var(--ink-line);
+}
+.brand-left{display:flex;align-items:center;gap:12px;}
+.brand-left img{width:30px;height:30px;border-radius:7px;display:block;}
+.brand-left .name{font-size:15px;font-weight:700;letter-spacing:.2px;}
+.shell-back-btn{
+  appearance:none;border:none;background:none;margin:0 auto 0 24px;color:var(--ink-text-dim);
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:6px 4px;
+}
+.shell-back-btn:hover{color:var(--ink-text);}
+.gear-btn{
+  appearance:none;border:none;background:none;margin:0;cursor:pointer;width:38px;height:38px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-text-dim);
+}
+.gear-btn:hover{background:var(--ink-700);color:var(--ink-text);}
+
+.progress-strip{background:var(--ink-800);padding:16px 28px 18px;border-bottom:1px solid var(--ink-line);}
+.steps{display:flex;align-items:center;max-width:520px;margin:0 auto;}
+.step-item{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;width:120px;}
+.step-circle{
+  width:32px;height:32px;border-radius:50%;background:var(--ink-700);color:var(--ink-text-dim);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;
+  border:2px solid var(--ink-line);flex-shrink:0;
+}
+.step-item.done .step-circle{background:var(--ok);color:#fff;border-color:var(--ok);}
+.step-item.current .step-circle{background:var(--brass);color:var(--brass-ink);border-color:var(--brass);}
+.step-label{font-size:11.5px;color:var(--ink-text-dim);font-weight:600;}
+.step-item.current .step-label,.step-item.done .step-label{color:var(--ink-text);}
+.step-line{flex:1;height:3px;background:var(--ink-700);border-radius:2px;margin:0 -4px 18px;}
+.step-line.filled{background:var(--ok);}
+
+/* ---------- Gear menu overlay ---------- */
+.gear-overlay{
+  display:none;position:fixed;inset:0;background:var(--ink-900);z-index:60;
+  color:var(--ink-text);flex-direction:column;pointer-events:none;
+}
+.gear-overlay.open{display:flex;pointer-events:auto;}
+.gear-head{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;border-bottom:1px solid var(--ink-line);}
+.gear-head h1{font-size:17px;margin:0;}
+.close-btn{
+  appearance:none;border:none;background:none;margin:0;cursor:pointer;width:38px;height:38px;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-text-dim);font-size:20px;
+}
+.close-btn:hover{background:var(--ink-700);color:var(--ink-text);}
+.tile-grid{
+  flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;
+  padding:36px 48px;align-content:center;max-width:960px;margin:0 auto;width:100%;
+}
+.tile{
+  appearance:none;cursor:pointer;background:var(--ink-800);border:1px solid var(--ink-line);color:inherit;
+  border-radius:12px;padding:22px 20px;display:flex;flex-direction:column;gap:8px;text-align:left;font:inherit;
+}
+.tile:hover{background:var(--ink-700);border-color:var(--brass);}
+.tile .t-title{font-size:15.5px;font-weight:700;}
+.tile .t-sub{font-size:12.5px;color:var(--ink-text-dim);line-height:1.5;}
+
+.content-col{min-width:0;}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+
+.btn{
+  appearance:none;-webkit-appearance:none;border:none;background:none;margin:0;color:inherit;
+  font:inherit;cursor:pointer;border-radius:var(--radius);font-size:13px;font-weight:600;
+  padding:9px 16px;min-height:38px;display:inline-flex;align-items:center;gap:7px;box-sizing:border-box;
+}
+.btn-brass{background:var(--brass);color:var(--brass-ink);}
+.btn-brass:hover{background:var(--brass-hover);}
+.btn-brass:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost-dark{background:transparent;color:var(--ink-text);border:1px solid var(--ink-line);}
+.btn-ghost-dark:hover{background:var(--ink-700);}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--paper-line);}
+.btn-ghost:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ghost:hover{background:#ffffff;}
+.btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid #e3bcb0;}
+.btn-danger:hover{background:#f3d5cb;}
+.btn-danger:disabled{opacity:.5;cursor:not-allowed;}
+.btn-sm{padding:6px 11px;min-height:30px;font-size:12px;}
+/* Fixed, comfortable primary size: never full-width, never a wrapped label. */
+.btn-brass{padding:10px 16px;white-space:nowrap;}
+.btn-giant{font-size:16px;padding:16px 28px;min-height:56px;width:100%;}
+.btn-quiet{
+  appearance:none;border:none;background:none;margin:0;cursor:pointer;color:var(--ink-dim);
+  font:inherit;font-size:13px;text-decoration:underline;font-weight:600;padding:0;
+}
+.btn-quiet:hover{color:var(--ink);}
+
+/* Item 15: main scrolls vertically only - horizontal overflow (a wide preset
+   preview table) is the table's own problem to solve (its scroll wrapper
+   below), never the page's. */
+main{min-width:0;overflow-x:hidden;padding:24px 28px 64px;max-width:1040px;margin:0 auto;}
+.screen{display:none;}
+.screen.active{display:block;}
+
+.panel{
+  background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius);
+  padding:18px 20px;margin-bottom:18px;
+}
+
+h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin:0 0 12px;}
+/* Fix item 2: the drawer's own header carries the export configuration
+   summary (columns/date range/currency) that used to sit under the result
+   card's headline - normal case/weight, not the section-title's own caps. */
+.drawer-settings-summary{display:inline-block;margin-top:4px;font-size:12.5px;text-transform:none;letter-spacing:normal;font-weight:400;color:var(--ink-dim);}
+
+.badge{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+  padding:3px 8px;border-radius:100px;line-height:1.5;
+}
+.badge-ok{background:var(--ok-bg);color:var(--ok);}
+.badge-warn{background:var(--warn-bg);color:var(--warn);}
+.badge-new{background:#e4e9f5;color:#3a51a3;}
+.badge-low{background:var(--warn-bg);color:var(--warn);}
+.badge-danger{background:var(--danger-bg);color:var(--danger);}
+.badge-confidence-high{background:var(--ok-bg);color:var(--ok);}
+.badge-confidence-med{background:var(--warn-bg);color:var(--warn);}
+.badge-confidence-low{background:var(--danger-bg);color:var(--danger);}
+
+/* --------- Home (import) --------- */
+.toolbar-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:16px;flex-wrap:wrap;}
+.dropzone{
+  border:2px dashed var(--paper-line);border-radius:var(--radius);background:#faf8f2;
+  padding:36px 24px;text-align:center;margin-bottom:14px;cursor:pointer;
+}
+.dropzone.dragover{background:#efe9d9;border-color:var(--brass);}
+.dropzone strong{font-size:15px;display:block;margin-bottom:4px;}
+.dropzone p{margin:0 0 14px;font-size:13px;color:var(--ink-dim);}
+
+/* Item 3: the empty-state hero - a giant, unmissable drop target, one line
+   of copy, one giant "Choose files" button. */
+.dropzone-hero{
+  border:3px dashed #cdbf9b;border-radius:16px;background:#faf8f2;
+  padding:56px 40px;text-align:center;cursor:default;
+}
+.dropzone-hero .drop-icon{margin:0 auto 16px;display:block;}
+.dropzone-hero strong{font-size:22px;margin-bottom:14px;}
+.dropzone-hero .choose-wrap{max-width:280px;margin:0 auto;}
+.dropzone-hero p{margin:16px 0 0;max-width:440px;margin-left:auto;margin-right:auto;line-height:1.6;}
+
+/* Single column, full content width: a card is a clear stop, not a tile in a
+   grid of competing tiles. */
+.file-grid{display:flex;flex-direction:column;gap:12px;}
+.file-card{
+  width:100%;box-sizing:border-box;
+  border:1px solid var(--paper-line);border-radius:var(--radius);background:var(--paper-raised);
+  padding:14px 16px;display:flex;flex-direction:column;gap:8px;position:relative;
+}
+.file-card .fc-name{font-size:13.5px;font-weight:600;}
+.file-card .fc-body{font-size:12.5px;color:var(--ink-dim);margin:0;}
+.file-card .fc-hint{font-size:12.5px;color:var(--ink);margin:0;}
+.file-card .fc-hint strong{font-weight:600;}
+.file-card .fc-actions{display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;align-items:center;}
+.fc-secondary{font-size:12.5px;color:var(--ink-dim);text-decoration:underline;font-weight:600;cursor:pointer;}
+.fr-caption{font-size:11.5px;color:var(--ink-dim);margin-top:2px;}
+/* Item 13: the inline "recognise files like this from now on?" confirm. */
+.fr-learn-prompt a{color:var(--brass-hover);text-decoration:underline;font-weight:600;}
+
+/* === PASSWORD PROMPT BLOCK (Track 2: password-protected PDFs) - start === */
+.fr-pw-form{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;}
+.fr-pw-input{
+  font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--paper-line);
+  border-radius:4px;background:var(--paper-raised);min-width:160px;
+}
+.fr-pw-wrong{color:var(--danger);}
+/* === PASSWORD PROMPT BLOCK - end === */
+
+/* Item 5: "New bank statement" - the one card with its own distinct brass
+   border, since it's usually the first thing a person needs to act on. */
+.new-bank-card{
+  flex-direction:row;align-items:center;justify-content:space-between;gap:20px;
+  border:1.5px solid var(--brass);
+}
+.new-bank-card .fc-name{font-size:15px;}
+.new-bank-card .fc-actions{margin-top:0;flex-shrink:0;}
+
+/* Item 5: the "N rows need a quick look" decision list. */
+.decision-banner{
+  background:var(--warn-bg);border:1px solid #ecd7a8;border-radius:var(--radius);
+  padding:14px 18px;margin-bottom:0;
+}
+.decision-banner summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--warn);list-style:none;}
+.decision-banner summary::-webkit-details-marker{display:none;}
+.decision-banner summary::after{content:" \25BE";}
+.decision-banner[open] summary::after{content:" \25B4";}
+.decision-list{display:flex;flex-direction:column;gap:12px;margin-top:14px;}
+.decision-row{
+  background:#fff;border:1px solid #ecd7a8;border-radius:var(--radius);padding:12px 16px;
+  display:flex;align-items:stretch;gap:16px;flex-wrap:wrap;
+}
+/* Fix item 3 part 2: a fixed 320x96 card (pdf-render.js's renderRowSnippet
+   renders its bitmap to exactly this box at 2x) - not the old 180px box
+   that squeezed a full page width down to unreadable text. */
+.decision-snippet{
+  flex:0 0 320px;width:320px;height:96px;background:#e8e4d8;
+  border:1px solid var(--paper-line);border-radius:6px;
+  overflow:hidden;display:flex;align-items:center;justify-content:center;
+}
+.decision-snippet canvas{display:block;width:100%;height:100%;}
+.decision-snippet-text{
+  padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  font-size:13px;color:#333;line-height:1.5;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  word-break:break-word;text-align:left;
+}
+.decision-body{flex:1;min-width:220px;}
+.decision-body .db-txn{font-size:13.5px;font-weight:600;margin-bottom:2px;}
+.decision-body .db-why{font-size:12px;color:var(--ink-dim);}
+.decision-choices{display:flex;gap:8px;flex-shrink:0;}
+.btn-choice{font-size:12.5px;padding:8px 14px;min-height:0;border-radius:6px;}
+.btn-choice.good{background:var(--ok-bg);color:var(--ok);border:1.5px solid #bfe0cb;}
+.btn-choice.good:hover{background:#d9edde;}
+.btn-choice.fix{background:var(--paper-raised);color:var(--ink);border:1.5px solid var(--paper-line);}
+.btn-choice.fix:hover{background:var(--paper);}
+.decision-fix-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.decision-fix-form input{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--paper-line);border-radius:5px;}
+.decision-fix-form .decision-fix-desc{flex:1 1 140px;min-width:100px;}
+
+/* Item 13: "Use an existing profile" picker - a small modal, no framework,
+   consistent with the rest of this app's plain DOM components. */
+.profile-picker-overlay{
+  position:fixed;inset:0;background:rgba(13,26,23,.45);z-index:50;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.profile-picker{
+  background:var(--paper-raised);border-radius:var(--radius);border:1px solid var(--paper-line);
+  width:420px;max-width:100%;max-height:80vh;overflow:auto;padding:20px;
+}
+.profile-picker h3{margin:0 0 6px;font-size:15px;}
+.profile-picker-groups{margin-top:12px;display:flex;flex-direction:column;gap:4px;}
+.pp-group-title{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-dim);margin-top:10px;}
+.pp-group-title:first-child{margin-top:0;}
+.pp-profile-btn{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  width:100%;text-align:left;appearance:none;border:1px solid var(--paper-line);background:#fff;
+  border-radius:5px;padding:8px 10px;font:inherit;font-size:12.5px;cursor:pointer;
+}
+.pp-profile-btn:hover:not(:disabled){border-color:var(--brass);}
+.pp-profile-btn:disabled{opacity:.45;cursor:not-allowed;}
+.pp-filetype{font-size:10.5px;color:var(--ink-dim);}
+.profile-picker-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--paper-line);}
+
+.btn-expander{
+  appearance:none;border:none;background:none;margin:0;font:inherit;
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:600;color:var(--ink-dim);padding:4px 2px;
+}
+.btn-expander:hover{color:var(--ink);}
+.btn-expander .chevron{transition:transform .15s ease;flex-shrink:0;}
+.btn-expander[aria-expanded="true"] .chevron{transform:rotate(180deg);}
+
+.mapping-list{display:flex;flex-direction:column;gap:6px;}
+/* Item 14a: Sources row - Include checkbox, then account/profile/range/count
+   info (wraps as a group before the row's own links do), then Review/Update
+   mapping, all on one line where it fits. */
+.mapping-row{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--paper-line);
+}
+.mapping-row:last-child{border-bottom:none;}
+.mapping-row .source-include-checkbox{flex-shrink:0;}
+.mapping-row .mr-info{display:flex;align-items:center;gap:12px;flex:1 1 auto;min-width:0;flex-wrap:wrap;}
+.mapping-row .mr-name{font-weight:600;}
+.mapping-row .mr-profile{color:var(--ink-dim);}
+.mapping-row .mr-range{color:var(--ink-dim);font-size:11.5px;}
+.mapping-row .mr-count{font-size:11.5px;font-variant-numeric:tabular-nums;}
+.mapping-row .mr-count-zero{color:var(--ink-dim);font-style:italic;}
+.mapping-row .mr-links{display:flex;gap:14px;flex-shrink:0;margin-left:auto;}
+.icon-btn{appearance:none;border:none;background:none;margin:0;font:inherit;cursor:pointer;font-size:11.5px;color:var(--ink-dim);padding:4px 7px;border-radius:4px;}
+.icon-btn:hover{background:var(--paper);color:var(--ink);}
+.icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
+.badge.badge-warn[href]{cursor:pointer;text-decoration:underline;}
+
+/* Section C (home agent): a consistent 16px gap between the file-row list,
+   the "Needs a look" group, and the "Ready to copy" panel, whichever of
+   these are present; :empty/[hidden] collapse to 0 so the gap never doubles
+   up when a group has nothing to show. Section titles all open the same way. */
+#screen-home .file-list{gap:16px;margin-bottom:0;}
+#screen-home #attention-heading{margin:16px 0 12px;}
+#screen-home .file-grid{margin-bottom:0;}
+#screen-home .file-grid:not(:empty){margin-bottom:16px;}
+#screen-home .export-panel{margin-top:16px;}
+/* Item 1: the drawer is the same "Ready to copy" card growing, not a second
+   box - a top rule + margin marks where the expansion begins, but it's still
+   one .panel's own padding/background throughout. */
+.drawer-body{margin-top:16px;padding-top:16px;border-top:1px solid var(--paper-line);}
+.drawer-footer-actions{display:flex;align-items:center;gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--paper-line);}
+/* /Section C */
+
+/* --------- Review --------- */
+.review-summary{
+  display:flex;gap:22px;flex-wrap:wrap;align-items:center;background:var(--paper-raised);
+  border:1px solid var(--paper-line);border-radius:var(--radius);padding:12px 18px;margin-bottom:14px;
+}
+.rs-item{font-size:12px;color:var(--ink-dim);}
+.rs-item .num{display:block;font-size:15px;color:var(--ink);font-weight:700;}
+.rs-item.fail{color:var(--danger);}
+.rs-item.fail .num{color:var(--danger);}
+.rs-item.pass .num{color:var(--ok);}
+.rs-link{font-size:12px;color:var(--danger);text-decoration:underline;font-weight:600;background:none;border:none;cursor:pointer;padding:0;}
+
+/* Review's split view decides side-by-side vs. stacked in JS
+   (review.js's updateSplitLayout), not a static CSS breakpoint: whether two
+   panes fit depends on how many optional columns THIS file's extracted
+   table has (Balance/Account/Reference/extras), which a fixed px breakpoint
+   can't know. updateSplitLayout compares the table's own required min-width
+   against the space side-by-side would actually leave the table pane AFTER
+   giving the source pane its own 440px floor (coordinator round 3: a
+   smaller floor let the source pane render at ~240px, an illegible PDF and
+   a toolbar that wrapped onto two lines) - stacked (source pane on top,
+   collapsible, default 40% height; table pane full width below) is the
+   answer whenever that doesn't hold, or the user has forced it via the
+   quiet Side-by-side/Stacked toggle. Recomputed on file switch and resize. */
+.split{display:flex;gap:16px;height:560px;}
+.pane{
+  border:1px solid var(--paper-line);border-radius:var(--radius);background:var(--paper-raised);
+  display:flex;flex-direction:column;overflow:hidden;flex:1;min-width:0;
+}
+/* Side-by-side gives the source pane 45% (never below its own 440px floor,
+   enforced by updateSplitLayout's stack-or-not decision, not by CSS alone)
+   and lets the table pane's Description column take whatever's left of the
+   other 55% beyond the table's own min-width (set inline by review.js). */
+.split:not(.stacked) #source-pane{flex:0 0 45%;min-width:440px;}
+.split:not(.stacked) .pane:last-child{flex:1 1 55%;}
+.pane-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;
+  border-bottom:1px solid var(--paper-line);font-size:12px;color:var(--ink-dim);flex-shrink:0;
+  flex-wrap:nowrap;
+}
+/* Coordinator round 3: the toolbar must stay one line even at the 440px
+   floor - the label shrinks first (ellipsis + title carries the full name,
+   set by review.js's setLabel), the controls group never wraps or shrinks. */
+#source-pane-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;}
+.pane-head .pn-controls{display:flex;align-items:center;gap:4px;flex:0 0 auto;white-space:nowrap;}
+.pane-head button.mini{
+  appearance:none;margin:0;font:inherit;color:inherit;
+  cursor:pointer;width:22px;height:22px;border-radius:4px;text-align:center;
+  line-height:22px;background:var(--paper);border:1px solid var(--paper-line);font-size:12px;flex-shrink:0;
+}
+#pdf-zoom-label,#pdf-page-label{white-space:nowrap;}
+.pane-body{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+#source-not-kept{margin:auto;padding:20px;text-align:center;}
+
+/* The collapse toggle only makes sense once the source pane is stacked on
+   top (side-by-side, its own pane already gives it a sensible height). */
+#source-pane-collapse{display:none;}
+
+/* Quiet Side-by-side/Stacked override (coordinator round 3): a plain
+   two-segment toggle, pushed to the far right of the warnings bar so it
+   reads as a secondary control, not a primary action. */
+.layout-toggle{display:flex;gap:2px;margin-left:auto;border:1px solid var(--paper-line);border-radius:var(--radius);padding:2px;background:var(--paper-raised);}
+.layout-toggle button{
+  appearance:none;border:none;background:none;margin:0;font:inherit;
+  cursor:pointer;font-size:11.5px;color:var(--ink-dim);padding:4px 9px;border-radius:4px;
+}
+.layout-toggle button.active{background:var(--ink-700);color:var(--ink-text);}
+.layout-toggle button:disabled{opacity:.4;cursor:default;}
+
+.split.stacked{flex-direction:column;height:auto;max-height:none;}
+.split.stacked .pane{flex:none;width:100%;min-width:0;}
+/* Default 40% of the viewport height for the source pane when stacked;
+   collapsed drops it to just its header bar so the table below can take
+   over the freed space. */
+.split.stacked #source-pane{height:40vh;min-height:160px;}
+.split.stacked #source-pane.pane-collapsed{height:auto;min-height:0;}
+#source-pane.pane-collapsed .pane-body{display:none;}
+.split.stacked .pane:last-child{height:auto;min-height:360px;}
+.split.stacked #source-pane-collapse{display:inline-block;}
+#source-pane.pane-collapsed #source-pane-collapse{transform:rotate(-90deg);}
+/* Section D: plain block layout, not flex+justify-content:center - a wrap
+   wider than the pane (zoomed in) inside a centered flex container gets its
+   start edge pushed past scrollLeft:0 and made unreachable, which is the
+   root cause of the "page is cropped on the left" bug: the fixed OCR render
+   scale (2.5) made the canvas wider than the pane on nearly every file, and
+   centering then clipped/hid the left side with no way to scroll to it. */
+.pdf-scroll{flex:1;overflow:auto;background:#e8e4d8;padding:20px;position:relative;}
+.pdf-page-wrap{position:relative;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);}
+.pdf-page-wrap canvas{display:block;width:100%;height:auto;}
+/* Review's own per-line overlay only (scoped to #source-pdf-scroll so it
+   never touches the wizard's anchor-picker use of the same base class): a
+   subtle 6% baseline tint so the page stays readable, strong only for the
+   one line actually selected/outlined. */
+#source-pdf-scroll .anchor-row-highlight{background:rgba(198,161,91,.06);}
+#source-pdf-scroll .anchor-row-highlight.outlined{outline:2px solid var(--brass);background:rgba(198,161,91,.45);}
+.csv-grid{flex:1;overflow:auto;}
+table.csv-table{width:100%;border-collapse:collapse;font-size:12px;}
+table.csv-table td,table.csv-table th{border-bottom:1px solid #f0ede2;padding:5px 8px;text-align:left;white-space:nowrap;}
+table.csv-table tr.src-selected td{background:#fbeecb;}
+
+.grid-scroll{flex:1;overflow:auto;}
+table.txn-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.txn-table th{
+  position:sticky;top:0;background:var(--paper);text-align:left;padding:8px 10px;
+  font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);
+  border-bottom:1px solid var(--paper-line);
+}
+table.txn-table td{padding:8px 10px;border-bottom:1px solid #f0ede2;vertical-align:top;}
+table.txn-table td:first-child,table.txn-table th:first-child{min-width:96px;white-space:nowrap;}
+table.txn-table tr.warn td{background:#fdf1e4;}
+table.txn-table tr.excluded td{color:#a6a196;text-decoration:line-through;background:#f7f5ee;}
+table.txn-table tr.edited td{box-shadow:inset 3px 0 0 var(--brass);}
+/* Item 1: the row being compared right now must be unmistakable - a strong
+   brass left bar (thicker than the plain "edited" one so it always wins when
+   a row is both), a stronger tint than the plain warn/edited backgrounds,
+   and a bold date. Declared after .warn/.edited so it wins the cascade when
+   a row carries more than one of these classes at once. */
+table.txn-table tr.selected td{background:#f8dfa8;box-shadow:inset 5px 0 0 var(--brass);}
+table.txn-table tr.selected td:first-child{font-weight:700;}
+
+/* Item 1: "Showing: 14 Sep 2026 · NTUC FAIRPRICE · -48.20" above the source
+   page/grid, naming which transaction the highlighted row on the other side
+   is - so both panes agree on what's in focus without hunting for the tint. */
+.showing-label{
+  margin:0;padding:8px 14px;flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--ink);
+  background:var(--paper-raised);border-bottom:1px solid var(--paper-line);
+}
+.amount-out{color:var(--danger);}
+.amount-in{color:var(--ok);}
+.flag-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-right:5px;}
+.row-tag{font-size:10px;color:var(--ink-dim);display:block;margin-top:2px;}
+td.cell-editable{cursor:text;}
+td.cell-editable:hover{background:#f7f4ea;}
+/* Section B: actions is a normal table cell in the same row as the data.
+   Root cause of the old "Exclude" + empty box bug: display:flex was applied
+   straight to the <td> (`.row-actions` matched the cell itself), and a flex
+   table-cell lays out unpredictably (vertical-align is ignored on flex
+   containers) - one collapsed/oversized cell per row. The flex row now
+   lives on an inner <div class="row-actions"> so the <td> stays a normal,
+   vertically-centred table cell. */
+table.txn-table td.cell-actions{vertical-align:middle;white-space:nowrap;}
+.row-actions{display:flex;gap:4px;white-space:nowrap;align-items:center;}
+.row-actions button{appearance:none;border:none;background:none;margin:0;font:inherit;cursor:pointer;font-size:11px;color:var(--ink-dim);padding:2px 5px;border-radius:3px;}
+.row-actions button:hover{background:var(--paper);color:var(--ink);}
+.row-actions button.primary{color:var(--brass);font-weight:600;}
+
+/* Findings 4/5 (coordinator round 2): Date, Amount and Account/Balance/
+   Reference/extra cells must NEVER truncate - only Description may ellipsis,
+   and it gets a 220px floor. table-layout:fixed with per-column widths sized
+   for their real content (never ellipsis'd, so they wrap on the rare
+   over-long value instead of cutting text off) plus Description left as the
+   one width:auto column, which receives 100% of whatever space is left
+   between the fixed columns. That's not enough on its own though: a fixed
+   auto column's own min-width is NOT honoured by the table-layout:fixed
+   algorithm (verified empirically - it silently shrinks the column instead
+   of ever growing the table), so review.js computes the real floor itself:
+   it sums this budget's px values for whichever optional columns are
+   actually present plus Description's own 220px floor, and sets that sum as
+   the TABLE's own min-width. A table min-width IS honoured by fixed layout -
+   below the ~1360px stacking breakpoint above the table then overflows its
+   pane and .grid-scroll's existing overflow:auto supplies a real horizontal
+   scrollbar (the "last resort" the original findings called for) instead of
+   ever truncating a value. Above the breakpoint, or with only Date/
+   Description/Amount present, the sum easily fits and Description simply
+   grows past 220px into the extra space. Actions is sized for its worst
+   case, three buttons ("Looks right"/Edit/Exclude) on one line, and never
+   wraps (already covered by the cell-actions/row-actions nowrap above). */
+#review-table{table-layout:fixed;}
+#review-table th:first-child,#review-table td:first-child{width:90px;min-width:0;}
+#review-table th:nth-child(2),#review-table td:nth-child(2){width:auto;}
+#review-table th:nth-child(3),#review-table td:nth-child(3){width:120px;}
+#review-table th:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child),
+#review-table td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child){width:130px;}
+#review-table th:last-child,#review-table td:last-child{width:185px;}
+#review-table .desc-row{display:flex;align-items:baseline;min-width:0;gap:0;}
+#review-table .desc-row .flag-dot{flex:0 0 auto;}
+#review-table .desc-text{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.edit-cell-inputs input{font:inherit;font-size:12px;width:100%;padding:3px 5px;border:1px solid var(--brass);border-radius:4px;margin-bottom:3px;box-sizing:border-box;}
+.row-caption{font-size:10.5px;color:var(--ink-dim);display:block;margin-top:2px;}
+.rs-item.neutral{color:var(--ink-dim);}
+.rs-item.neutral .num{color:var(--ink-dim);}
+
+/* Section B: warnings filter bar + skipped-lines group */
+.review-warnings-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;}
+.review-warnings-bar .chip{
+  appearance:none;margin:0;font:inherit;
+  cursor:pointer;font-size:12px;color:var(--ink-dim);padding:6px 12px;border-radius:999px;
+  border:1px solid var(--paper-line);background:#fff;
+}
+.review-warnings-bar .chip.active{background:var(--warn);border-color:var(--warn);color:#fff;}
+.review-warnings-bar .chip:disabled{opacity:.45;cursor:default;}
+/* Item 2: small key hints next to Previous/Next warning, and the "Warning 3
+   of 8" position indicator between them. */
+.review-warnings-bar kbd{
+  font:inherit;font-size:10px;color:var(--ink-dim);background:var(--paper);
+  border:1px solid var(--paper-line);border-radius:3px;padding:0 4px;margin-left:4px;
+}
+.warning-position{font-size:12px;color:var(--ink-dim);white-space:nowrap;}
+/* Item 3: inline undo bar for the last resolve action, 8s auto-dismiss. */
+.undo-bar{
+  display:flex;align-items:center;gap:10px;background:var(--paper-raised);
+  border:1px solid var(--paper-line);border-radius:var(--radius);
+  padding:8px 14px;margin-bottom:10px;font-size:12.5px;
+}
+.undo-bar button{
+  appearance:none;border:none;background:none;margin:0;padding:0;font:inherit;
+  cursor:pointer;color:var(--brass);font-weight:600;text-decoration:underline;
+}
+/* Item 3: the same per-row Undo link that outlives the 8s bar, for the rest
+   of the session. */
+.row-actions button[data-act="undo"]{color:var(--brass);}
+/* Item 6b: the "All N warnings resolved" completion panel's 3s auto-advance
+   countdown. prefers-reduced-motion drops the visual sweep only - the
+   setTimeout driving the actual advance is untouched either way. */
+.countdown-bar{height:4px;background:var(--paper-line);border-radius:2px;overflow:hidden;margin-top:2px;}
+.countdown-bar .countdown-fill{height:100%;width:0;background:var(--brass);}
+@media (prefers-reduced-motion: reduce){.countdown-bar .countdown-fill{transition:none !important;}}
+/* Item 6c: calm all-statements-done state, replaces both panes. */
+.review-all-done{text-align:center;padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.review-all-done .all-done-check{
+  width:44px;height:44px;border-radius:50%;background:var(--ok);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:6px;
+}
+.review-all-done .section-title{margin:0;}
+.review-all-done .review-complete-actions{justify-content:center;margin-top:10px;}
+#review-all-done-reselect{font:inherit;font-size:12.5px;padding:6px 10px;border-radius:5px;border:1px solid var(--paper-line);}
+/* Item 6a: never show a blank table body when the Warnings filter leaves nothing. */
+.all-resolved-row{text-align:center;color:var(--ink-dim);padding:26px 10px;}
+.skipped-group{
+  background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius);
+  padding:10px 14px;margin-bottom:14px;font-size:12.5px;
+}
+.skipped-group summary{cursor:pointer;color:var(--ink-dim);}
+.skipped-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.skipped-list li{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  background:#fff;border:1px solid var(--paper-line);border-radius:5px;padding:6px 10px;
+}
+.skipped-list li button{appearance:none;border:none;background:none;margin:0;padding:0;font:inherit;cursor:pointer;font-size:11px;color:var(--ink-dim);text-decoration:underline;}
+.skipped-list li button:hover{color:var(--ink);}
+.review-complete{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.review-complete p{margin:0;font-weight:600;}
+.review-complete-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.review-footer-actions{
+  display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;
+  padding:12px 0 0;margin-top:8px;border-top:1px solid var(--paper-line);
+}
+/* /Section B */
+.cell-edit-input{font:inherit;font-size:12.5px;width:100%;padding:3px 5px;border:1px solid var(--brass);border-radius:4px;}
+.add-row-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-top:1px solid var(--paper-line);background:var(--paper);}
+.add-row-form input{font:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);}
+.add-row-form input[name="date"]{width:120px;}
+.add-row-form input[name="description_raw"]{width:200px;flex:1;min-width:140px;}
+.add-row-form input[name="amount"]{width:100px;}
+
+/* --------- Mapping wizard (Section A) --------- */
+.stepper{display:flex;align-items:center;gap:0;margin-bottom:20px;flex-wrap:wrap;}
+.step{appearance:none;border:none;background:none;margin:0;font:inherit;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-dim);padding:6px 14px 6px 0;}
+.step .dot{width:22px;height:22px;border-radius:50%;background:#e7e2d3;color:var(--ink-dim);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.step.done .dot{background:var(--ok);color:#fff;}
+.step.current{color:var(--ink);font-weight:700;}
+.step.current .dot{background:var(--brass);color:var(--brass-ink);}
+.step-sep{width:34px;height:1px;background:var(--paper-line);margin:0 4px;}
+
+.confirm-note{background:#efe9d9;border-radius:var(--radius);padding:10px 14px;font-size:12.5px;color:var(--ink);margin-bottom:16px;}
+.pending-prefix-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);margin-bottom:16px;}
+.pending-prefix-row code{background:#efe9d9;border-radius:4px;padding:1px 5px;}
+
+#wizard-steps > div{display:none;}
+#wizard-steps > div.active{display:block;}
+
+table.map-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:20px;}
+table.map-table th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+table.map-table td{padding:9px 10px;border-bottom:1px solid #f0ede2;vertical-align:middle;}
+.sample-vals{font-size:11.5px;color:var(--ink-dim);}
+select.map-select,select.picker-select,select.transform-select{
+  font-family:inherit;font-size:12.5px;padding:7px 9px;border-radius:5px;border:1px solid var(--paper-line);
+  background:#fff;min-width:150px;
+}
+
+.picker-row{display:flex;gap:28px;margin-bottom:20px;flex-wrap:wrap;}
+.picker-group label.pg-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--ink-dim);margin-bottom:6px;}
+.picker-group select,.picker-group input{font-family:inherit;font-size:12.5px;padding:8px 10px;border-radius:5px;border:1px solid var(--paper-line);background:#fff;}
+
+.transforms-editor{border-top:1px solid var(--paper-line);margin-top:14px;padding-top:14px;}
+.transform-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.transform-row input{font:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);width:120px;}
+
+.pdf-anchor-stage{position:relative;display:inline-block;background:#e8e4d8;padding:8px;border-radius:var(--radius);}
+.pdf-anchor-stage canvas{display:block;}
+.col-boundary{position:absolute;top:0;bottom:0;width:3px;background:var(--brass);cursor:col-resize;opacity:.85;}
+.col-boundary:hover{opacity:1;}
+.anchor-row-highlight{position:absolute;left:0;right:0;background:rgba(198,161,91,.28);pointer-events:none;}
+.pdf-anchor-hint{font-size:12px;color:var(--ink-dim);margin:8px 0;}
+.wizard-error-actions{display:flex;gap:8px;margin-top:6px;}
+/* Final integration pass: detected debit/credit column bands (grouped rowModel), draggable divider between them */
+.grouped-band{position:absolute;top:0;bottom:0;pointer-events:none;}
+.grouped-band.debit{background:rgba(161,64,47,.10);}
+.grouped-band.credit{background:rgba(63,120,86,.10);}
+
+/* Section A additions: basics captions, raw grid picker, live preview, sticky footer */
+.suggest-cap{display:block;font-size:10.5px;color:var(--ok);margin-top:4px;}
+.map-samples{font-size:11.5px;color:var(--ink-dim);max-width:220px;}
+.field-id-cap{display:block;font-size:10.5px;color:var(--ink-dim);margin-top:3px;}
+.brass-caption{display:inline-block;font-size:10px;font-weight:700;color:var(--brass-ink);background:var(--brass);
+  border-radius:100px;padding:1px 7px;margin-right:6px;vertical-align:middle;}
+
+.raw-grid-scroll{max-height:420px;overflow:auto;border:1px solid var(--paper-line);border-radius:var(--radius);margin-bottom:16px;}
+table.raw-grid{border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;white-space:nowrap;}
+table.raw-grid td{padding:4px 8px;border-bottom:1px solid #f0ede2;cursor:pointer;}
+table.raw-grid .raw-skip-cell{cursor:default;padding:4px 4px;}
+table.raw-grid .raw-row-num{color:var(--ink-dim);text-align:right;cursor:default;}
+table.raw-grid tr.raw-row-dim td{color:#b9b3a0;}
+table.raw-grid tr.raw-row-header td{background:#f7ecd3;font-weight:700;}
+table.raw-grid tr.raw-row-skip td{text-decoration:line-through;color:#a6a196;}
+table.raw-grid .raw-use-header-btn{width:18px;height:18px;line-height:16px;padding:0;margin-right:4px;
+  border:1px solid var(--paper-line);border-radius:4px;background:#fff;color:var(--ink-dim);
+  font-size:11px;cursor:pointer;vertical-align:middle;}
+table.raw-grid .raw-use-header-btn:hover,table.raw-grid .raw-use-header-btn:focus-visible{color:var(--ink);border-color:var(--ink-dim);}
+table.raw-grid .raw-row-action-btn{height:18px;line-height:16px;padding:0 3px;margin-right:4px;
+  border:1px solid var(--paper-line);border-radius:4px;background:#fff;color:var(--ink-dim);
+  font-size:9.5px;cursor:pointer;vertical-align:middle;}
+table.raw-grid .raw-row-action-btn:hover,table.raw-grid .raw-row-action-btn:focus-visible{color:var(--ink);border-color:var(--ink-dim);}
+table.raw-grid th.raw-col-header{background:#f7ecd3;font-weight:700;text-align:left;padding:2px 6px;position:sticky;top:0;}
+table.raw-grid th.raw-col-header input{vertical-align:middle;margin-right:3px;}
+table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decoration:line-through;}
+
+.live-preview{border-top:1px solid var(--paper-line);margin-top:14px;padding-top:14px;}
+.signatures-preview{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;background:#f7f5ee;
+  border:1px solid var(--paper-line);border-radius:var(--radius);padding:12px 14px;white-space:pre-wrap;overflow-wrap:anywhere;}
+
+/* Fix 4 (2026-09-16, superseding the earlier sticky-footer/padding-bottom
+   attempt, confirmed broken against the real unpacked extension): the actual
+   scroll container was never #wizard-steps, it was <main> (the whole app's
+   scroller, overflow:auto with its own padding) - a position:sticky footer
+   pins itself against THAT ancestor's viewport, so padding on #wizard-steps
+   only ever changed main's total scrollHeight, never where the sticky
+   footer visually sat relative to it. Root fix: give the wizard screen its
+   own fixed-height flex column (height:100% of main's content box, which is
+   already exactly the space main leaves for this screen) with #wizard-steps
+   as the ONLY scrolling region and the footer a normal, non-sticky flex
+   item below it - the footer can then never overlap scrolled content on any
+   step, regardless of that step's height, and <main> never needs to scroll
+   at all while the wizard is open. */
+#screen-wizard.active{display:flex;flex-direction:column;height:100%;min-height:0;}
+#screen-wizard #wizard-back-btn,#screen-wizard #wizard-stepper{flex-shrink:0;}
+#screen-wizard #wizard-steps{flex:1;min-height:0;overflow:auto;padding-bottom:24px;}
+
+/* --------- Confirm-first setup (Section 2): Screens A/B/focus/C --------- */
+#screen-wizard #wizard-confirm{flex:1;min-height:0;overflow:auto;padding-bottom:24px;}
+#screen-wizard #wizard-confirm[hidden]{display:none;}
+.confirm-step{max-width:640px;margin:0 auto;text-align:center;}
+.confirm-step h2.confirm-heading{font-size:19px;text-transform:none;letter-spacing:0;color:var(--ink);line-height:1.4;font-weight:700;}
+.confirm-totals{display:flex;justify-content:center;gap:36px;margin:14px 0 20px;}
+.confirm-total-item{text-align:center;}
+.confirm-total-item .num{display:block;font-size:19px;font-weight:700;}
+.confirm-total-item.in .num{color:var(--ok);}
+.confirm-total-item.out .num{color:var(--danger);}
+.confirm-actions{display:flex;flex-direction:column;gap:10px;max-width:380px;margin:22px auto 0;}
+.btn-confirm-giant{font-size:15.5px;padding:14px 20px;min-height:52px;width:100%;justify-content:center;}
+.confirm-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
+.confirm-choice-tile{
+  appearance:none;background:var(--paper-raised);border:1.5px solid var(--paper-line);border-radius:var(--radius);
+  padding:20px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-align:center;color:var(--ink);
+}
+.confirm-choice-tile:hover{border-color:var(--brass);background:#faf6ec;}
+.confirm-name-input{
+  font:inherit;font-size:16px;padding:12px 14px;border-radius:var(--radius);border:1.5px solid var(--paper-line);
+  width:100%;max-width:340px;text-align:center;margin:16px auto 0;display:block;
+}
+#confirm-focus-host{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;text-align:left;}
+#confirm-focus-host > #csv-header-picker,#confirm-focus-host > #pdf-anchor-picker{width:100%;}
+#confirm-focus-host .live-preview{width:100%;}
+.wizard-footer{flex-shrink:0;position:static;background:var(--paper-raised);border-top:1px solid var(--paper-line);
+  padding:14px 4px;margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.wizard-footer-stepname{font-size:12px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.05em;}
+#wizard-next:disabled{opacity:.5;cursor:not-allowed;}
+.sample-cap{display:block;font-size:10.5px;color:var(--ink-dim);margin-top:4px;}
+/* Item 4: red mismatch warning under a date/number-format picker, and the one-click "Use detected" fallback inside it. */
+.picker-warn{color:var(--danger);margin:4px 0;}
+.picker-warn .rs-link{color:inherit;text-decoration:underline;}
+.row-resolve-actions{display:flex;gap:8px;flex-wrap:wrap;white-space:nowrap;}
+.row-resolve-actions .rs-link{color:var(--ink-dim);text-decoration:underline;cursor:pointer;background:none;border:none;font:inherit;padding:0;}
+.signatures-human{list-style:none;margin:0 0 12px;padding:0;font-size:12.5px;}
+.signatures-human li{padding:6px 0;border-bottom:1px solid #f0ede2;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+
+/* Locate-data page navigation (Fix 1) */
+.pdf-page-nav{display:flex;align-items:center;gap:10px;margin:8px 0;}
+.pdf-page-indicator{font-size:12px;color:var(--ink-dim);}
+
+/* Test step: neutral check result (Fix 3, e.g. no balance column - never red) */
+.rs-item.neutral{color:var(--ink-dim);}
+.rs-item.neutral .num{color:var(--ink-dim);}
+
+/* Test step: "show only flagged rows" toggle (Fix 6) */
+.flagged-only-toggle{display:block;font-size:12px;color:var(--ink-dim);margin:8px 0;cursor:pointer;}
+.flagged-only-toggle input{margin-right:6px;vertical-align:middle;}
+
+/* --------- Profiles --------- */
+.settings-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start;}
+/* Item E4: when profiles.js/settings.js measure one column running more than
+   2x taller than the other, they add this class instead of leaving a tall
+   empty gap in the short column at wide viewports. */
+.settings-grid.single-col{grid-template-columns:1fr;}
+.bank-group{margin-bottom:16px;}
+.bank-group h3{font-size:13px;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
+.version-row{
+  display:flex;justify-content:space-between;align-items:center;padding:9px 12px;
+  border:1px solid var(--paper-line);border-radius:5px;margin-bottom:6px;font-size:12.5px;background:#fff;gap:10px;
+}
+.version-row .vr-meta{color:var(--ink-dim);font-size:11.5px;}
+.version-row .vr-health{margin-top:2px;}
+.version-row-focused{border-color:var(--brass);box-shadow:0 0 0 2px var(--brass);}
+.version-row .vr-actions{display:flex;gap:6px;flex-shrink:0;}
+
+.settings-side .panel{margin-bottom:16px;}
+.kv-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px solid #f0ede2;}
+.kv-row:last-child{border-bottom:none;}
+.kv-row input{font:inherit;font-size:12.5px;padding:5px 7px;border-radius:4px;border:1px solid var(--paper-line);width:90px;}
+
+.danger-zone{border:1px solid #e3bcb0;background:var(--danger-bg);border-radius:var(--radius);padding:16px 18px;}
+.danger-zone h2{color:var(--danger);margin:0 0 6px;font-size:13.5px;}
+.danger-zone p{font-size:12.5px;color:#7a3327;margin:0 0 12px;}
+.danger-confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.danger-confirm input{font-family:inherit;font-size:12.5px;padding:8px 10px;border-radius:5px;border:1px solid #e3bcb0;width:140px;}
+
+/* --------- Settings: preset editor --------- */
+/* Item 2: compact rows - enabled columns are 32px, one line (drag handle,
+   checkbox, internal id caption, rename input); the whole editor fits in
+   about half its old height at 1440. */
+.preset-columns{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:4px;}
+.preset-columns li{
+  display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--paper-line);
+  border-radius:5px;padding:0 8px;height:32px;font-size:12px;
+}
+.preset-columns li input{font:inherit;font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid var(--paper-line);flex:1;height:22px;}
+.preset-columns li .col-field{color:var(--ink-dim);font-size:10.5px;min-width:88px;}
+/* Item 2: disabled fields are a two-column checklist (label + coverage, no
+   rename input), 28px rows - half the row count fits per pixel of height. */
+.preset-columns-disabled{list-style:none;margin:0 0 8px;padding:0;
+  display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;}
+.preset-columns-disabled li{display:flex;align-items:center;gap:6px;height:28px;font-size:11.5px;
+  color:var(--ink-dim);min-width:0;}
+.preset-columns-disabled li .col-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.preset-columns-disabled li .col-coverage{flex:0 1 96px;min-width:60px;}
+/* Item 2: drag handle + smaller up/down buttons now the handle is primary. */
+.col-drag-handle{cursor:grab;color:var(--ink-dim);font-size:13px;line-height:1;flex-shrink:0;user-select:none;}
+.preset-columns li.dragging{opacity:.4;}
+.icon-btn-xs{font-size:10px;padding:2px 5px;}
+/* Item 3: Coverage column - "All" reads plain, a partial file list or "None
+   in this session" reads muted (same disabled-column colour). */
+.col-coverage{font-size:11px;color:var(--ink-dim);flex:1 1 120px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.col-coverage-none{font-style:italic;}
+/* Item 4: the date format picker's live example, right next to its select. */
+.pg-example{display:block;margin-top:4px;font-size:11px;color:var(--ink-dim);}
+.money-direction-note{margin-top:10px;grid-column:1/-1;}
+/* The preview's Date column is a fixed-shape value (YYYY-MM-DD or similar) -
+   never let it wrap mid-date the way a long description cell can. */
+.preset-preview-table [data-field="date"]{min-width:96px;white-space:nowrap;}
+/* Item 15: the preview can be wider than the card once many columns are on -
+   it scrolls in its own box instead of stretching #export-panel/the page.
+   width:max-content (not the table's normal width:100%) is what actually
+   lets it grow past the container; min-width:100% keeps it from looking
+   sparse with few columns. The card and every ancestor up to it keep
+   min-width:0 so a flex/grid parent doesn't refuse to let this shrink back
+   down in the first place (workspace.css's main/.content-col already do). */
+.preset-preview-scroll{overflow-x:auto;max-width:100%;min-width:0;}
+.preset-preview-table{width:max-content;min-width:100%;}
+.preset-preview-table th:first-child,
+.preset-preview-table td:first-child{position:sticky;left:0;background:#fff;z-index:1;}
+.preset-preview-table thead th:first-child{background:var(--paper);}
+/* Item 1: fixed row height (not just min-height) so the box's height always
+   equals exactly one header + PREVIEW_VISIBLE_ROWS data rows - a value that
+   would otherwise wrap (a long description) just widens its column instead,
+   since the table's own width is content-driven (width:max-content above),
+   not wrapped-and-squeezed. */
+.preset-preview-table th,.preset-preview-table td{height:32px;box-sizing:border-box;white-space:nowrap;}
+/* Item 1/3: the live "what will be copied" preview scrolls vertically inside
+   a box exactly --preview-rows rows tall (plus its sticky header, already
+   `position:sticky;top:0` on every table.txn-table th) - the Settings
+   "Sample" preview (no --preview-rows set, 1-2 rows) never needs this. */
+.preset-preview-scroll-live{overflow-y:auto;max-height:calc((var(--preview-rows, 5) + 1) * 32px);}
+.preset-preview-caption{margin:12px 0 4px;}
+.preset-preview-footcaption{margin:6px 0 0;}
+#home-preset-editor,#preset-editor-container,.drawer-body,.export-panel{min-width:0;}
+/* Home drawer: standard 16px gap above the Mapping section, same as every
+   other picker-row/preview block in this drawer, so it doesn't collide with
+   the "Include header row" checkbox line above it. */
+h2.drawer-mapping-title{margin-top:16px;}
+.preset-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+/* --------- Home fast path: dropzone states, file rows, attention cards, export --------- */
+.dropzone.dragover{background:#efe9d9;border-color:var(--brass);}
+.reco-strip{
+  display:flex;align-items:center;gap:8px;justify-content:center;font-size:12.5px;
+  color:var(--ink-dim);background:#efe9d9;border-radius:var(--radius);padding:8px 12px;
+  max-width:520px;margin:0 auto;
+}
+.empty-explainer{font-size:12.5px;color:var(--ink-dim);margin:14px 0 0;line-height:1.6;}
+
+.dropzone-slim{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 18px;text-align:left;cursor:pointer;}
+.dropzone-slim strong{margin:0;font-size:13.5px;}
+
+.file-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+.file-row{
+  display:flex;align-items:center;gap:16px;background:var(--paper-raised);
+  border:1px solid var(--paper-line);border-radius:var(--radius);padding:10px 16px;
+}
+.file-row .fr-main{flex:1;min-width:0;}
+.file-row .fr-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.file-row .fr-line{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+/* Fix item 1: the row's status is plain text, not a coloured pill - drop
+   .badge's chip chrome here only (Profiles/Settings/Review keep their own
+   pill badges elsewhere). A flagged file's status stays an <a>, styled the
+   same as any other quiet text link. */
+.file-row .fr-line .badge{
+  display:inline;background:none;padding:0;border-radius:0;font-size:inherit;font-weight:inherit;line-height:inherit;
+}
+.file-row .fr-line a.badge{text-decoration:underline;cursor:pointer;}
+.prog{width:110px;flex-shrink:0;height:5px;border-radius:3px;background:#ece6d6;overflow:hidden;}
+.prog span{display:block;height:100%;background:var(--ok);}
+.prog.prog-active span{background:var(--brass);}
+
+.badge-low{background:var(--warn-bg);color:var(--warn);}
+
+.merge-notice{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  background:var(--ok-bg);border:1px solid #bfe0cb;border-radius:var(--radius);
+  padding:11px 16px;margin-bottom:16px;font-size:13px;color:#255239;
+}
+.merge-notice a{font-weight:600;text-decoration:underline;color:#255239;cursor:pointer;}
+
+.export-panel .export-summary{font-size:13px;color:var(--ink-dim);margin:0 0 14px;}
+.export-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.export-warn-note{font-size:12.5px;color:var(--warn);}
+.toggle-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-dim);}
+
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.chip{
+  border:1px solid var(--paper-line);background:#fff;border-radius:100px;padding:8px 15px;
+  font-size:12.5px;cursor:pointer;color:var(--ink);
+}
+.chip.active{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
+
+table.account-cov{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px;}
+table.account-cov th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+table.account-cov td{padding:9px 10px;border-bottom:1px solid #f0ede2;}
+
+.currency-modes{display:flex;gap:12px;margin-bottom:16px;}
+.mode-card{flex:1;border:1px solid var(--paper-line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;background:#fff;}
+.mode-card.active{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass);}
+.mode-card h3{margin:0 0 4px;font-size:13px;}
+.mode-card p{margin:0;font-size:12px;color:var(--ink-dim);}
+
+.rate-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;}
+.rate-table th{text-align:left;padding:7px 10px;font-size:11px;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+.rate-table td{padding:7px 10px;border-bottom:1px solid #f0ede2;}
+.rate-table input{font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);width:90px;}
+
+.preset-unsaved{display:flex;align-items:center;gap:12px;font-size:12px;margin-left:4px;}
+.preset-unsaved .tag-unsaved{background:var(--warn-bg);color:var(--warn);font-weight:600;font-size:11px;padding:3px 8px;border-radius:100px;}
+
+.home-toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--ink-900);color:var(--ink-text);padding:10px 20px;border-radius:var(--radius);
+  font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.25);opacity:0;transition:opacity .15s ease, transform .15s ease;
+  z-index:50;
+}
+.home-toast.shown{opacity:1;transform:translateX(-50%) translateY(0);}
+.home-toast a{color:inherit;text-decoration:underline;font-weight:600;margin-left:4px;cursor:pointer;}
+
+/* Remove control on every Home file row (Nate, 2026-09-17: delete individual
+   statements without clearing everything) - quiet until hovered/focused, but
+   never removed from the tab order so it's always reachable by keyboard. */
+.remove-file-btn{opacity:0;transition:opacity .12s ease;font-size:13px;flex-shrink:0;}
+.file-row:hover .remove-file-btn,
+.remove-file-btn:focus-visible{opacity:1;}
+
+/* --------- How it works (reading layout) --------- */
+.reading{max-width:680px;line-height:1.65;}
+.reading h2{font-size:15px;margin:26px 0 6px;}
+.reading h2:first-child{margin-top:0;}
+.reading p{margin:0 0 4px;font-size:13.5px;color:var(--ink);}
+.reading .password-note{margin-top:22px;padding:12px 14px;background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius);font-size:13px;color:var(--ink-dim);}
+.first-run-how-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-size:12.5px;cursor:pointer;padding:0;margin-top:10px;}

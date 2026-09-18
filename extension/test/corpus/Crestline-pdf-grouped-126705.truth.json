@@ -1,0 +1,62 @@
+{
+  "axes": {
+    "fileType": "pdf-grouped",
+    "bank": "Crestline",
+    "lang": "ja",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "1.234,56",
+    "signConvention": "crdr-prefix",
+    "preamble": "quoted",
+    "footer": "totals",
+    "encoding": "utf-16le",
+    "hasBalance": false,
+    "currency": "EUR"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": -45348,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-02",
+      "minor": 186439,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-02",
+      "minor": 76108,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-03",
+      "minor": -28908,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-03",
+      "minor": -109056,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": 99734,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 164799,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": 165443,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -31489,
+      "description": "Transfer From Savings"
+    }
+  ]
+}

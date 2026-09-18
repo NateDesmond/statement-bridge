@@ -1,0 +1,242 @@
+[
+  {
+    "date": "2026-08-15",
+    "amount": -330.66,
+    "description": "TARGET T-1234 CHICAGO IL REF0091829"
+  },
+  {
+    "date": "2026-08-16",
+    "amount": -86.47,
+    "description": "TARGET T-1234 CHICAGO IL REF0091829"
+  },
+  {
+    "date": "2026-08-17",
+    "amount": -78.13,
+    "description": "TARGET T-1234 CHICAGO IL REF0091829"
+  },
+  {
+    "date": "2026-08-17",
+    "amount": -163.17,
+    "description": "AMAZON.COM*A1B2C3D4E SEATTLE WA REF0091823"
+  },
+  {
+    "date": "2026-08-19",
+    "amount": -49.92,
+    "description": "COMCAST CABLE COMM PHILADELPHIA PA REF0091830"
+  },
+  {
+    "date": "2026-08-20",
+    "amount": -43.1,
+    "description": "CVS/PHARMACY #04471 CHICAGO IL REF0091831"
+  },
+  {
+    "date": "2026-08-21",
+    "amount": -392.76,
+    "description": "SHELL OIL 57200019283 CHICAGO IL REF0091827"
+  },
+  {
+    "date": "2026-08-21",
+    "amount": -86.48,
+    "description": "AMAZON.COM*A1B2C3D4E SEATTLE WA REF0091823"
+  },
+  {
+    "date": "2026-08-22",
+    "amount": -53.62,
+    "description": "ZELLE TRANSFER FROM J SMITH REF0091833"
+  },
+  {
+    "date": "2026-08-24",
+    "amount": -302.39,
+    "description": "COMCAST CABLE COMM PHILADELPHIA PA REF0091830"
+  },
+  {
+    "date": "2026-08-26",
+    "amount": -237.91,
+    "description": "TARGET T-1234 CHICAGO IL REF0091829"
+  },
+  {
+    "date": "2026-08-26",
+    "amount": -178.91,
+    "description": "CVS/PHARMACY #04471 CHICAGO IL REF0091831"
+  },
+  {
+    "date": "2026-08-28",
+    "amount": -128.27,
+    "description": "UBER TRIP 8X7Y6Z SAN FRANCISCO CA REF0091825"
+  },
+  {
+    "date": "2026-08-28",
+    "amount": -337.6,
+    "description": "ZELLE TRANSFER FROM J SMITH REF0091833"
+  },
+  {
+    "date": "2026-08-30",
+    "amount": -259.65,
+    "description": "CVS/PHARMACY #04471 CHICAGO IL REF0091831"
+  },
+  {
+    "date": "2026-08-31",
+    "amount": -100.72,
+    "description": "COMCAST CABLE COMM PHILADELPHIA PA REF0091830"
+  },
+  {
+    "date": "2026-09-01",
+    "amount": -86.82,
+    "description": "STARBUCKS STORE 04471 CHICAGO IL REF0091826"
+  },
+  {
+    "date": "2026-09-01",
+    "amount": -331.63,
+    "description": "CVS/PHARMACY #04471 CHICAGO IL REF0091831"
+  },
+  {
+    "date": "2026-09-03",
+    "amount": -96.15,
+    "description": "TARGET T-1234 CHICAGO IL REF0091829"
+  },
+  {
+    "date": "2026-09-03",
+    "amount": -391.84,
+    "description": "UBER TRIP 8X7Y6Z SAN FRANCISCO CA REF0091825"
+  },
+  {
+    "date": "2026-09-04",
+    "amount": -190.95,
+    "description": "AMAZON.COM*A1B2C3D4E SEATTLE WA REF0091823"
+  },
+  {
+    "date": "2026-09-05",
+    "amount": -378.42,
+    "description": "NETFLIX.COM LOS GATOS CA REF0091828"
+  },
+  {
+    "date": "2026-09-05",
+    "amount": -395.58,
+    "description": "CVS/PHARMACY #04471 CHICAGO IL REF0091831"
+  },
+  {
+    "date": "2026-09-06",
+    "amount": -113.6,
+    "description": "DIRECT DEPOSIT PAYROLL ACME CORP REF0091832"
+  },
+  {
+    "date": "2026-09-08",
+    "amount": -246.62,
+    "description": "AMAZON.COM*A1B2C3D4E SEATTLE WA REF0091823"
+  },
+  {
+    "date": "2026-09-10",
+    "amount": -110.53,
+    "description": "ZELLE TRANSFER FROM J SMITH REF0091833"
+  },
+  {
+    "date": "2026-09-10",
+    "amount": -213.89,
+    "description": "COMCAST CABLE COMM PHILADELPHIA PA REF0091830"
+  },
+  {
+    "date": "2026-09-11",
+    "amount": -79.43,
+    "description": "WHOLE FOODS MKT 10234 CHICAGO IL REF0091824"
+  },
+  {
+    "date": "2026-09-11",
+    "amount": -345.04,
+    "description": "STARBUCKS STORE 04471 CHICAGO IL REF0091826"
+  },
+  {
+    "date": "2026-09-13",
+    "amount": -10.47,
+    "description": "NETFLIX.COM LOS GATOS CA REF0091828"
+  },
+  {
+    "date": "2026-09-13",
+    "amount": 121.52,
+    "description": "TARGET T-1234 CHICAGO IL REF0091829"
+  },
+  {
+    "date": "2026-09-15",
+    "amount": -208.04,
+    "description": "ZELLE TRANSFER FROM J SMITH REF0091833"
+  },
+  {
+    "date": "2026-09-15",
+    "amount": -316.75,
+    "description": "WHOLE FOODS MKT 10234 CHICAGO IL REF0091824"
+  },
+  {
+    "date": "2026-09-16",
+    "amount": -390.35,
+    "description": "COMCAST CABLE COMM PHILADELPHIA PA REF0091830"
+  },
+  {
+    "date": "2026-09-18",
+    "amount": 132.26,
+    "description": "STARBUCKS STORE 04471 CHICAGO IL REF0091826"
+  },
+  {
+    "date": "2026-09-19",
+    "amount": -407.51,
+    "description": "NETFLIX.COM LOS GATOS CA REF0091828"
+  },
+  {
+    "date": "2026-09-19",
+    "amount": -21.69,
+    "description": "ZELLE TRANSFER FROM J SMITH REF0091833"
+  },
+  {
+    "date": "2026-09-21",
+    "amount": -369,
+    "description": "CVS/PHARMACY #04471 CHICAGO IL REF0091831"
+  },
+  {
+    "date": "2026-09-23",
+    "amount": -240.16,
+    "description": "COMCAST CABLE COMM PHILADELPHIA PA REF0091830"
+  },
+  {
+    "date": "2026-09-23",
+    "amount": 233.3,
+    "description": "UBER TRIP 8X7Y6Z SAN FRANCISCO CA REF0091825"
+  },
+  {
+    "date": "2026-09-24",
+    "amount": -138.76,
+    "description": "WHOLE FOODS MKT 10234 CHICAGO IL REF0091824"
+  },
+  {
+    "date": "2026-09-26",
+    "amount": -161.13,
+    "description": "CHIPOTLE ONLINE 4471 CHICAGO IL REF0091834"
+  },
+  {
+    "date": "2026-09-26",
+    "amount": -11.51,
+    "description": "UBER TRIP 8X7Y6Z SAN FRANCISCO CA REF0091825"
+  },
+  {
+    "date": "2026-09-28",
+    "amount": -225.86,
+    "description": "SHELL OIL 57200019283 CHICAGO IL REF0091827"
+  },
+  {
+    "date": "2026-09-29",
+    "amount": -369.17,
+    "description": "CHIPOTLE ONLINE 4471 CHICAGO IL REF0091834"
+  },
+  {
+    "date": "2026-09-29",
+    "amount": -230.53,
+    "description": "UBER TRIP 8X7Y6Z SAN FRANCISCO CA REF0091825"
+  },
+  {
+    "date": "2026-09-30",
+    "amount": -44.1,
+    "description": "DIRECT DEPOSIT PAYROLL ACME CORP REF0091832"
+  },
+  {
+    "date": "2026-09-30",
+    "amount": -118.81,
+    "description": "NETFLIX.COM LOS GATOS CA REF0091828"
+  }
+]

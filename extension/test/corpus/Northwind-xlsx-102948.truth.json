@@ -1,0 +1,97 @@
+{
+  "axes": {
+    "fileType": "xlsx",
+    "bank": "Northwind",
+    "lang": "de",
+    "dateFormat": "DD/MM/YYYY",
+    "numberFormat": "space-thousands",
+    "signConvention": "debitCredit",
+    "preamble": "none",
+    "footer": "none",
+    "encoding": "utf-8",
+    "hasBalance": false,
+    "currency": "USD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-04",
+      "minor": -184092,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 185876,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -75352,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 65276,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": 172608,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": 8204,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": -18083,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": 112430,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-19",
+      "minor": -196978,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-21",
+      "minor": -10303,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-23",
+      "minor": -5488,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-25",
+      "minor": 132010,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-28",
+      "minor": 129702,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-30",
+      "minor": 88771,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-07-03",
+      "minor": 126040,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-07-05",
+      "minor": 51433,
+      "description": "Bookstore"
+    }
+  ]
+}

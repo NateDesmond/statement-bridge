@@ -1,0 +1,82 @@
+{
+  "axes": {
+    "fileType": "pdf-columns",
+    "bank": "Crestline",
+    "lang": "nl",
+    "dateFormat": "DD/MM/YYYY",
+    "numberFormat": "jpy",
+    "signConvention": "parens",
+    "preamble": "none",
+    "footer": "totals",
+    "encoding": "utf-8",
+    "hasBalance": false,
+    "currency": "JPY"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -249,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": 160,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": -390,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -984,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -1810,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -195,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-14",
+      "minor": 1661,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -1580,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-18",
+      "minor": -191,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-19",
+      "minor": -1582,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": 1195,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-24",
+      "minor": 1779,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-26",
+      "minor": -261,
+      "description": "Cinema Tickets"
+    }
+  ]
+}

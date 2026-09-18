@@ -1,0 +1,92 @@
+{
+  "axes": {
+    "fileType": "pdf-grouped",
+    "bank": "Crestline",
+    "lang": "ms",
+    "dateFormat": "DD/MM/YYYY",
+    "numberFormat": "jpy",
+    "signConvention": "crdr-suffix",
+    "preamble": "none",
+    "footer": "totals",
+    "encoding": "windows-1252",
+    "hasBalance": false,
+    "currency": "JPY"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": 1163,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -1733,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -697,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": -1997,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 1403,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 899,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -203,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": 91,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -1357,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -811,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -1861,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": 1237,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -851,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -1742,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": 774,
+      "description": "Electric Co Bill"
+    }
+  ]
+}

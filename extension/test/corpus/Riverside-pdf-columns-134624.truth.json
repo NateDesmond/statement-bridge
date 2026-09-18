@@ -1,0 +1,97 @@
+{
+  "axes": {
+    "fileType": "pdf-columns",
+    "bank": "Riverside",
+    "lang": "pt",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "1.234,56",
+    "signConvention": "signed",
+    "preamble": "tabpadded",
+    "footer": "none",
+    "encoding": "utf-8-bom",
+    "hasBalance": true,
+    "currency": "EUR"
+  },
+  "truth": [
+    {
+      "date": "2026-06-04",
+      "minor": -5141,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": -28400,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": 133269,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -769,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": 145598,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": -72124,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": 178958,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": 109204,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": 28668,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": 21431,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": 53405,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-21",
+      "minor": -159830,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-23",
+      "minor": -73493,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-25",
+      "minor": -73513,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-28",
+      "minor": -183323,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-07-01",
+      "minor": -43803,
+      "description": "Coffee House"
+    }
+  ]
+}

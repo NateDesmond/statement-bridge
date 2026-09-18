@@ -1,0 +1,33 @@
+<!doctype html>
+<html><body>
+<div id="out">running</div>
+<script type="module">
+import { withPdfjs } from '../src/core/pdf.js';
+
+const params = new URLSearchParams(location.search);
+const src = params.get('src') || '../test/fixtures/northwind_transaction_history_sample.pdf';
+const scale = Number(params.get('scale') || '2');
+
+async function main() {
+  const bytes = new Uint8Array(await (await fetch(src)).arrayBuffer());
+  const { dataUrl, width, height } = await withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
+    const doc = await pdfjsLib.getDocument({ data: bytes, standardFontDataUrl }).promise;
+    const page = await doc.getPage(1);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    // White background: the source PDF has no background fill, so an
+    // unfilled canvas (transparent) would turn black once re-encoded as
+    // opaque JPEG. A real scanned statement page is white paper.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.92), width: canvas.width, height: canvas.height };
+  });
+  document.getElementById('out').textContent = JSON.stringify({ dataUrl, width, height });
+}
+main();
+</script>
+</body></html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Statement Bridge dev harness</title></head>
+<body>
+<script src="chrome-shim.js"></script>
+<script>
+  // Load the real workspace.html (paths become relative to /dev/, so rewrite them)
+  // then replace this document with it. window.chrome (set above) survives the
+  // document.open()/write()/close() reset since it's the same window.
+  fetch('../workspace.html').then((r) => r.text()).then((html) => {
+    const fixed = html.replace(/(href|src)="(?!http)/g, '$1="../');
+    document.open();
+    document.write(fixed);
+    document.close();
+  });
+</script>
+</body>
+</html>

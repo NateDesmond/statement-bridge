@@ -1,0 +1,14 @@
+"Account Details For:","Meridian Current Account 123-4-567890",,,,,,,,,,
+"Statement as at:","16 Sep 2026",,,,,,,,,,
+"",,,,,,,,,,,
+"Currency:","SGD - Singapore Dollar",,,,,,,,,,
+"",,,,,,,,,,,
+"Available Balance:","SGD 8214.12",,,,,,,,,,
+"Ledger Balance:","SGD 8214.12",,,,,,,,,,
+"",,,,,,,,,,,
+"Transaction Date","Value Date","Statement Code","Description","Supplementary Code","Supplementary Code Description","Client Reference","Additional Reference","Status","Currency","Debit Amount","Credit Amount"
+"15 Sep 2026","","POS","BAT 2C2*LAZADA Singapore SGP","","","","","Settled","SGD","20.83",""
+"15 Sep 2026","","ADV","GIRO SALARY CREDIT ACME PTE LTD","","","","","Settled","SGD","","4200.00"
+"14 Sep 2026","","POS","NTUC FAIRPRICE FINEST SGP","","","","","Settled","SGD","48.20",""
+"12 Sep 2026","","POS","GRAB* A-1928374 SINGAPORE SG","","","","","Settled","SGD","14.60",""
+"12 Sep 2026","","POS","SHOPEE SG *8823","","","","","Settled","SGD","216.30",""

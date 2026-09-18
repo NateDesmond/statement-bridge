@@ -1,0 +1,28 @@
+**/test/private/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+wrangler.jsonc.orig.bak
+
+# node
+node_modules/
+**/node_modules/
+
+# audit / dev scratch output, never real content to publish
+**/audit/tmp/
+**/audit/shots/
+**/dev/tmp/
+**/dev/shots/
+designs/*/shots/
+site/shots/
+
+# logs and local backups
+*.log
+*.bak
+
+# internal dev-coordination notes, not for the public repo
+/HARDENING.md

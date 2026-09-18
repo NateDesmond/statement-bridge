@@ -1,0 +1,87 @@
+{
+  "axes": {
+    "fileType": "pdf-grouped",
+    "bank": "Lattice",
+    "lang": "it",
+    "dateFormat": "DD MMM YYYY",
+    "numberFormat": "space-thousands",
+    "signConvention": "crdr-suffix",
+    "preamble": "tabpadded",
+    "footer": "totals",
+    "encoding": "utf-8-bom",
+    "hasBalance": false,
+    "currency": "EUR"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": 82746,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-02",
+      "minor": 76082,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-02",
+      "minor": -154608,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -48593,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -72464,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -145612,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 20003,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 10279,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -144149,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -190673,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": 150014,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 124099,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": -115599,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": 190637,
+      "description": "Amazon Purchase"
+    }
+  ]
+}

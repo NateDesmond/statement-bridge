@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Statement Bridge, Option 3: The Guide</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --brand:#0E8577;
+    --brand-dark:#0A6558;
+    --brand-ink:#063E35;
+    --panel:#EAF5F2;
+    --panel-strong:#DCEFEA;
+    --bg:#FFFFFF;
+    --ink:#152420;
+    --muted:#5C6B67;
+    --border:#DCE6E2;
+    --border-strong:#C4D3CE;
+    --warn-bg:#FFF3E1;
+    --warn-ink:#8A5300;
+    --warn-border:#F3D8A9;
+    --bad-bg:#FDECE9;
+    --bad-ink:#A23A25;
+    --bad-border:#F3C7BC;
+    --coral:#E0603F;
+    --good:#0E8577;
+    --radius:12px;
+    --radius-sm:10px;
+    --shadow:0 1px 2px rgba(21,36,32,0.06), 0 6px 20px rgba(21,36,32,0.05);
+    font-size:15px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    min-width:1024px;
+  }
+  a{color:var(--brand-dark);}
+  h1,h2,h3,h4{margin:0 0 4px 0; font-weight:650; letter-spacing:-0.01em; color:var(--ink);}
+  p{margin:0;}
+  button{font-family:inherit; font-size:15px; cursor:pointer;}
+  :focus-visible{outline:2px solid var(--brand-dark); outline-offset:2px; border-radius:6px;}
+
+  /* ---------- Shell ---------- */
+  .shell{max-width:1520px; margin:0 auto; padding:0 32px 64px;}
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 0; border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:var(--bg); z-index:20;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand img{width:32px; height:32px; border-radius:8px; display:block;}
+  .brand-name{font-weight:700; font-size:17px; letter-spacing:-0.01em;}
+  nav.tabs{display:flex; gap:4px; background:var(--panel); padding:4px; border-radius:999px;}
+  nav.tabs button{
+    border:none; background:transparent; padding:9px 18px; border-radius:999px;
+    color:var(--brand-ink); font-weight:600; font-size:14px;
+  }
+  nav.tabs button.active{background:var(--bg); color:var(--brand-dark); box-shadow:var(--shadow);}
+  nav.tabs button:hover:not(.active){background:var(--panel-strong);}
+
+  /* ---------- About panel ---------- */
+  .about{
+    margin-top:24px; display:flex; gap:24px; align-items:center;
+    background:var(--panel); border:1px solid var(--border-strong);
+    border-radius:var(--radius); padding:22px 26px;
+  }
+  .about img{width:64px; height:64px; border-radius:14px; background:var(--bg); flex-shrink:0; display:block;}
+  .about-copy h2{font-size:16px; margin-bottom:6px;}
+  .about-copy p{color:var(--brand-ink); max-width:900px; font-size:14px;}
+  .about-copy p + p{margin-top:6px;}
+
+  /* ---------- Screens ---------- */
+  .screen{display:none; margin-top:28px;}
+  .screen.active{display:block;}
+  .screen-head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px;}
+  .screen-head h1{font-size:22px;}
+  .screen-head .sub{color:var(--muted); font-size:14px; margin-top:2px;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px; border-radius:var(--radius-sm);
+    border:1px solid transparent; padding:11px 18px; font-weight:650; font-size:14px;
+    transition:background .12s ease;
+  }
+  .btn-primary{background:var(--brand); color:#fff;}
+  .btn-primary:hover{background:var(--brand-dark);}
+  .btn-primary:disabled{background:#B9CFCA; cursor:not-allowed;}
+  .btn-secondary{background:var(--bg); border-color:var(--border-strong); color:var(--ink);}
+  .btn-secondary:hover{border-color:var(--brand); color:var(--brand-dark);}
+  .btn-ghost{background:transparent; border-color:transparent; color:var(--brand-dark); padding:8px 10px;}
+  .btn-ghost:hover{background:var(--panel);}
+  .btn-danger{background:#fff; border-color:var(--bad-border); color:var(--bad-ink);}
+  .btn-danger:hover{background:var(--bad-bg);}
+  .btn-sm{padding:7px 12px; font-size:13px;}
+
+  .badge{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:650; padding:4px 10px; border-radius:999px; border:1px solid transparent;}
+  .badge-good{background:#E4F3EF; color:var(--brand-dark); border-color:#BFE2D8;}
+  .badge-warn{background:var(--warn-bg); color:var(--warn-ink); border-color:var(--warn-border);}
+  .badge-bad{background:var(--bad-bg); color:var(--bad-ink); border-color:var(--bad-border);}
+  .badge-new{background:var(--panel); color:var(--brand-ink); border-color:var(--border-strong);}
+  .badge-muted{background:#F1F3F2; color:var(--muted); border-color:var(--border);}
+  .dot{width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0;}
+
+  .card{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);}
+
+  /* ---------- Screen 1: Import ---------- */
+  .import-toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
+  .dropzone{
+    border:2px dashed var(--border-strong); border-radius:var(--radius); background:var(--panel);
+    padding:36px 28px; display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:20px;
+  }
+  .dropzone .dz-copy h2{font-size:17px;}
+  .dropzone .dz-copy p{color:var(--brand-ink); font-size:14px; margin-top:4px;}
+  .dropzone .dz-hint{color:var(--muted); font-size:12.5px; margin-top:8px;}
+  .merge-notice{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    background:#EFF7F4; border:1px solid #C9E5DB; border-radius:var(--radius-sm);
+    padding:12px 16px; margin-bottom:18px; font-size:14px; color:var(--brand-ink);
+  }
+  .file-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:16px;}
+  .file-card{padding:18px 20px;}
+  .file-card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:12px;}
+  .file-card h3{font-size:15.5px;}
+  .file-card .meta{color:var(--muted); font-size:13px; margin-top:2px;}
+  .file-card .stats{display:flex; gap:18px; margin-top:14px; font-size:13px; color:var(--ink);}
+  .file-card .stats b{display:block; font-size:14.5px;}
+  .file-card .stats span{color:var(--muted); font-size:12px;}
+  .file-card .actions{display:flex; gap:8px; margin-top:16px;}
+  .file-card .expiry{margin-top:10px; font-size:12px; color:var(--warn-ink); display:flex; align-items:center; gap:6px;}
+  .file-card .ask{
+    margin-top:12px; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px;
+    padding:10px 12px; font-size:13px; color:var(--warn-ink);
+  }
+  .file-card .ask .ask-actions{display:flex; gap:8px; margin-top:8px;}
+
+  /* ---------- Screen 2: Review ---------- */
+  .summary-bar{
+    display:flex; gap:0; background:var(--panel); border:1px solid var(--border-strong);
+    border-radius:var(--radius); overflow:hidden; margin-bottom:18px;
+  }
+  .summary-cell{flex:1; padding:13px 18px; border-right:1px solid var(--border-strong);}
+  .summary-cell:last-child{border-right:none;}
+  .summary-cell .label{font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--brand-ink); font-weight:650;}
+  .summary-cell .value{font-size:15px; font-weight:650; margin-top:3px;}
+  .summary-cell.fail{background:var(--bad-bg);}
+  .summary-cell.fail .value{color:var(--bad-ink);}
+  .summary-cell .value a{font-size:12px; font-weight:650; margin-left:6px;}
+
+  .split{display:grid; grid-template-columns:1fr 1.15fr; gap:18px; align-items:stretch;}
+  .pane{padding:0; overflow:hidden; display:flex; flex-direction:column; height:640px;}
+  .pane-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--panel);}
+  .pane-head .zoom{display:flex; align-items:center; gap:6px;}
+  .pane-head .zoom button{width:26px; height:26px; border-radius:6px; border:1px solid var(--border-strong); background:var(--bg);}
+  .pane-body{flex:1; overflow:auto; padding:20px;}
+  .fake-page{
+    background:#fff; border:1px solid var(--border-strong); border-radius:4px; padding:28px 24px;
+    font-family:"Courier New", monospace; font-size:12px; color:#2c3a36; line-height:1.7; box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  }
+  .fake-page .stmt-title{font-family:-apple-system, sans-serif; font-weight:700; font-size:14px; margin-bottom:2px;}
+  .fake-page .stmt-sub{font-family:-apple-system, sans-serif; color:#667; font-size:11.5px; margin-bottom:16px;}
+  .fake-page table{width:100%; border-collapse:collapse; font-size:11.5px;}
+  .fake-page td{padding:5px 4px; vertical-align:top;}
+  .fake-page tr.pdf-row{cursor:pointer;}
+  .fake-page tr.pdf-row:hover td{background:#F2FAF7;}
+  .fake-page tr.row-selected td{background:#DCEFEA; box-shadow:inset 0 0 0 1px var(--brand);}
+
+  table.data{width:100%; border-collapse:collapse; font-size:13.5px;}
+  table.data thead th{
+    position:sticky; top:0; background:var(--bg); text-align:left; font-size:11.5px; text-transform:uppercase;
+    letter-spacing:.03em; color:var(--muted); font-weight:650; padding:8px 10px; border-bottom:1px solid var(--border);
+  }
+  table.data tbody td{padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top;}
+  table.data tbody tr{cursor:pointer;}
+  table.data tbody tr:hover td{background:#F7FBFA;}
+  table.data tbody tr.row-selected td{background:#DCEFEA;}
+  table.data tbody tr.row-excluded td{color:var(--muted); text-decoration:line-through; background:#FAFAF9;}
+  table.data td.amt{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .flag-warn{color:var(--warn-ink); font-size:11.5px; font-weight:650; display:flex; align-items:center; gap:4px; margin-top:2px; white-space:normal;}
+  .flag-edit{color:var(--brand-dark); font-size:11.5px; font-weight:650; display:flex; align-items:center; gap:4px; margin-top:2px; white-space:normal;}
+  .flag-excl{font-size:11.5px; font-weight:650; display:flex; align-items:center; gap:4px; margin-top:2px; white-space:normal;}
+  .row-toggle{border:1px solid var(--border-strong); background:var(--bg); border-radius:6px; font-size:11px; padding:2px 7px;}
+
+  /* ---------- Screen 3: Mapping wizard ---------- */
+  .stepper{display:flex; align-items:center; gap:0; margin-bottom:22px;}
+  .step{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13.5px; font-weight:600;}
+  .step .num{width:24px; height:24px; border-radius:50%; background:var(--panel); border:1px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--brand-ink);}
+  .step.done .num{background:var(--brand); border-color:var(--brand); color:#fff;}
+  .step.current{color:var(--ink);}
+  .step.current .num{background:var(--brand); border-color:var(--brand); color:#fff;}
+  .step-line{width:36px; height:1px; background:var(--border-strong); margin:0 10px;}
+
+  .wizard-grid{display:grid; grid-template-columns:0.85fr 1.15fr; gap:20px;}
+  .conversation{padding:24px; display:flex; flex-direction:column; gap:16px;}
+  .progress-line{font-size:12.5px; color:var(--muted); font-weight:650;}
+  .progress-track{height:5px; background:var(--panel); border-radius:99px; overflow:hidden;}
+  .progress-fill{height:100%; background:var(--brand); width:37.5%;}
+  .question h2{font-size:17px; margin-bottom:4px;}
+  .question .hint{color:var(--muted); font-size:13px;}
+  .samples{background:var(--panel); border-radius:8px; padding:10px 12px; font-family:"Courier New", monospace; font-size:12px; color:var(--brand-ink); margin-top:2px;}
+  .samples div + div{margin-top:3px;}
+  .choice-list{display:flex; flex-direction:column; gap:8px; margin-top:4px;}
+  .choice{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:11px 14px; background:var(--bg);
+  }
+  .choice.picked{border-color:var(--brand); background:#F2FAF7;}
+  .choice .cname{font-weight:650; font-size:14px;}
+  .choice .csample{color:var(--muted); font-size:12px; margin-top:2px;}
+  .confirm-note{font-size:12.5px; color:var(--brand-ink); background:var(--panel); border-radius:8px; padding:10px 12px;}
+  .confirm-row{display:flex; gap:10px; margin-top:4px;}
+  .mini-pickers{display:flex; gap:10px; margin-top:2px;}
+  .mini-pickers label{display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); font-weight:650; flex:1;}
+  select, input[type=text], input[type=number]{
+    font-family:inherit; font-size:13.5px; padding:8px 10px; border-radius:8px; border:1px solid var(--border-strong); background:#fff; color:var(--ink);
+  }
+  .field-list{display:flex; flex-direction:column; gap:6px; margin-top:6px;}
+  .field-pill{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:8px; font-size:12.5px;}
+  .field-pill.mapped{background:#F2FAF7;}
+  .field-pill.pending{background:var(--panel);}
+  .field-pill .fname{font-weight:650;}
+  .field-pill .fsrc{color:var(--muted);}
+
+  .preview-pane{padding:0; display:flex; flex-direction:column; height:100%;}
+  .preview-pane .pane-head{background:var(--panel);}
+  .preview-pane .pane-body{padding:0;}
+  table.preview{width:100%; border-collapse:collapse; font-size:13px;}
+  table.preview thead th{position:sticky; top:0; background:var(--bg); text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; color:var(--muted); font-weight:650;}
+  table.preview thead th.active-col{color:var(--brand-dark); background:#F2FAF7;}
+  table.preview tbody td{padding:8px 12px; border-bottom:1px solid var(--border);}
+  table.preview tbody td.active-col{background:#F2FAF7;}
+  table.preview td.amt{text-align:right; font-variant-numeric:tabular-nums;}
+
+  /* ---------- Screen 4: Export ---------- */
+  .export-grid{display:grid; grid-template-columns:1.3fr 0.9fr; gap:20px; align-items:start;}
+  .section-block{padding:20px 22px; margin-bottom:18px;}
+  .section-block h2{font-size:15px; margin-bottom:12px;}
+  .preset-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .preset-row button{border:1px solid var(--border-strong); background:var(--bg); border-radius:999px; padding:8px 15px; font-size:13px; font-weight:650; color:var(--ink);}
+  .preset-row button.active{background:var(--brand); border-color:var(--brand); color:#fff;}
+  .account-table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  .account-table th{text-align:left; font-size:11.5px; text-transform:uppercase; color:var(--muted); font-weight:650; padding:6px 8px; border-bottom:1px solid var(--border);}
+  .account-table td{padding:8px 8px; border-bottom:1px solid var(--border);}
+  .coverage-warn{
+    margin-top:14px; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px;
+    padding:11px 14px; font-size:13.5px; color:var(--warn-ink); display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+  .mode-toggle{display:flex; gap:10px; margin-bottom:14px;}
+  .mode-card{
+    flex:1; border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:13px 15px; cursor:pointer;
+  }
+  .mode-card.selected{border-color:var(--brand); background:#F2FAF7;}
+  .mode-card h3{font-size:13.5px;}
+  .mode-card p{font-size:12px; color:var(--muted); margin-top:3px;}
+  .rate-grid{display:flex; flex-direction:column; gap:10px;}
+  .rate-row{display:flex; align-items:center; gap:10px; background:var(--panel); border-radius:8px; padding:10px 12px;}
+  .rate-row .pair{font-weight:650; font-size:13px; width:90px;}
+  .rate-row input{width:80px;}
+  .rate-row .flip{font-size:12px; color:var(--muted);}
+  .checklist{display:flex; flex-direction:column; gap:9px; margin-bottom:16px;}
+  .check-item{display:flex; align-items:center; gap:9px; font-size:13.5px;}
+  .check-item .tick{width:18px; height:18px; border-radius:5px; background:var(--brand); color:#fff; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .check-item.pending .tick{background:var(--panel-strong); color:var(--brand-ink);}
+  .export-actions{display:flex; gap:10px; align-items:center;}
+  .toggle-row{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-top:12px;}
+
+  /* ---------- Screen 5: Settings ---------- */
+  .settings-grid{display:grid; grid-template-columns:1.3fr 0.9fr; gap:20px; align-items:start;}
+  .bank-group{margin-bottom:8px;}
+  .bank-group summary{list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; padding:14px 20px; font-weight:650; font-size:14.5px;}
+  .bank-group summary::-webkit-details-marker{display:none;}
+  .bank-group[open] summary{border-bottom:1px solid var(--border);}
+  .version-row{display:flex; align-items:center; justify-content:space-between; padding:11px 20px; border-bottom:1px solid var(--border); font-size:13.5px;}
+  .version-row:last-child{border-bottom:none;}
+  .version-row .vmeta{color:var(--muted); font-size:12px; margin-top:2px;}
+  .version-row .vactions{display:flex; gap:6px;}
+  .icon-btn{width:28px; height:28px; border-radius:7px; border:1px solid var(--border-strong); background:#fff; font-size:13px; display:flex; align-items:center; justify-content:center;}
+  .icon-btn:hover{border-color:var(--brand);}
+  .storage-bar{height:10px; border-radius:99px; overflow:hidden; display:flex; background:var(--panel); margin-top:8px;}
+  .storage-bar .seg-sessions{background:var(--brand);}
+  .storage-bar .seg-settings{background:#7FBBAF;}
+  .storage-legend{display:flex; gap:16px; margin-top:8px; font-size:12.5px; color:var(--muted);}
+  .storage-legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:9px; height:9px; border-radius:3px; display:inline-block;}
+  .danger-zone{border-color:var(--bad-border); background:#FFFBFA;}
+  .danger-zone h2{color:var(--bad-ink);}
+  .confirm-box{margin-top:10px; background:var(--bad-bg); border:1px solid var(--bad-border); border-radius:8px; padding:12px 14px; font-size:13px; color:var(--bad-ink);}
+  .confirm-box input[type=text]{margin-top:8px; width:220px;}
+
+  .empty{color:var(--muted); font-size:13.5px; padding:14px 0;}
+  code.k{background:var(--panel); padding:1px 6px; border-radius:5px; font-size:12px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="topbar">
+    <div class="brand">
+      <img src="../logos/logo-3.png" width="32" height="32" alt="Statement Bridge logo" onerror="this.style.background='var(--panel-strong)'">
+      <span class="brand-name">Statement Bridge</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="active" data-screen="s1">Import</button>
+      <button data-screen="s2">Review</button>
+      <button data-screen="s3">Map fields</button>
+      <button data-screen="s4">Export</button>
+      <button data-screen="s5">Settings</button>
+    </nav>
+  </header>
+
+  <section class="about">
+    <img src="../logos/logo-3.png" width="64" height="64" alt="Statement Bridge logo, larger" onerror="this.style.background='var(--panel-strong)'">
+    <div class="about-copy">
+      <h2>Option 3: "The Guide"</h2>
+      <p>A calm, conversational layout for the first person who has never mapped a statement before: one teal accent, soft tinted panels, generous space, and progress that says what is actually happening instead of a bare percentage.</p>
+      <p>Spreadsheet budgeters trust their own sheet more than any tool, so nothing here claims a result without showing the row it came from, and every automatic guess still waits for a click before it counts.</p>
+      <p>Worth a look: the mapping wizard on the Map fields tab asks one question at a time on the left while the real preview table updates on the right, so the format never feels abstract.</p>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 1: IMPORT ================= -->
+  <section class="screen active" id="s1">
+    <div class="screen-head">
+      <div>
+        <h1>Your statements</h1>
+        <div class="sub">Drop files in, or pick them. 2 of 4 files are ready to export.</div>
+      </div>
+      <button class="btn btn-ghost btn-sm">Clear sessions</button>
+    </div>
+
+    <div class="dropzone">
+      <div class="dz-copy">
+        <h2>Drop statements here</h2>
+        <p>CSV is more reliable than PDF. If your bank offers a CSV download, use that first.</p>
+        <div class="dz-hint">Works with CSV and text PDF statements. Nothing leaves this tab.</div>
+      </div>
+      <button class="btn btn-primary">Choose files</button>
+    </div>
+
+    <div class="merge-notice">
+      <span>3 rows merged from overlapping files in Summit Bank One.</span>
+      <button class="btn btn-ghost btn-sm">Undo</button>
+    </div>
+
+    <div class="file-grid">
+      <div class="card file-card">
+        <div class="file-card-top">
+          <div>
+            <h3>Meridian Bank, Savings</h3>
+            <div class="meta">****4821 &middot; CSV &middot; 01 to 31 Aug 2026</div>
+          </div>
+          <span class="badge badge-good"><span class="dot"></span>All checks pass</span>
+        </div>
+        <div class="stats">
+          <div><b>42</b><span>rows</span></div>
+          <div><b>SGD 5,230.00</b><span>in</span></div>
+          <div><b>SGD 3,110.45</b><span>out</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm">Open in Review</button>
+          <button class="btn btn-ghost btn-sm">Remove</button>
+        </div>
+      </div>
+
+      <div class="card file-card">
+        <div class="file-card-top">
+          <div>
+            <h3>Summit Bank One, Savings</h3>
+            <div class="meta">****7734 &middot; CSV &middot; 01 to 25 Aug 2026</div>
+          </div>
+          <span class="badge badge-warn"><span class="dot"></span>Warnings</span>
+        </div>
+        <div class="stats">
+          <div><b>38</b><span>rows</span></div>
+          <div><b>SGD 2,010.00</b><span>in</span></div>
+          <div><b>SGD 1,940.20</b><span>out</span></div>
+        </div>
+        <div class="ask">
+          Layout seems to have changed since your saved format. <strong>Update mapping</strong> to keep everything lined up.
+          <div class="ask-actions">
+            <button class="btn btn-primary btn-sm">Update mapping</button>
+            <button class="btn btn-ghost btn-sm">Review anyway</button>
+          </div>
+        </div>
+        <div class="expiry"><span class="dot"></span>Deletes in 5 days unless exported</div>
+      </div>
+
+      <div class="card file-card">
+        <div class="file-card-top">
+          <div>
+            <h3>ocbc-360-aug.pdf</h3>
+            <div class="meta">PDF &middot; not mapped yet</div>
+          </div>
+          <span class="badge badge-new">New statement</span>
+        </div>
+        <div class="stats">
+          <div><b>&mdash;</b><span>rows</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm">Map this format</button>
+          <button class="btn btn-ghost btn-sm">Remove</button>
+        </div>
+      </div>
+
+      <div class="card file-card">
+        <div class="file-card-top">
+          <div>
+            <h3>chase-aug-statement.csv</h3>
+            <div class="meta">****9002 &middot; CSV &middot; USD</div>
+          </div>
+          <span class="badge badge-bad">Low confidence</span>
+        </div>
+        <div class="ask">
+          Looks like a Meridian Bank savings format, is that right?
+          <div class="ask-actions">
+            <button class="btn btn-primary btn-sm">Yes, use it</button>
+            <button class="btn btn-secondary btn-sm">No, pick another</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 2: REVIEW ================= -->
+  <section class="screen" id="s2">
+    <div class="screen-head">
+      <div>
+        <h1>Review: Meridian Bank, Savings</h1>
+        <div class="sub">****4821 &middot; 01 to 31 Aug 2026</div>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-sm">Back to import</button>
+        <button class="btn btn-primary btn-sm">Looks right, continue</button>
+      </div>
+    </div>
+
+    <div class="summary-bar">
+      <div class="summary-cell"><div class="label">Rows</div><div class="value">42</div></div>
+      <div class="summary-cell"><div class="label">Date range</div><div class="value">01 to 31 Aug 2026</div></div>
+      <div class="summary-cell"><div class="label">Money in / out</div><div class="value">SGD 5,230.00 / 3,110.45</div></div>
+      <div class="summary-cell fail"><div class="label">Balance check</div><div class="value">Fail<a href="#" onclick="return selectRow(7)">Go to row</a></div></div>
+      <div class="summary-cell"><div class="label">Count check</div><div class="value">42 of 42 matched</div></div>
+    </div>
+
+    <div class="split">
+      <div class="card pane">
+        <div class="pane-head">
+          <strong style="font-size:13px;">Source: dbs-aug-2026.csv</strong>
+          <div class="zoom"><button>&minus;</button><span style="font-size:12px; color:var(--muted);">Page 1 of 1</span><button>&plus;</button></div>
+        </div>
+        <div class="pane-body">
+          <div class="fake-page">
+            <div class="stmt-title">Meridian Bank, Statement of Account</div>
+            <div class="stmt-sub">Account Details For: Multiplier ****4821 &middot; Period: 01/08/2026 to 31/08/2026</div>
+            <table>
+              <tr><td colspan="4"><b>Transaction Date&nbsp;&nbsp;Reference&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Debit&nbsp;&nbsp;&nbsp;Credit&nbsp;&nbsp;&nbsp;Balance</b></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(1)"><td>01/08/2026</td><td>GIRO SALARY</td><td></td><td>4,200.00</td></tr>
+              <tr class="pdf-row" onclick="return selectRow(2)"><td>03/08/2026</td><td>NTUC FAIRPRICE</td><td>54.20</td><td></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(3)"><td>04/08/2026</td><td>GRAB *RIDE</td><td>12.80</td><td></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(4)"><td>06/08/2026</td><td>SHOPEE SG</td><td>68.90</td><td></td></tr>
+              <tr class="pdf-row row-selected" onclick="return selectRow(5)"><td>09/08/2026</td><td>NTUC FAIRPRICE</td><td>41.15</td><td></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(6)"><td>14/08/2026</td><td>GRAB *RIDE</td><td>9.40</td><td></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(7)"><td>18/08/2026</td><td>AMAZON.COM USD</td><td>132.00</td><td></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(8)"><td>22/08/2026</td><td>SHOPEE SG</td><td>27.50</td><td></td></tr>
+              <tr class="pdf-row" onclick="return selectRow(9)"><td>28/08/2026</td><td>NTUC FAIRPRICE</td><td>60.30</td><td></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card pane">
+        <div class="pane-head">
+          <strong style="font-size:13px;">Extracted rows</strong>
+          <span style="font-size:12px; color:var(--muted);">Click a row to match it on both sides</span>
+        </div>
+        <div class="pane-body" style="padding:0;">
+          <table class="data">
+            <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Balance</th></tr></thead>
+            <tbody>
+              <tr data-row="1" onclick="return selectRow(1)"><td>01 Aug</td><td>GIRO Salary</td><td class="amt">+4,200.00</td><td class="amt">9,340.00</td></tr>
+              <tr data-row="2" onclick="return selectRow(2)"><td>03 Aug</td><td>NTUC FairPrice</td><td class="amt">&minus;54.20</td><td class="amt">9,285.80</td></tr>
+              <tr data-row="3" onclick="return selectRow(3)"><td>04 Aug</td><td>Grab</td><td class="amt">&minus;12.80</td><td class="amt">9,273.00</td></tr>
+              <tr data-row="4" onclick="return selectRow(4)">
+                <td>06 Aug</td><td>Shopee SG<div class="flag-edit">&#9998; Amount edited</div></td><td class="amt">&minus;68.90</td><td class="amt">9,204.10</td>
+              </tr>
+              <tr data-row="5" class="row-selected" onclick="return selectRow(5)"><td>09 Aug</td><td>NTUC FairPrice</td><td class="amt">&minus;41.15</td><td class="amt">9,162.95</td></tr>
+              <tr data-row="6" onclick="return selectRow(6)"><td>14 Aug</td><td>Grab</td><td class="amt">&minus;9.40</td><td class="amt">9,153.55</td></tr>
+              <tr data-row="7" onclick="return selectRow(7)">
+                <td>18 Aug</td>
+                <td>Amazon.com USD<div class="flag-warn">&#9888; Balance does not follow from previous row</div></td>
+                <td class="amt">&minus;132.00</td><td class="amt">9,001.00</td>
+              </tr>
+              <tr data-row="8" class="row-excluded" onclick="return selectRow(8)">
+                <td>22 Aug</td><td>Shopee SG<div class="flag-excl">Excluded from export <button class="row-toggle">Include</button></div></td>
+                <td class="amt">&minus;27.50</td><td class="amt">8,973.50</td>
+              </tr>
+              <tr data-row="9" onclick="return selectRow(9)"><td>28 Aug</td><td>NTUC FairPrice</td><td class="amt">&minus;60.30</td><td class="amt">8,913.20</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 3: MAPPING WIZARD ================= -->
+  <section class="screen" id="s3">
+    <div class="screen-head">
+      <div>
+        <h1>Map fields: Riverside Bank 360, Savings PDF</h1>
+        <div class="sub">Step 3 of 5. Every suggestion needs your confirmation before it counts.</div>
+      </div>
+    </div>
+
+    <div class="stepper">
+      <div class="step done"><div class="num">&#10003;</div>Basics</div>
+      <div class="step-line"></div>
+      <div class="step done"><div class="num">&#10003;</div>Locate data</div>
+      <div class="step-line"></div>
+      <div class="step current"><div class="num">3</div>Map fields</div>
+      <div class="step-line"></div>
+      <div class="step"><div class="num">4</div>Test</div>
+      <div class="step-line"></div>
+      <div class="step"><div class="num">5</div>Save</div>
+    </div>
+
+    <div class="wizard-grid">
+      <div class="card conversation">
+        <div>
+          <div class="progress-line">3 of 8 fields mapped</div>
+          <div class="progress-track"><div class="progress-fill"></div></div>
+        </div>
+
+        <div class="question">
+          <h2>Which column is the amount?</h2>
+          <div class="hint">We found two columns that look like money. Pick how they combine, or say if it is one signed column.</div>
+        </div>
+
+        <div class="samples">
+          <div>Debit Amt: 54.20, &nbsp; 132.00, &nbsp; (blank)</div>
+          <div>Credit Amt: (blank), &nbsp; (blank), &nbsp; 4,200.00</div>
+        </div>
+
+        <div class="choice-list">
+          <div class="choice picked">
+            <div>
+              <div class="cname">Debit + Credit columns</div>
+              <div class="csample">Two columns, one for money out, one for money in</div>
+            </div>
+            <span class="badge badge-good">High confidence</span>
+          </div>
+          <div class="choice">
+            <div>
+              <div class="cname">One signed column</div>
+              <div class="csample">Negative numbers mean money out</div>
+            </div>
+          </div>
+          <div class="choice">
+            <div>
+              <div class="cname">One column + CR/DR flag</div>
+              <div class="csample">A separate column marks each row credit or debit</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mini-pickers">
+          <label>Date format
+            <select><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select>
+          </label>
+          <label>Sign convention
+            <select><option selected>Debit and credit columns</option><option>Negative is money out</option><option>Positive is money out</option></select>
+          </label>
+        </div>
+
+        <div class="confirm-note">This is our best guess from your sample rows. Check the preview on the right, then confirm to move on.</div>
+        <div class="confirm-row">
+          <button class="btn btn-primary">Yes, that's right</button>
+          <button class="btn btn-secondary">Choose a different column</button>
+        </div>
+
+        <div class="field-list">
+          <div class="field-pill mapped"><span class="fname">Date</span><span class="fsrc">Transaction Date</span></div>
+          <div class="field-pill mapped"><span class="fname">Description</span><span class="fsrc">Reference + Transaction Ref2</span></div>
+          <div class="field-pill mapped"><span class="fname">Amount</span><span class="fsrc">Debit Amt + Credit Amt</span></div>
+          <div class="field-pill pending"><span class="fname">Balance</span><span class="fsrc">not yet mapped</span></div>
+          <div class="field-pill pending"><span class="fname">Currency</span><span class="fsrc">not yet mapped</span></div>
+          <div class="field-pill pending"><span class="fname">Reference</span><span class="fsrc">not yet mapped</span></div>
+          <div class="field-pill pending"><span class="fname">Extra: Category</span><span class="fsrc">not yet mapped</span></div>
+          <div class="field-pill pending"><span class="fname">Unmapped columns</span><span class="fsrc">1 column ignored</span></div>
+        </div>
+      </div>
+
+      <div class="card preview-pane">
+        <div class="pane-head">
+          <strong style="font-size:13px;">Live preview</strong>
+          <span style="font-size:12px; color:var(--muted);">Updates as you answer</span>
+        </div>
+        <div class="pane-body">
+          <table class="preview">
+            <thead>
+              <tr>
+                <th>Date</th><th>Description</th><th class="active-col">Amount</th><th>Balance</th><th>Currency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>01 Aug 2026</td><td>Interest Credit</td><td class="amt active-col">+38.10</td><td>?</td><td>?</td></tr>
+              <tr><td>05 Aug 2026</td><td>Grab *Ride</td><td class="amt active-col">&minus;10.60</td><td>?</td><td>?</td></tr>
+              <tr><td>09 Aug 2026</td><td>Shopee Sg</td><td class="amt active-col">&minus;45.00</td><td>?</td><td>?</td></tr>
+              <tr><td>15 Aug 2026</td><td>Giro Salary</td><td class="amt active-col">+3,900.00</td><td>?</td><td>?</td></tr>
+              <tr><td>21 Aug 2026</td><td>Ntuc Fairprice</td><td class="amt active-col">&minus;72.35</td><td>?</td><td>?</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 4: EXPORT ================= -->
+  <section class="screen" id="s4">
+    <div class="screen-head">
+      <div>
+        <h1>Export</h1>
+        <div class="sub">3 of 4 files ready to export.</div>
+      </div>
+    </div>
+
+    <div class="export-grid">
+      <div>
+        <div class="card section-block">
+          <h2>Date range</h2>
+          <div class="preset-row">
+            <button>Last full month</button>
+            <button class="active">This month</button>
+            <button>Last 3 months</button>
+            <button>Year to date</button>
+            <button>All</button>
+            <button>Custom&hellip;</button>
+          </div>
+        </div>
+
+        <div class="card section-block">
+          <h2>What is included</h2>
+          <table class="account-table">
+            <thead><tr><th>Account</th><th>Included</th><th>Excluded</th></tr></thead>
+            <tbody>
+              <tr><td>Meridian Bank ****4821</td><td>42</td><td>0</td></tr>
+              <tr><td>Summit Bank One ****7734</td><td>37</td><td>1</td></tr>
+              <tr><td>Riverside Bank 360 ****5190</td><td>29</td><td>0</td></tr>
+              <tr><td>Anchor Bank Card ****9002</td><td>18</td><td>2</td></tr>
+            </tbody>
+          </table>
+          <div class="coverage-warn">
+            <span>No Summit Bank data after 25 Aug 2026. The rest of the month will be missing from this export.</span>
+            <button class="btn btn-secondary btn-sm">Export anyway</button>
+          </div>
+        </div>
+
+        <div class="card section-block">
+          <h2>Currency</h2>
+          <div class="mode-toggle">
+            <div class="mode-card" onclick="setMode(this,'a')">
+              <h3>Keep original currency</h3>
+              <p>SGD and USD stay separate. Totals per currency are never added together.</p>
+            </div>
+            <div class="mode-card selected" onclick="setMode(this,'b')">
+              <h3>Convert everything to SGD</h3>
+              <p>Needs a rate for each currency pair before you can export.</p>
+            </div>
+          </div>
+          <div class="rate-grid" id="rateGrid">
+            <div class="rate-row">
+              <span class="pair">USD / SGD</span>
+              <input type="number" value="1.28" step="0.0001">
+              <span class="flip">1 USD = 1.28 SGD, so 1 SGD = 0.78 USD</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card section-block">
+          <h2>Match my sheet columns</h2>
+          <select style="width:100%; margin-bottom:4px;">
+            <option>Default columns</option>
+            <option selected>My Budget Sheet (2026)</option>
+            <option>YNAB style</option>
+            <option>Custom&hellip;</option>
+          </select>
+        </div>
+
+        <div class="card section-block">
+          <h2>Before you export</h2>
+          <div class="checklist">
+            <div class="check-item"><span class="tick">&#10003;</span>All files mapped</div>
+            <div class="check-item"><span class="tick">&#10003;</span>Balance checks pass on 3 of 4 files</div>
+            <div class="check-item pending"><span class="tick">!</span>1 exchange rate still needed</div>
+            <div class="check-item pending"><span class="tick">!</span>Summit Bank One is missing the last few days of August</div>
+          </div>
+          <div class="export-actions">
+            <button class="btn btn-primary" disabled>Download CSV</button>
+            <button class="btn btn-secondary" disabled>Copy for Sheets</button>
+          </div>
+          <div class="toggle-row"><input type="checkbox" id="skiphdr" checked><label for="skiphdr">Skip header row when copying</label></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 5: SETTINGS ================= -->
+  <section class="screen" id="s5">
+    <div class="screen-head">
+      <div>
+        <h1>Settings</h1>
+        <div class="sub">Formats, rates and storage, all kept on this device.</div>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <div>
+        <div class="card" style="margin-bottom:18px;">
+          <details class="bank-group" open>
+            <summary>Meridian Bank <span class="badge badge-muted">2 formats</span></summary>
+            <div class="version-row">
+              <div><div>Multiplier, Savings, CSV</div><div class="vmeta">Created 12 Jul 2026 &middot; used by 3 files</div></div>
+              <div class="vactions"><button class="icon-btn" title="Rename">&#9998;</button><button class="icon-btn" title="Duplicate">&#8862;</button><button class="icon-btn" title="Delete">&#128465;</button></div>
+            </div>
+            <div class="version-row">
+              <div><div>Multiplier, Savings, PDF</div><div class="vmeta">Created 03 Aug 2026 &middot; used by 1 file</div></div>
+              <div class="vactions"><button class="icon-btn" title="Rename">&#9998;</button><button class="icon-btn" title="Duplicate">&#8862;</button><button class="icon-btn" title="Delete">&#128465;</button></div>
+            </div>
+          </details>
+          <details class="bank-group">
+            <summary>Summit Bank <span class="badge badge-muted">1 format, 2 versions</span></summary>
+            <div class="version-row">
+              <div><div>One, Savings, CSV, v2</div><div class="vmeta">Created 10 Sep 2026 &middot; used by 1 file &middot; current</div></div>
+              <div class="vactions"><button class="icon-btn" title="Rename">&#9998;</button><button class="icon-btn" title="Duplicate">&#8862;</button><button class="icon-btn" title="Delete">&#128465;</button></div>
+            </div>
+            <div class="version-row">
+              <div><div>One, Savings, CSV, v1</div><div class="vmeta">Created 14 Jun 2026 &middot; used by 5 files &middot; kept for old files</div></div>
+              <div class="vactions"><button class="icon-btn" title="Rename">&#9998;</button><button class="icon-btn" title="Duplicate">&#8862;</button><button class="icon-btn" title="Delete">&#128465;</button></div>
+            </div>
+          </details>
+          <details class="bank-group">
+            <summary>Riverside Bank <span class="badge badge-muted">1 format</span></summary>
+            <div class="version-row">
+              <div><div>360, Savings, PDF</div><div class="vmeta">Created today &middot; used by 1 file</div></div>
+              <div class="vactions"><button class="icon-btn" title="Rename">&#9998;</button><button class="icon-btn" title="Duplicate">&#8862;</button><button class="icon-btn" title="Delete">&#128465;</button></div>
+            </div>
+          </details>
+          <details class="bank-group">
+            <summary>Anchor Bank <span class="badge badge-muted">1 format</span></summary>
+            <div class="version-row">
+              <div><div>Sapphire, Credit card, CSV</div><div class="vmeta">Created 02 Aug 2026 &middot; used by 4 files</div></div>
+              <div class="vactions"><button class="icon-btn" title="Rename">&#9998;</button><button class="icon-btn" title="Duplicate">&#8862;</button><button class="icon-btn" title="Delete">&#128465;</button></div>
+            </div>
+          </details>
+        </div>
+
+        <div class="card section-block danger-zone">
+          <h2>Delete everything</h2>
+          <p style="font-size:13.5px; color:var(--muted);">Removes every saved format, rate and open session from this device. Cannot be undone.</p>
+          <div class="confirm-box">
+            This deletes 5 formats, 1 saved rate and 4 open sessions.
+            <div>Type <code class="k">DELETE</code> to confirm, then press the button.</div>
+            <input type="text" placeholder="Type DELETE">
+          </div>
+          <div style="margin-top:12px;"><button class="btn btn-danger">Delete everything</button></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card section-block">
+          <h2>Backup</h2>
+          <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">Save your formats and rates to a file, or bring them back on a new machine.</p>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary btn-sm">Back up to file</button>
+            <button class="btn btn-secondary btn-sm">Restore from file</button>
+          </div>
+        </div>
+
+        <div class="card section-block">
+          <h2>Saved exchange rates</h2>
+          <div class="rate-row" style="margin-bottom:0;">
+            <span class="pair">USD / SGD</span>
+            <input type="number" value="1.28" step="0.0001">
+            <span class="flip">1 USD = 1.28 SGD</span>
+          </div>
+        </div>
+
+        <div class="card section-block">
+          <h2>Storage used</h2>
+          <div class="storage-bar"><div class="seg-sessions" style="width:78%;"></div><div class="seg-settings" style="width:22%;"></div></div>
+          <div class="storage-legend">
+            <span><span class="swatch" style="background:var(--brand);"></span>Sessions, 2.1 MB</span>
+            <span><span class="swatch" style="background:#7FBBAF;"></span>Settings, 0.6 MB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  document.getElementById('tabs').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-screen]');
+    if(!btn) return;
+    document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('active', b===btn); });
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('active', s.id===btn.dataset.screen); });
+  });
+
+  function selectRow(n){
+    document.querySelectorAll('[data-row]').forEach(function(r){ r.classList.toggle('row-selected', r.dataset.row==n); });
+    document.querySelectorAll('.pdf-row').forEach(function(r,i){ r.classList.toggle('row-selected', (i+1)==n); });
+    return false;
+  }
+
+  function setMode(el, mode){
+    document.querySelectorAll('.mode-card').forEach(function(c){ c.classList.remove('selected'); });
+    el.classList.add('selected');
+    document.getElementById('rateGrid').style.display = (mode==='b') ? 'flex' : 'none';
+  }
+</script>
+</body>
+</html>

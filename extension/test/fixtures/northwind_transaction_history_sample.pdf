@@ -1,0 +1,65 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1552 >>
+stream
+/F1 12 Tf
+BT 1 0 0 1 50 760 Tm (Northwind Bank) Tj ET
+/F1 9 Tf
+BT 1 0 0 1 50 744 Tm (JANE SAMPLE TAN) Tj ET
+BT 1 0 0 1 50 730 Tm (123 Example Avenue, #01-01, Singapore 123456) Tj ET
+/F1 11 Tf
+BT 1 0 0 1 50 712 Tm (Northwind Current Account) Tj ET
+/F1 9 Tf
+BT 1 0 0 1 50 696 Tm (Account No: 123-4-567890) Tj ET
+BT 1 0 0 1 50 680 Tm (Available Balance: SGD 8,214.12    Ledger Balance: SGD 8,214.12) Tj ET
+/F1 11 Tf
+BT 1 0 0 1 50 656 Tm (Transaction History) Tj ET
+/F1 9 Tf
+BT 1 0 0 1 50 640 Tm (September 2026) Tj ET
+BT 1 0 0 1 50 610 Tm (Yesterday, 15 Sep 2026) Tj ET
+BT 1 0 0 1 50 592 Tm (BAT 2C2*LAZADA Singapore SGP 12SEP 4628-XXXX) Tj ET
+BT 1 0 0 1 430 592 Tm (SGD - 20.83) Tj ET
+BT 1 0 0 1 50 578 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 560 Tm (GIRO SALARY CREDIT ACME PTE LTD) Tj ET
+BT 1 0 0 1 430 560 Tm (SGD + 4,200.00) Tj ET
+BT 1 0 0 1 50 546 Tm (Advice · ADV) Tj ET
+BT 1 0 0 1 50 522 Tm (Monday, 14 Sep 2026) Tj ET
+BT 1 0 0 1 50 504 Tm (NTUC FAIRPRICE FINEST SGP) Tj ET
+BT 1 0 0 1 430 504 Tm (SGD - 48.20) Tj ET
+BT 1 0 0 1 50 490 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 466 Tm (12 Sep 2026) Tj ET
+BT 1 0 0 1 50 448 Tm (GRAB* A-1928374 SINGAPORE SG) Tj ET
+BT 1 0 0 1 430 448 Tm (SGD - 14.60) Tj ET
+BT 1 0 0 1 50 434 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 416 Tm (SHOPEE SG *8823) Tj ET
+BT 1 0 0 1 430 416 Tm (SGD - 216.30) Tj ET
+BT 1 0 0 1 50 402 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 368 Tm (End of Transaction History) Tj ET
+BT 1 0 0 1 500 15 Tm (Page 1 of 1) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001839 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1936
+%%EOF

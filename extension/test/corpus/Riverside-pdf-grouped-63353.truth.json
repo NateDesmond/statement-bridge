@@ -1,0 +1,92 @@
+{
+  "axes": {
+    "fileType": "pdf-grouped",
+    "bank": "Riverside",
+    "lang": "fr",
+    "dateFormat": "DD/MM/YYYY",
+    "numberFormat": "1,234.56",
+    "signConvention": "parens",
+    "preamble": "quoted",
+    "footer": "totals",
+    "encoding": "utf-16le",
+    "hasBalance": true,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": 117232,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-02",
+      "minor": 148711,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -151235,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": 38733,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": 198733,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 114997,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 60499,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": -58318,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": -148541,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": -174682,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": -29071,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": 56149,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": 107992,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": -61047,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -134619,
+      "description": "Hardware Store"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "axes": {
+    "fileType": "csv",
+    "bank": "Cobalt",
+    "lang": "ms",
+    "dateFormat": "YYYY-MM-DD",
+    "numberFormat": "jpy",
+    "signConvention": "parens",
+    "preamble": "none",
+    "footer": "pagemarkers",
+    "encoding": "utf-8",
+    "hasBalance": true,
+    "currency": "JPY"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -1844,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -396,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": -1314,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 946,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": 884,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": -219,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -1319,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": -498,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": 1651,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": -1525,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-23",
+      "minor": 121,
+      "description": "Grab Ride"
+    }
+  ]
+}

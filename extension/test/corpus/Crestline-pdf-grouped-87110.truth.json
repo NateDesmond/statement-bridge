@@ -1,0 +1,87 @@
+{
+  "axes": {
+    "fileType": "pdf-grouped",
+    "bank": "Crestline",
+    "lang": "ms",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "no-decimal",
+    "signConvention": "crdr-prefix",
+    "preamble": "tabpadded",
+    "footer": "totals",
+    "encoding": "windows-1252",
+    "hasBalance": false,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -142600,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-03",
+      "minor": 153600,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -197000,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": -99700,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": 138800,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": -169100,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -400,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 190200,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": 33300,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -188800,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -192500,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": 78700,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -4900,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -198400,
+      "description": "Pharmacy"
+    }
+  ]
+}

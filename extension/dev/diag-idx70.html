@@ -1,0 +1,25 @@
+<!doctype html><html><body><div id="out">running</div>
+<script type="module">
+import { withPdfjs, groupItemsIntoLines, lineText } from '/src/core/pdf.js';
+import { renderPageToCanvas } from '/src/core/pdf-image.js';
+import { ocrPageCanvas } from '/src/core/ocr.js';
+function redact(t) {
+  return t.replace(/[A-Za-z][A-Za-z'*.\-]*/g, (w) => (/^[A-Z]{2,4}$/.test(w) ? w : 'x'.repeat(Math.min(w.length,4))));
+}
+async function main(){
+  const bytes = new Uint8Array(await (await fetch('/test/private/aug_2026_dbs.pdf')).arrayBuffer());
+  const out = await withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
+    const doc = await pdfjsLib.getDocument({ data: bytes, standardFontDataUrl }).promise;
+    const allLines = [];
+    for (let pageNum=1; pageNum<=doc.numPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const { canvas } = await renderPageToCanvas(page, 2.5);
+      const items = await ocrPageCanvas(canvas, { scale:2.5, restrictNumbers:true });
+      groupItemsIntoLines(items).forEach(l => allLines.push({page:pageNum, y:Math.round(l.y), text: redact(lineText(l)), raw: lineText(l), itemCount: l.items.length}));
+    }
+    return allLines.slice(64, 74);
+  });
+  document.getElementById('out').textContent = JSON.stringify(out, null, 2);
+}
+main().catch(e=>{document.getElementById('out').textContent='ERR:'+e.stack;});
+</script></body></html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html><body>
+<div id="out">running</div>
+<script type="module">
+// OCR + extraction RECALL measurement for non-grouped layouts (audit/
+// REPORT-OCR-GENERALISATION.md). Runs the same building blocks Home/the
+// wizard use for an unmapped PDF - ocrDocument (Home's runOcrOnFile, no scale
+// override so this always tracks whatever core/ocr.js's own default is -
+// still 2.5: the Track 3 speed pass tried 2 and reverted it after this very
+// audit caught a real regression on Anchor Bank, see ocrDocument's own doc
+// comment), detectPdfRowModel + detectGroupedSignConvention (the wizard's
+// own Locate-data auto-detect, src/ui/wizard.js), extractPdfPagesRows,
+// normalizeRecords - with NO fixture-specific profile: the "columns"
+// defaults below (3-band date/description/amount split, PDF_DATE_LINE_RE
+// row-start pattern) are copied verbatim from src/ui/wizard.js's
+// renderLocatePage/computeWholeFileColumnAnchors, since that IS what
+// auto-detection produces before a human drags anything - not a new,
+// separately-tuned heuristic invented for this audit.
+import { groupItemsIntoLines } from '../src/core/pdf.js';
+import { ocrDocument } from '../src/core/ocr.js';
+import { normalizeRecords } from '../src/core/normalize.js';
+import { buildAutoVersion, pdfPageWidthPt } from './auto-version.mjs';
+
+const params = new URLSearchParams(location.search);
+const pdfUrl = params.get('pdf');
+const truthUrl = params.get('truth');
+
+function ocrConfidenceStats(pages) {
+  const confidences = [];
+  for (const p of pages) for (const it of p.items) if (typeof it.confidence === 'number') confidences.push(it.confidence);
+  if (!confidences.length) return { count: 0 };
+  confidences.sort((a, b) => a - b);
+  const sum = confidences.reduce((a, b) => a + b, 0);
+  const pct = (p) => confidences[Math.min(confidences.length - 1, Math.floor((p / 100) * confidences.length))];
+  return {
+    count: confidences.length,
+    mean: Math.round((sum / confidences.length) * 10) / 10,
+    p10: pct(10), p50: pct(50), p90: pct(90),
+    min: confidences[0], max: confidences[confidences.length - 1],
+  };
+}
+
+function normDesc(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+async function run() {
+  const truth = await (await fetch(truthUrl)).json();
+  const bytes = new Uint8Array(await (await fetch(pdfUrl)).arrayBuffer());
+
+  const wallStart = performance.now();
+  const { pages } = await ocrDocument(bytes);
+  const wallMs = Math.round(performance.now() - wallStart);
+  const pagesLines = pages.map((p) => groupItemsIntoLines(p.items));
+  const perPageMs = pages.map((p) => p.ms);
+  const avgPageMs = perPageMs.length ? Math.round(perPageMs.reduce((a, b) => a + b, 0) / perPageMs.length) : null;
+
+  const pageWidthPt = await pdfPageWidthPt(bytes);
+  const { detected, version, records } = buildAutoVersion(pagesLines, pageWidthPt);
+  const rows = normalizeRecords(records, version, { ocr: true, currency: 'SGD' })
+    .filter((r) => !r.skipped);
+
+  // Match by (date ISO, signed amount in dollars, rounded to cents).
+  const key = (dateISO, amountMinor) => `${dateISO}|${Math.round(amountMinor)}`;
+  const truthByKey = new Map();
+  truth.forEach((t, i) => {
+    const k = key(t.date, Math.round(t.amount * 100));
+    if (!truthByKey.has(k)) truthByKey.set(k, []);
+    truthByKey.get(k).push(i);
+  });
+
+  const matchedTruthIdx = new Set();
+  const extras = [];
+  let descAgree = 0, descComparable = 0;
+  rows.forEach((row) => {
+    const k = key(row.date, row.amount);
+    const bucket = truthByKey.get(k);
+    if (bucket && bucket.length) {
+      const ti = bucket.shift();
+      matchedTruthIdx.add(ti);
+      const a = normDesc(row.description_raw).slice(0, 12);
+      const b = normDesc(truth[ti].description).slice(0, 12);
+      if (a && b) { descComparable += 1; if (a === b) descAgree += 1; }
+    } else {
+      extras.push({ date: row.date, amount: row.amount, description_raw: row.description_raw });
+    }
+  });
+
+  const misses = truth
+    .map((t, i) => ({ ...t, idx: i }))
+    .filter((t) => !matchedTruthIdx.has(t.idx));
+
+  document.getElementById('out').textContent = JSON.stringify({
+    timing: { pageCount: pages.length, wallMs, avgPageMs, perPageMs },
+    detected,
+    truthCount: truth.length,
+    rowsExtracted: rows.length,
+    exactMatches: matchedTruthIdx.size,
+    misses,
+    extras,
+    descComparable, descAgree,
+    descAgreePct: descComparable ? Math.round((descAgree / descComparable) * 1000) / 10 : null,
+    ocrConfidence: ocrConfidenceStats(pages),
+    version: { rowModel: version.pdf.rowModel, signConvention: version.signConvention, dateFormat: version.dateFormat },
+    sampleRows: rows.slice(0, 8).map((r) => ({ date: r.date, amount: r.amount, description_raw: r.description_raw, flags: r.flags })),
+    sampleRawRecords: records.slice(0, 6),
+  });
+}
+run().catch((e) => { document.getElementById('out').textContent = JSON.stringify({ error: String(e && e.stack || e) }); });
+</script>
+</body></html>

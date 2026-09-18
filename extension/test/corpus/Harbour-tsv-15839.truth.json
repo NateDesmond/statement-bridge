@@ -1,0 +1,97 @@
+{
+  "axes": {
+    "fileType": "tsv",
+    "bank": "Harbour",
+    "lang": "ja",
+    "dateFormat": "DD/MM/YYYY",
+    "numberFormat": "space-thousands",
+    "signConvention": "crdr-suffix",
+    "preamble": "none",
+    "footer": "balances",
+    "encoding": "utf-8",
+    "hasBalance": false,
+    "currency": "EUR"
+  },
+  "truth": [
+    {
+      "date": "2026-06-04",
+      "minor": 74027,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -27312,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -23617,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": 73908,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": 91280,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": 173903,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-14",
+      "minor": -14834,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -139023,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": 26576,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-18",
+      "minor": 144120,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": 39455,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-21",
+      "minor": 70684,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-24",
+      "minor": -156517,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-26",
+      "minor": 18384,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-29",
+      "minor": 30502,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-07-01",
+      "minor": 70886,
+      "description": "Electric Co Bill"
+    }
+  ]
+}

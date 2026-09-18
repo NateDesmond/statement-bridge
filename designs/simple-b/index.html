@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statement Bridge: Simple B, Big Friendly Steps</title>
+<style>
+  :root{
+    --ink-900:#0d1a17;
+    --ink-800:#132420;
+    --ink-700:#1a302a;
+    --ink-line:#2c463e;
+    --ink-text:#e7efe9;
+    --ink-text-dim:#9db3ab;
+    --brass:#c6a15b;
+    --brass-hover:#d6b06a;
+    --brass-ink:#2a2109;
+    --paper:#f3efe6;
+    --paper-raised:#ffffff;
+    --paper-line:#e3ddcd;
+    --ink:#20241f;
+    --ink-dim:#666a5f;
+    --ok:#3f7856;
+    --ok-bg:#e7f1e9;
+    --warn:#9a6a1f;
+    --warn-bg:#f7ecd6;
+    --danger:#a1402f;
+    --danger-bg:#f8e6e1;
+    --radius:10px;
+    --focus:2px solid #7fb8ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    min-width:1024px;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+  :focus-visible{outline:var(--focus);outline-offset:2px;}
+
+  /* ---------- Preview switcher (dev only, not part of the product UI) ---------- */
+  .preview-bar{
+    background:#2b2b26;color:#cfcac0;display:flex;align-items:center;gap:10px;
+    padding:8px 20px;font-size:12px;
+  }
+  .preview-bar span.lbl{color:#8a857a;margin-right:2px;}
+  .preview-bar button{
+    all:unset;cursor:pointer;padding:5px 11px;border-radius:100px;font-size:12px;color:#cfcac0;
+  }
+  .preview-bar button:hover{background:#3c3c35;}
+  .preview-bar button.active{background:var(--brass);color:var(--brass-ink);font-weight:700;}
+
+  /* ---------- Brand bar ---------- */
+  .brand-bar{
+    background:var(--ink-900);color:var(--ink-text);display:flex;align-items:center;
+    justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--ink-line);
+  }
+  .brand-left{display:flex;align-items:center;gap:12px;}
+  .brand-left img{width:34px;height:34px;border-radius:7px;display:block;}
+  .brand-left .logo-fallback{
+    width:34px;height:34px;border-radius:7px;background:var(--brass);color:var(--brass-ink);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+  }
+  .brand-left .name{font-size:16px;font-weight:700;letter-spacing:.2px;}
+  .gear-btn{
+    all:unset;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;
+    align-items:center;justify-content:center;color:var(--ink-text-dim);
+  }
+  .gear-btn:hover{background:var(--ink-700);color:var(--ink-text);}
+
+  /* ---------- 3-step progress strip ---------- */
+  .progress-strip{
+    background:var(--ink-800);padding:18px 32px 20px;border-bottom:1px solid var(--ink-line);
+  }
+  .steps{display:flex;align-items:center;max-width:760px;margin:0 auto;}
+  .step-item{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 auto;width:140px;}
+  .step-circle{
+    width:40px;height:40px;border-radius:50%;background:var(--ink-700);color:var(--ink-text-dim);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;
+    border:2px solid var(--ink-line);flex-shrink:0;
+  }
+  .step-item.done .step-circle{background:var(--ok);color:#fff;border-color:var(--ok);}
+  .step-item.current .step-circle{background:var(--brass);color:var(--brass-ink);border-color:var(--brass);}
+  .step-label{font-size:12.5px;color:var(--ink-text-dim);font-weight:600;}
+  .step-item.current .step-label,.step-item.done .step-label{color:var(--ink-text);}
+  .step-line{flex:1;height:3px;background:var(--ink-700);border-radius:2px;margin:0 -4px 22px;}
+  .step-line.filled{background:var(--ok);}
+
+  /* ---------- Main content ---------- */
+  main{max-width:1040px;margin:0 auto;padding:28px 32px 80px;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  /* Buttons */
+  .btn{
+    all:unset;cursor:pointer;border-radius:10px;font-weight:700;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    box-sizing:border-box;text-align:center;
+  }
+  .btn-giant{background:var(--brass);color:var(--brass-ink);font-size:19px;padding:20px 40px;min-height:64px;width:100%;}
+  .btn-giant:hover{background:var(--brass-hover);}
+  .btn-big{background:var(--brass);color:var(--brass-ink);font-size:16px;padding:15px 26px;min-height:52px;}
+  .btn-big:hover{background:var(--brass-hover);}
+  .btn-secondary{background:#fff;color:var(--ink);border:1.5px solid var(--paper-line);font-size:15px;padding:14px 24px;min-height:48px;}
+  .btn-secondary:hover{background:var(--paper);}
+  .btn-quiet{all:unset;cursor:pointer;color:var(--ink-dim);font-size:13.5px;text-decoration:underline;font-weight:600;}
+  .btn-quiet:hover{color:var(--ink);}
+  .btn-ghost-dark{background:transparent;color:var(--ink-text);border:1.5px solid var(--ink-line);font-size:14px;padding:10px 18px;min-height:40px;}
+  .btn-ghost-dark:hover{background:var(--ink-700);}
+
+  /* ---------- Empty state ---------- */
+  .dropzone{
+    border:3px dashed #cdbf9b;border-radius:16px;background:#faf8f2;
+    padding:64px 40px;text-align:center;
+  }
+  .drop-icon{margin:0 auto 18px;display:block;}
+  .dropzone h1{font-size:26px;margin:0 0 12px;}
+  .dropzone .sub{font-size:14.5px;color:var(--ink-dim);margin:14px 0 26px;max-width:440px;margin-left:auto;margin-right:auto;line-height:1.6;}
+  .dropzone .choose-wrap{max-width:320px;margin:0 auto;}
+
+  /* ---------- Processing ---------- */
+  .drop-slim{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    background:#faf8f2;border:2px dashed #cdbf9b;border-radius:12px;padding:16px 22px;margin-bottom:26px;
+  }
+  .drop-slim strong{font-size:15px;}
+  .file-rows{display:flex;flex-direction:column;gap:14px;}
+  .file-row-b{
+    background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:12px;
+    padding:18px 22px;display:flex;flex-direction:column;gap:10px;
+  }
+  .fr-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .fr-name{font-size:16px;font-weight:700;}
+  .fr-status{font-size:14px;color:var(--ink-dim);}
+  .fr-status.done{color:var(--ok);font-weight:600;}
+  .prog-b{height:10px;border-radius:6px;background:#ece6d6;overflow:hidden;}
+  .prog-b span{display:block;height:100%;background:var(--brass);border-radius:6px;}
+  .prog-b.done span{background:var(--ok);}
+
+  /* ---------- Result ---------- */
+  .result-card{
+    background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:16px;
+    padding:36px 40px;text-align:center;margin-bottom:24px;
+  }
+  .result-card h1{font-size:24px;margin:0 0 10px;}
+  .result-card .headline{font-size:17px;color:var(--ink-dim);margin:0 0 28px;}
+  .result-card .headline .num{color:var(--ink);font-weight:700;}
+  .result-actions{display:flex;gap:16px;max-width:640px;margin:0 auto;}
+  .result-actions .btn-secondary{flex:0 0 auto;}
+  .result-actions .btn-giant{flex:1;}
+
+  .result-links{display:flex;justify-content:center;gap:28px;margin:20px 0 30px;}
+
+  table.txn-table-b{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--paper-raised);
+    border:1px solid var(--paper-line);border-radius:12px;overflow:hidden;}
+  table.txn-table-b th{
+    text-align:left;padding:14px 18px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--ink-dim);background:#faf8f2;border-bottom:1px solid var(--paper-line);
+  }
+  table.txn-table-b td{padding:14px 18px;border-bottom:1px solid #f0ede2;}
+  table.txn-table-b tr:last-child td{border-bottom:none;}
+  .amount-out{color:var(--danger);}
+  .amount-in{color:var(--ok);}
+  .table-scroll-note{text-align:center;font-size:12.5px;color:var(--ink-dim);margin-top:10px;}
+
+  /* ---------- Decision ---------- */
+  .decision-banner{
+    background:var(--warn-bg);border:1px solid #ecd7a8;border-radius:12px;padding:18px 24px;margin-bottom:20px;
+  }
+  .decision-banner summary{cursor:pointer;font-size:16px;font-weight:700;color:var(--warn);list-style:none;}
+  .decision-banner summary::-webkit-details-marker{display:none;}
+  .decision-banner summary::after{content:" \25BE";}
+  .decision-banner[open] summary::after{content:" \25B4";}
+  .decision-list{display:flex;flex-direction:column;gap:14px;margin-top:18px;}
+  .decision-row{
+    background:#fff;border:1px solid #ecd7a8;border-radius:12px;padding:16px 20px;
+    display:flex;align-items:center;gap:20px;
+  }
+  .decision-snippet{
+    flex:0 0 200px;background:#e8e4d8;border:1px solid var(--paper-line);border-radius:8px;
+    padding:12px 14px;font-family:Georgia,serif;font-size:11px;color:#333;line-height:1.5;
+  }
+  .decision-snippet .snip-row{display:flex;justify-content:space-between;padding:2px 0;}
+  .decision-snippet .snip-flag{background:#fbe4dd;}
+  .decision-body{flex:1;min-width:0;}
+  .decision-body .db-txn{font-size:15px;font-weight:700;margin-bottom:4px;}
+  .decision-body .db-why{font-size:13.5px;color:var(--ink-dim);}
+  .decision-choices{display:flex;gap:10px;flex-shrink:0;}
+  .btn-choice{font-size:14.5px;padding:12px 20px;min-height:44px;border-radius:9px;}
+  .btn-choice.good{background:var(--ok-bg);color:var(--ok);border:1.5px solid #bfe0cb;}
+  .btn-choice.good:hover{background:#d9edde;}
+  .btn-choice.fix{background:var(--paper-raised);color:var(--ink);border:1.5px solid var(--paper-line);}
+  .btn-choice.fix:hover{background:var(--paper);}
+
+  .new-bank-card{
+    background:#fff;border:1.5px solid var(--brass);border-radius:12px;padding:20px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px;
+  }
+  .new-bank-card .nb-title{font-size:16px;font-weight:700;margin-bottom:4px;}
+  .new-bank-card .nb-sub{font-size:13.5px;color:var(--ink-dim);}
+
+  .decision-result-below{opacity:.55;pointer-events:none;}
+
+  /* ---------- Setup wizard ---------- */
+  .setup-overlay{max-width:640px;margin:0 auto;text-align:center;}
+  .setup-pager{display:flex;justify-content:center;gap:8px;margin-bottom:20px;}
+  .setup-pill{
+    all:unset;cursor:pointer;font-size:12.5px;padding:7px 14px;border-radius:100px;color:var(--ink-dim);
+    background:var(--paper-raised);border:1px solid var(--paper-line);
+  }
+  .setup-pill.active{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
+  .setup-step{display:none;}
+  .setup-step.active{display:block;}
+  .setup-step h1{font-size:22px;margin:0 0 18px;line-height:1.35;}
+  .setup-totals{display:flex;justify-content:center;gap:36px;margin:16px 0 20px;}
+  .setup-total-item{text-align:center;}
+  .setup-total-item .num{display:block;font-size:20px;font-weight:700;}
+  .setup-total-item .lbl{font-size:12.5px;color:var(--ink-dim);}
+  .setup-total-item.in .num{color:var(--ok);}
+  .setup-total-item.out .num{color:var(--danger);}
+  .setup-buttons{display:flex;flex-direction:column;gap:12px;max-width:420px;margin:20px auto 0;}
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px;}
+  .choice-tile{
+    background:var(--paper-raised);border:1.5px solid var(--paper-line);border-radius:12px;
+    padding:22px 18px;font-size:15.5px;font-weight:700;cursor:pointer;text-align:center;
+  }
+  .choice-tile:hover{border-color:var(--brass);background:#faf6ec;}
+  .setup-input{
+    font-family:inherit;font-size:17px;padding:14px 16px;border-radius:10px;border:1.5px solid var(--paper-line);
+    width:100%;max-width:360px;text-align:center;margin:0 auto 24px;display:block;
+  }
+
+  /* ---------- Gear overlay ---------- */
+  .gear-overlay{
+    display:none;position:fixed;inset:0;background:var(--ink-900);z-index:50;
+    color:var(--ink-text);flex-direction:column;
+  }
+  .gear-overlay.open{display:flex;}
+  .gear-head{display:flex;align-items:center;justify-content:space-between;padding:20px 36px;border-bottom:1px solid var(--ink-line);}
+  .gear-head h1{font-size:19px;margin:0;}
+  .close-btn{
+    all:unset;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;
+    align-items:center;justify-content:center;color:var(--ink-text-dim);font-size:20px;
+  }
+  .close-btn:hover{background:var(--ink-700);color:var(--ink-text);}
+  .tile-grid{
+    flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:22px;
+    padding:44px 60px;align-content:center;max-width:1040px;margin:0 auto;width:100%;
+  }
+  .tile{
+    all:unset;cursor:pointer;background:var(--ink-800);border:1px solid var(--ink-line);
+    border-radius:14px;padding:26px 24px;display:flex;flex-direction:column;gap:10px;
+  }
+  .tile:hover{background:var(--ink-700);border-color:var(--brass);}
+  .tile .t-title{font-size:17px;font-weight:700;}
+  .tile .t-sub{font-size:13px;color:var(--ink-text-dim);line-height:1.5;}
+</style>
+</head>
+<body>
+
+  <div class="preview-bar" role="navigation" aria-label="Preview surface switcher, dev only">
+    <span class="lbl">Preview surface:</span>
+    <button data-screen="empty" class="active" type="button">1 Empty</button>
+    <button data-screen="processing" type="button">2 Processing</button>
+    <button data-screen="result" type="button">3 Result</button>
+    <button data-screen="decision" type="button">4 Needs a look</button>
+    <button data-screen="setup" type="button">5 Setup</button>
+    <button data-screen="menu" type="button">6 Gear menu</button>
+  </div>
+
+  <header class="brand-bar">
+    <div class="brand-left">
+      <img src="../logos/logo-final.png" alt="Statement Bridge logo" width="34" height="34"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <div class="logo-fallback" style="display:none;">SB</div>
+      <div class="name">Statement Bridge</div>
+    </div>
+    <button class="gear-btn" type="button" aria-label="Open menu" onclick="openMenu();">
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 2.5v1.4M8 12.1v1.4M13.5 8h-1.4M3.9 8H2.5M11.7 4.3l-1 1M5.3 10.7l-1 1M11.7 11.7l-1-1M5.3 5.3l-1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <div class="progress-strip" id="progress-strip">
+    <div class="steps">
+      <div class="step-item" id="step-1">
+        <div class="step-circle">1</div>
+        <div class="step-label">Drop</div>
+      </div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step-item" id="step-2">
+        <div class="step-circle">2</div>
+        <div class="step-label">Read</div>
+      </div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step-item" id="step-3">
+        <div class="step-circle">3</div>
+        <div class="step-label">Copy</div>
+      </div>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- ============ 1: EMPTY ============ -->
+    <section class="screen active" id="screen-empty">
+      <div class="dropzone">
+        <svg class="drop-icon" width="52" height="52" viewBox="0 0 24 24" fill="none">
+          <path d="M12 3v13m0 0l-5-5m5 5l5-5" stroke="#c6a15b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 19v1.5A1.5 1.5 0 0 0 5.5 22h13a1.5 1.5 0 0 0 1.5-1.5V19" stroke="#c6a15b" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        <h1>Drop your bank statements here</h1>
+        <div class="choose-wrap">
+          <button class="btn btn-giant" type="button" onclick="showScreen('processing');return false;">Choose files</button>
+        </div>
+        <p class="sub">Works with the CSV or PDF your bank gives you. Nothing leaves your computer.</p>
+      </div>
+    </section>
+
+    <!-- ============ 2: PROCESSING ============ -->
+    <section class="screen" id="screen-processing">
+      <div class="drop-slim">
+        <strong>Drop more statements</strong>
+        <button class="btn btn-secondary" type="button">Choose files</button>
+      </div>
+      <div class="file-rows">
+        <div class="file-row-b">
+          <div class="fr-top">
+            <div class="fr-name">Meridian Bank savings</div>
+            <div class="fr-status">Reading page 2 of 3</div>
+          </div>
+          <div class="prog-b"><span style="width:55%;"></span></div>
+        </div>
+        <div class="file-row-b">
+          <div class="fr-top">
+            <div class="fr-name">Summit Bank One</div>
+            <div class="fr-status done">Done, 91 transactions</div>
+          </div>
+          <div class="prog-b done"><span style="width:100%;"></span></div>
+        </div>
+        <div class="file-row-b">
+          <div class="fr-top">
+            <div class="fr-name">Riverside Bank 360</div>
+            <div class="fr-status done">Done, 54 transactions</div>
+          </div>
+          <div class="prog-b done"><span style="width:100%;"></span></div>
+        </div>
+        <div class="file-row-b">
+          <div class="fr-top">
+            <div class="fr-name">Palisade Bank Save Up</div>
+            <div class="fr-status">Reading page 1 of 2</div>
+          </div>
+          <div class="prog-b"><span style="width:30%;"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3: RESULT ============ -->
+    <section class="screen" id="screen-result">
+      <div class="result-card">
+        <h1>Your transactions are ready.</h1>
+        <p class="headline"><span class="num">546</span> transactions from <span class="num">3</span> statements &middot; 1 Jun to 15 Sep 2026</p>
+        <div class="result-actions">
+          <button class="btn btn-giant" type="button">Copy to Google Sheets</button>
+          <button class="btn btn-secondary" type="button">Download CSV</button>
+        </div>
+      </div>
+
+      <table class="txn-table-b">
+        <thead>
+          <tr><th>Date</th><th>Account</th><th>Description</th><th>Amount</th><th>Currency</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>15 Sep 2026</td><td>Meridian Bank savings</td><td>NTUC FairPrice, Tampines</td><td class="num amount-out">-48.20</td><td>SGD</td></tr>
+          <tr><td>14 Sep 2026</td><td>Summit Bank One</td><td>Grab</td><td class="num amount-out">-14.60</td><td>SGD</td></tr>
+          <tr><td>12 Sep 2026</td><td>Riverside Bank 360</td><td>GIRO salary, Horizon Tech Pte Ltd</td><td class="num amount-in">+4,820.00</td><td>SGD</td></tr>
+          <tr><td>10 Sep 2026</td><td>Meridian Bank savings</td><td>Shopee SG</td><td class="num amount-out">-216.30</td><td>SGD</td></tr>
+          <tr><td>08 Sep 2026</td><td>Summit Bank One</td><td>Circles.Life</td><td class="num amount-out">-38.00</td><td>SGD</td></tr>
+        </tbody>
+      </table>
+      <p class="table-scroll-note">Scroll for the rest of the 546 rows.</p>
+
+      <div class="result-links">
+        <button class="btn-quiet" type="button" onclick="openMenu('export');return false;">Adjust what's exported</button>
+        <button class="btn-quiet" type="button" onclick="showScreen('empty');return false;">Add more statements</button>
+      </div>
+    </section>
+
+    <!-- ============ 4: NEEDS A LOOK ============ -->
+    <section class="screen" id="screen-decision">
+
+      <div class="new-bank-card">
+        <div>
+          <div class="nb-title">New bank statement</div>
+          <div class="nb-sub">Palisade Bank Save Up. Let's set it up, takes about a minute.</div>
+        </div>
+        <button class="btn btn-big" type="button" onclick="showScreen('setup');return false;">Set up</button>
+      </div>
+
+      <details class="decision-banner" open>
+        <summary>3 rows need a quick look</summary>
+        <div class="decision-list">
+          <div class="decision-row">
+            <div class="decision-snippet">
+              <div class="snip-row"><span>09/08</span><span>SHOPEE SG *8823</span></div>
+              <div class="snip-row snip-flag"><span>Balance</span><span>12,803.22</span></div>
+              <div class="snip-row"><span>14/08</span><span>AMAZON.COM USD 22.40</span></div>
+            </div>
+            <div class="decision-body">
+              <div class="db-txn">09 Aug 2026 &middot; Shopee SG &middot; -216.30 SGD</div>
+              <div class="db-why">Balance jump does not match the amount, off by 12.00.</div>
+            </div>
+            <div class="decision-choices">
+              <button class="btn btn-choice good" type="button">Looks right</button>
+              <button class="btn btn-choice fix" type="button">Fix</button>
+            </div>
+          </div>
+
+          <div class="decision-row">
+            <div class="decision-snippet">
+              <div class="snip-row snip-flag"><span>21/08</span><span>GRAB* A-2910384</span></div>
+              <div class="snip-row"><span>21/08</span><span>GRAB* A-2910384</span></div>
+            </div>
+            <div class="decision-body">
+              <div class="db-txn">21 Aug 2026 &middot; Grab &middot; -9.80 SGD</div>
+              <div class="db-why">This might be a duplicate of a transaction already imported.</div>
+            </div>
+            <div class="decision-choices">
+              <button class="btn btn-choice good" type="button">Looks right</button>
+              <button class="btn btn-choice fix" type="button">Fix</button>
+            </div>
+          </div>
+
+          <div class="decision-row">
+            <div class="decision-snippet">
+              <div class="snip-row snip-flag"><span>14/08</span><span>AMAZON.COM USD 22.40</span></div>
+              <div class="snip-row"><span>-30.71</span><span>12,772.51</span></div>
+            </div>
+            <div class="decision-body">
+              <div class="db-txn">14 Aug 2026 &middot; Amazon.com &middot; -30.71 SGD</div>
+              <div class="db-why">Description looks unusual, please check.</div>
+            </div>
+            <div class="decision-choices">
+              <button class="btn btn-choice good" type="button">Looks right</button>
+              <button class="btn btn-choice fix" type="button">Fix</button>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="result-card decision-result-below">
+        <h1>Your transactions are ready.</h1>
+        <p class="headline"><span class="num">543</span> transactions from <span class="num">3</span> statements &middot; 1 Jun to 15 Sep 2026</p>
+        <div class="result-actions">
+          <button class="btn btn-giant" type="button">Copy to Google Sheets</button>
+          <button class="btn btn-secondary" type="button">Download CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 5: SETUP ============ -->
+    <section class="screen" id="screen-setup">
+      <div class="setup-overlay">
+        <div class="setup-pager">
+          <button class="setup-pill active" data-setup="a" type="button">A. Confirm</button>
+          <button class="setup-pill" data-setup="b" type="button">B. What's wrong</button>
+          <button class="setup-pill" data-setup="c" type="button">C. Name it</button>
+        </div>
+
+        <div class="setup-step active" id="setup-a">
+          <h1>We found 205 transactions from 1 Jun to 31 Aug.<br>Does this look right?</h1>
+          <table class="txn-table-b">
+            <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+            <tbody>
+              <tr><td>03 Jun 2026</td><td>NTUC FairPrice, Jurong Point</td><td class="num amount-out">-62.15</td></tr>
+              <tr><td>28 Jun 2026</td><td>GIRO salary, Palisade Bank</td><td class="num amount-in">+3,900.00</td></tr>
+              <tr><td>17 Aug 2026</td><td>Grab</td><td class="num amount-out">-11.40</td></tr>
+            </tbody>
+          </table>
+          <div class="setup-totals">
+            <div class="setup-total-item in"><span class="num">+11,700.00</span><span class="lbl">Money in</span></div>
+            <div class="setup-total-item out"><span class="num">-9,214.60</span><span class="lbl">Money out</span></div>
+          </div>
+          <div class="setup-buttons">
+            <button class="btn btn-giant" type="button" onclick="switchSetup('c');return false;">Yes, looks right</button>
+            <button class="btn btn-secondary" type="button" onclick="switchSetup('b');return false;">Something's off</button>
+          </div>
+        </div>
+
+        <div class="setup-step" id="setup-b">
+          <h1>What's wrong?</h1>
+          <div class="choice-grid">
+            <button class="choice-tile" type="button" onclick="switchSetup('c');return false;">Dates are wrong</button>
+            <button class="choice-tile" type="button" onclick="switchSetup('c');return false;">Amounts or +/- are wrong</button>
+            <button class="choice-tile" type="button" onclick="switchSetup('c');return false;">Rows are missing or extra</button>
+            <button class="choice-tile" type="button" onclick="switchSetup('c');return false;">Something else</button>
+          </div>
+        </div>
+
+        <div class="setup-step" id="setup-c">
+          <h1>Name this statement</h1>
+          <input class="setup-input" type="text" value="Palisade Bank Save Up">
+          <div class="setup-buttons">
+            <button class="btn btn-giant" type="button" onclick="showScreen('result');return false;">Save and finish</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ 6: GEAR MENU OVERLAY ============ -->
+  <div class="gear-overlay" id="gear-overlay">
+    <div class="gear-head">
+      <h1>Menu</h1>
+      <button class="close-btn" type="button" aria-label="Close menu" onclick="closeMenu();">&times;</button>
+    </div>
+    <div class="tile-grid">
+      <button class="tile" type="button" id="tile-export">
+        <span class="t-title">Adjust what's exported</span>
+        <span class="t-sub">Date range, columns, currency, and the export preset.</span>
+      </button>
+      <button class="tile" type="button">
+        <span class="t-title">Statement types</span>
+        <span class="t-sub">Meridian Bank, Summit Bank, Riverside Bank and Palisade Bank are set up. Manage or add one.</span>
+      </button>
+      <button class="tile" type="button" onclick="showScreen('decision');closeMenu();return false;">
+        <span class="t-title">Check a statement</span>
+        <span class="t-sub">Look at any row next to the original page.</span>
+      </button>
+      <button class="tile" type="button">
+        <span class="t-title">Storage and privacy</span>
+        <span class="t-sub">Everything stays on this device. Clear it any time.</span>
+      </button>
+      <button class="tile" type="button">
+        <span class="t-title">Settings</span>
+        <span class="t-sub">Name, defaults, and how long files are kept.</span>
+      </button>
+      <button class="tile" type="button">
+        <span class="t-title">How it works</span>
+        <span class="t-sub">A plain-language walkthrough of the three steps.</span>
+      </button>
+    </div>
+  </div>
+
+<script>
+  var stepFor = {empty:1, processing:2, result:3, decision:3, setup:2, menu:0};
+
+  function showScreen(name){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('screen-' + name).classList.add('active');
+    document.querySelectorAll('.preview-bar button').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-screen') === name);
+    });
+    updateProgress(stepFor[name] || 1);
+  }
+
+  function updateProgress(step){
+    for (var i = 1; i <= 3; i++){
+      var circle = document.getElementById('step-' + i);
+      circle.classList.remove('done','current');
+      if (i < step) circle.classList.add('done');
+      else if (i === step) circle.classList.add('current');
+    }
+    document.getElementById('line-1').classList.toggle('filled', step > 1);
+    document.getElementById('line-2').classList.toggle('filled', step > 2);
+  }
+
+  function switchSetup(which){
+    document.querySelectorAll('.setup-step').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('setup-' + which).classList.add('active');
+    document.querySelectorAll('.setup-pill').forEach(function(p){
+      p.classList.toggle('active', p.getAttribute('data-setup') === which);
+    });
+  }
+
+  function openMenu(focusTile){
+    document.getElementById('gear-overlay').classList.add('open');
+    if (focusTile === 'export') document.getElementById('tile-export').focus();
+  }
+  function closeMenu(){
+    document.getElementById('gear-overlay').classList.remove('open');
+  }
+
+  document.querySelectorAll('.preview-bar button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var name = btn.getAttribute('data-screen');
+      if (name === 'menu') {
+        openMenu();
+        document.querySelectorAll('.preview-bar button').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+      } else {
+        closeMenu();
+        showScreen(name);
+      }
+    });
+  });
+
+  document.querySelectorAll('.setup-pill').forEach(function(p){
+    p.addEventListener('click', function(){ switchSetup(p.getAttribute('data-setup')); });
+  });
+
+  updateProgress(1);
+</script>
+</body>
+</html>

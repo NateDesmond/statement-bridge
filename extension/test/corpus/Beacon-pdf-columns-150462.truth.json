@@ -1,0 +1,102 @@
+{
+  "axes": {
+    "fileType": "pdf-columns",
+    "bank": "Beacon",
+    "lang": "de",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "1.234,56",
+    "signConvention": "signed",
+    "preamble": "keyvalue",
+    "footer": "totals",
+    "encoding": "utf-8",
+    "hasBalance": false,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": -141345,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -166174,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 114527,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-07",
+      "minor": -75967,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -31365,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": 179414,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-13",
+      "minor": -32721,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": 181916,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": 27166,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-18",
+      "minor": -110259,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": -152516,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": 68977,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-25",
+      "minor": -47898,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-27",
+      "minor": -65957,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-28",
+      "minor": -176784,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-07-01",
+      "minor": 5381,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-07-03",
+      "minor": 92889,
+      "description": "Bakery"
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+[
+  {
+    "date": "2026-08-01",
+    "amount": 490,
+    "description": "JOM PAY - TENAGA NASIONAL BERHAD"
+  },
+  {
+    "date": "2026-08-03",
+    "amount": -688.89,
+    "description": "CASH DEPOSIT MACHINE KL SENTRAL"
+  },
+  {
+    "date": "2026-08-03",
+    "amount": -231.95,
+    "description": "ONLINE PURCHASE - SHOPEE MALAYSIA"
+  },
+  {
+    "date": "2026-08-04",
+    "amount": -370.12,
+    "description": "JOM PAY - TENAGA NASIONAL BERHAD"
+  },
+  {
+    "date": "2026-08-04",
+    "amount": -219.38,
+    "description": "INTEREST PAID"
+  },
+  {
+    "date": "2026-08-06",
+    "amount": -774.49,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-08-06",
+    "amount": -331.52,
+    "description": "JOM PAY - TENAGA NASIONAL BERHAD"
+  },
+  {
+    "date": "2026-08-08",
+    "amount": -312.33,
+    "description": "ONLINE PURCHASE - SHOPEE MALAYSIA"
+  },
+  {
+    "date": "2026-08-08",
+    "amount": -778.63,
+    "description": "AUTOPAY INSURANS TAKAFUL"
+  },
+  {
+    "date": "2026-08-10",
+    "amount": -150,
+    "description": "CHEQUE DEPOSIT"
+  },
+  {
+    "date": "2026-08-12",
+    "amount": -260,
+    "description": "CHEQUE DEPOSIT"
+  },
+  {
+    "date": "2026-08-14",
+    "amount": -482.21,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-08-15",
+    "amount": -658.65,
+    "description": "ONLINE PURCHASE - SHOPEE MALAYSIA"
+  },
+  {
+    "date": "2026-08-16",
+    "amount": -397.95,
+    "description": "CHEQUE DEPOSIT"
+  },
+  {
+    "date": "2026-08-16",
+    "amount": -106.27,
+    "description": "ONLINE PURCHASE - SHOPEE MALAYSIA"
+  },
+  {
+    "date": "2026-08-18",
+    "amount": -847.76,
+    "description": "SALARY CREDIT - SYARIKAT MAJU SDN BHD"
+  },
+  {
+    "date": "2026-08-18",
+    "amount": -470,
+    "description": "ATM WITHDRAWAL - PALISADE KLCC"
+  },
+  {
+    "date": "2026-08-19",
+    "amount": -116.94,
+    "description": "SALARY CREDIT - SYARIKAT MAJU SDN BHD"
+  },
+  {
+    "date": "2026-08-19",
+    "amount": -548.3,
+    "description": "CHEQUE DEPOSIT"
+  },
+  {
+    "date": "2026-08-21",
+    "amount": -64.16,
+    "description": "INTEREST PAID"
+  },
+  {
+    "date": "2026-08-21",
+    "amount": 382.43,
+    "description": "AUTOPAY INSURANS TAKAFUL"
+  },
+  {
+    "date": "2026-08-23",
+    "amount": -890,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-08-24",
+    "amount": -80,
+    "description": "ATM WITHDRAWAL - PALISADE KLCC"
+  },
+  {
+    "date": "2026-08-24",
+    "amount": -613.71,
+    "description": "CHEQUE DEPOSIT"
+  },
+  {
+    "date": "2026-08-25",
+    "amount": -557.13,
+    "description": "AUTOPAY INSURANS TAKAFUL"
+  },
+  {
+    "date": "2026-08-25",
+    "amount": -417.4,
+    "description": "CASH DEPOSIT MACHINE KL SENTRAL"
+  },
+  {
+    "date": "2026-08-26",
+    "amount": -190.2,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-08-26",
+    "amount": -320.04,
+    "description": "SALARY CREDIT - SYARIKAT MAJU SDN BHD"
+  },
+  {
+    "date": "2026-08-28",
+    "amount": -892.73,
+    "description": "CASH DEPOSIT MACHINE KL SENTRAL"
+  },
+  {
+    "date": "2026-08-28",
+    "amount": -472.89,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-08-30",
+    "amount": -308.86,
+    "description": "STANDING INSTRUCTION - RENTAL PAYMENT"
+  },
+  {
+    "date": "2026-08-30",
+    "amount": -387.17,
+    "description": "ATM WITHDRAWAL - PALISADE KLCC"
+  },
+  {
+    "date": "2026-09-01",
+    "amount": -870,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-09-02",
+    "amount": 677.8,
+    "description": "SALARY CREDIT - SYARIKAT MAJU SDN BHD"
+  },
+  {
+    "date": "2026-09-03",
+    "amount": -427.57,
+    "description": "ONLINE PURCHASE - SHOPEE MALAYSIA"
+  },
+  {
+    "date": "2026-09-05",
+    "amount": -850.37,
+    "description": "DUITNOW TRANSFER - SITI NURHALIZA"
+  },
+  {
+    "date": "2026-09-05",
+    "amount": -74.56,
+    "description": "BILL PAYMENT - ASTRO MALAYSIA"
+  },
+  {
+    "date": "2026-09-06",
+    "amount": -590,
+    "description": "STANDING INSTRUCTION - RENTAL PAYMENT"
+  },
+  {
+    "date": "2026-09-07",
+    "amount": -270.37,
+    "description": "JOM PAY - TENAGA NASIONAL BERHAD"
+  },
+  {
+    "date": "2026-09-07",
+    "amount": -529.96,
+    "description": "STANDING INSTRUCTION - RENTAL PAYMENT"
+  },
+  {
+    "date": "2026-09-08",
+    "amount": -441.48,
+    "description": "BILL PAYMENT - ASTRO MALAYSIA"
+  },
+  {
+    "date": "2026-09-09",
+    "amount": 180,
+    "description": "AUTOPAY INSURANS TAKAFUL"
+  },
+  {
+    "date": "2026-09-10",
+    "amount": 380,
+    "description": "AUTOPAY INSURANS TAKAFUL"
+  },
+  {
+    "date": "2026-09-10",
+    "amount": 858.72,
+    "description": "SALARY CREDIT - SYARIKAT MAJU SDN BHD"
+  },
+  {
+    "date": "2026-09-12",
+    "amount": -490.53,
+    "description": "JOM PAY - TENAGA NASIONAL BERHAD"
+  }
+]

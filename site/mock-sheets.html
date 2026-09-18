@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mock spreadsheet (screenshot fixture, not a real page)</title>
+<style>
+  /* Screenshot fixture only: a generic spreadsheet-style grid to show
+     pasted transaction data landing in columns. Not shipped, not linked
+     from the site. No trademarked wordmark/logo used, styled generically. */
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#202124;width:1280px;height:800px;overflow:hidden;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:10px 16px 4px;}
+  .doc-icon{width:28px;height:36px;background:#0f9d58;border-radius:2px;position:relative;}
+  .doc-icon::after{content:"";position:absolute;top:0;right:0;border-width:8px 8px 0 0;border-style:solid;border-color:#0b7a44 #fff #fff #fff;}
+  .doc-title{font-size:17px;color:#202124;}
+  .doc-sub{font-size:11px;color:#5f6368;margin-top:2px;}
+  .menubar{display:flex;gap:14px;padding:2px 16px 6px 54px;font-size:12.5px;color:#3c4043;}
+  .toolbar{display:flex;align-items:center;gap:10px;padding:6px 16px;border-bottom:1px solid #e0e0e0;}
+  .tb-btn{width:26px;height:26px;border-radius:4px;background:#f1f3f4;}
+  .tb-sep{width:1px;height:20px;background:#e0e0e0;}
+  .formula-row{display:flex;align-items:center;gap:10px;padding:6px 16px;border-bottom:1px solid #e0e0e0;font-size:12.5px;color:#3c4043;}
+  .name-box{border:1px solid #dadce0;border-radius:2px;padding:3px 8px;width:60px;background:#fff;}
+  .fx{width:16px;font-style:italic;color:#5f6368;}
+  .formula-input{flex:1;border:1px solid transparent;padding:3px 4px;}
+  table{border-collapse:collapse;width:100%;table-layout:fixed;}
+  th,td{border:1px solid #e1e3e4;font-size:12.5px;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  th{background:#f8f9fa;color:#5f6368;font-weight:400;text-align:center;width:46px;}
+  .rownum{background:#f8f9fa;color:#5f6368;text-align:center;width:34px;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .pasted{background:#e8f0fe;}
+  .pasted.marquee-edge{outline:2px solid #1a73e8;outline-offset:-2px;}
+  .toast{position:absolute;left:16px;bottom:20px;background:#323232;color:#fff;font-size:12.5px;padding:10px 16px;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+  .grid-wrap{position:relative;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="doc-icon"></div>
+    <div>
+      <div class="doc-title">June statement &mdash; Meridian Bank Savings</div>
+      <div class="doc-sub">Spreadsheet</div>
+    </div>
+  </div>
+  <div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Data</span><span>Tools</span><span>Help</span></div>
+  <div class="toolbar">
+    <div class="tb-btn"></div><div class="tb-btn"></div><div class="tb-sep"></div>
+    <div class="tb-btn"></div><div class="tb-btn"></div><div class="tb-btn"></div><div class="tb-sep"></div>
+    <div class="tb-btn"></div><div class="tb-btn"></div>
+  </div>
+  <div class="formula-row">
+    <div class="name-box">A1</div>
+    <div class="fx">fx</div>
+    <div class="formula-input">Transaction Date</div>
+  </div>
+  <div class="grid-wrap">
+    <table>
+      <tr><th></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th></tr>
+      <tr><td class="rownum">1</td><td class="pasted marquee-edge">Transaction Date</td><td class="pasted marquee-edge">Description</td><td class="pasted marquee-edge">Debit</td><td class="pasted marquee-edge">Credit</td><td class="pasted marquee-edge">Balance</td></tr>
+      <tr><td class="rownum">2</td><td class="pasted">01/06/2026</td><td class="pasted">NETS PAY 8817 SHENG SIONG</td><td class="pasted num">45.20</td><td class="pasted num"></td><td class="pasted num">4954.80</td></tr>
+      <tr><td class="rownum">3</td><td class="pasted">03/06/2026</td><td class="pasted">GIRO SP SERVICES</td><td class="pasted num">120.00</td><td class="pasted num"></td><td class="pasted num">4834.80</td></tr>
+      <tr><td class="rownum">4</td><td class="pasted">05/06/2026</td><td class="pasted">PAYNOW TRANSFER FROM JANE LEE</td><td class="pasted num"></td><td class="pasted num">200.00</td><td class="pasted num">5034.80</td></tr>
+      <tr><td class="rownum">5</td><td class="pasted">15/06/2026</td><td class="pasted">SALARY GIRO CREDIT ACME PTE LTD</td><td class="pasted num"></td><td class="pasted num">5000.00</td><td class="pasted num">10034.80</td></tr>
+      <tr><td class="rownum">6</td><td class="pasted marquee-edge">20/06/2026</td><td class="pasted marquee-edge">VISA DEBIT NTUC FAIRPRICE</td><td class="pasted num marquee-edge">88.35</td><td class="pasted num marquee-edge"></td><td class="pasted num marquee-edge">9946.45</td></tr>
+      <tr><td class="rownum">7</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">8</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">9</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">10</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">11</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">12</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">13</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">14</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">15</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">16</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="rownum">17</td><td></td><td></td><td></td><td></td><td></td></tr>
+    </table>
+    <div class="toast">Pasted 6 rows, 5 columns</div>
+  </div>
+</body>
+</html>

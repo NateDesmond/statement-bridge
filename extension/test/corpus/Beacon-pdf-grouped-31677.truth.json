@@ -1,0 +1,67 @@
+{
+  "axes": {
+    "fileType": "pdf-grouped",
+    "bank": "Beacon",
+    "lang": "en",
+    "dateFormat": "DD/MM/YYYY",
+    "numberFormat": "space-thousands",
+    "signConvention": "crdr-prefix",
+    "preamble": "keyvalue",
+    "footer": "none",
+    "encoding": "utf-8",
+    "hasBalance": true,
+    "currency": "USD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -189102,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-03",
+      "minor": 56447,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-03",
+      "minor": 142721,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": 90134,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -188665,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -54803,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 96710,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": 170277,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": -128375,
+      "description": "Freelance Invoice"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -11167,
+      "description": "Transfer From Savings"
+    }
+  ]
+}

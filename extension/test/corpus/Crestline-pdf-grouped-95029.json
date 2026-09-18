@@ -1,0 +1,165 @@
+{
+  "items": [
+    {
+      "str": "Monday, 2 Jun 2026",
+      "x": 40,
+      "y": 700,
+      "width": 90,
+      "height": 10
+    },
+    {
+      "str": "Freelance Invoice JPY 1,163 CR",
+      "x": 40,
+      "y": 684,
+      "width": 150,
+      "height": 10
+    },
+    {
+      "str": "Tuesday, 4 Jun 2026",
+      "x": 40,
+      "y": 668,
+      "width": 95,
+      "height": 10
+    },
+    {
+      "str": "Transfer From Savings JPY 1,733 DR",
+      "x": 40,
+      "y": 652,
+      "width": 170,
+      "height": 10
+    },
+    {
+      "str": "Salary Payment JPY 697 DR",
+      "x": 40,
+      "y": 636,
+      "width": 125,
+      "height": 10
+    },
+    {
+      "str": "Wednesday, 5 Jun 2026",
+      "x": 40,
+      "y": 620,
+      "width": 105,
+      "height": 10
+    },
+    {
+      "str": "Electric Co Bill JPY 1,997 DR",
+      "x": 40,
+      "y": 604,
+      "width": 145,
+      "height": 10
+    },
+    {
+      "str": "Salary Payment JPY 1,403 CR",
+      "x": 40,
+      "y": 588,
+      "width": 135,
+      "height": 10
+    },
+    {
+      "str": "Coffee House JPY 899 CR",
+      "x": 40,
+      "y": 572,
+      "width": 115,
+      "height": 10
+    },
+    {
+      "str": "Thursday, 7 Jun 2026",
+      "x": 40,
+      "y": 556,
+      "width": 100,
+      "height": 10
+    },
+    {
+      "str": "Electric Co Bill JPY 203 DR",
+      "x": 40,
+      "y": 540,
+      "width": 135,
+      "height": 10
+    },
+    {
+      "str": "Pharmacy JPY 91 CR",
+      "x": 40,
+      "y": 524,
+      "width": 90,
+      "height": 10
+    },
+    {
+      "str": "Friday, 8 Jun 2026",
+      "x": 40,
+      "y": 508,
+      "width": 90,
+      "height": 10
+    },
+    {
+      "str": "Bakery JPY 1,357 DR",
+      "x": 40,
+      "y": 492,
+      "width": 95,
+      "height": 10
+    },
+    {
+      "str": "Transfer From Savings JPY 811 DR",
+      "x": 40,
+      "y": 476,
+      "width": 160,
+      "height": 10
+    },
+    {
+      "str": "Saturday, 9 Jun 2026",
+      "x": 40,
+      "y": 460,
+      "width": 100,
+      "height": 10
+    },
+    {
+      "str": "Cinema Tickets JPY 1,861 DR",
+      "x": 40,
+      "y": 444,
+      "width": 135,
+      "height": 10
+    },
+    {
+      "str": "Coffee House JPY 1,237 CR",
+      "x": 40,
+      "y": 428,
+      "width": 125,
+      "height": 10
+    },
+    {
+      "str": "Sunday, 11 Jun 2026",
+      "x": 40,
+      "y": 412,
+      "width": 95,
+      "height": 10
+    },
+    {
+      "str": "Salary Payment JPY 851 DR",
+      "x": 40,
+      "y": 396,
+      "width": 125,
+      "height": 10
+    },
+    {
+      "str": "Bakery JPY 1,742 DR",
+      "x": 40,
+      "y": 380,
+      "width": 95,
+      "height": 10
+    },
+    {
+      "str": "Monday, 12 Jun 2026",
+      "x": 40,
+      "y": 364,
+      "width": 95,
+      "height": 10
+    },
+    {
+      "str": "Electric Co Bill JPY 774 CR",
+      "x": 40,
+      "y": 348,
+      "width": 135,
+      "height": 10
+    }
+  ]
+}

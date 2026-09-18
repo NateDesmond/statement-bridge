@@ -1,0 +1,102 @@
+{
+  "items": [
+    {
+      "str": "Monday, 2 Jun 2026",
+      "x": 40,
+      "y": 700,
+      "width": 90,
+      "height": 10
+    },
+    {
+      "str": "Pharmacy EUR -453,48",
+      "x": 40,
+      "y": 684,
+      "width": 100,
+      "height": 10
+    },
+    {
+      "str": "Grab Ride EUR +1.864,39",
+      "x": 40,
+      "y": 668,
+      "width": 115,
+      "height": 10
+    },
+    {
+      "str": "Freelance Invoice EUR +761,08",
+      "x": 40,
+      "y": 652,
+      "width": 145,
+      "height": 10
+    },
+    {
+      "str": "Tuesday, 3 Jun 2026",
+      "x": 40,
+      "y": 636,
+      "width": 95,
+      "height": 10
+    },
+    {
+      "str": "Hardware Store EUR -289,08",
+      "x": 40,
+      "y": 620,
+      "width": 130,
+      "height": 10
+    },
+    {
+      "str": "Hardware Store EUR -1.090,56",
+      "x": 40,
+      "y": 604,
+      "width": 140,
+      "height": 10
+    },
+    {
+      "str": "Wednesday, 4 Jun 2026",
+      "x": 40,
+      "y": 588,
+      "width": 105,
+      "height": 10
+    },
+    {
+      "str": "Grab Ride EUR +997,34",
+      "x": 40,
+      "y": 572,
+      "width": 105,
+      "height": 10
+    },
+    {
+      "str": "Thursday, 5 Jun 2026",
+      "x": 40,
+      "y": 556,
+      "width": 100,
+      "height": 10
+    },
+    {
+      "str": "Bakery EUR +1.647,99",
+      "x": 40,
+      "y": 540,
+      "width": 100,
+      "height": 10
+    },
+    {
+      "str": "Friday, 7 Jun 2026",
+      "x": 40,
+      "y": 524,
+      "width": 90,
+      "height": 10
+    },
+    {
+      "str": "Cinema Tickets EUR +1.654,43",
+      "x": 40,
+      "y": 508,
+      "width": 140,
+      "height": 10
+    },
+    {
+      "str": "Transfer From Savings EUR -314,89",
+      "x": 40,
+      "y": 492,
+      "width": 165,
+      "height": 10
+    }
+  ]
+}

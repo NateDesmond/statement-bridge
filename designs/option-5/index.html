@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statement Bridge: The Vault</title>
+<style>
+  :root{
+    --ink-900:#0d1a17;
+    --ink-800:#132420;
+    --ink-700:#1a302a;
+    --ink-600:#254038;
+    --ink-line:#2c463e;
+    --ink-text:#e7efe9;
+    --ink-text-dim:#9db3ab;
+    --brass:#c6a15b;
+    --brass-hover:#d6b06a;
+    --brass-ink:#2a2109;
+    --paper:#f3efe6;
+    --paper-raised:#ffffff;
+    --paper-line:#e3ddcd;
+    --ink:#20241f;
+    --ink-dim:#666a5f;
+    --ok:#3f7856;
+    --ok-bg:#e7f1e9;
+    --warn:#9a6a1f;
+    --warn-bg:#f7ecd6;
+    --danger:#a1402f;
+    --danger-bg:#f8e6e1;
+    --radius:6px;
+    --focus:2px solid #7fb8ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    min-width:1024px;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+  :focus-visible{outline:var(--focus);outline-offset:2px;}
+
+  /* ---------- App shell ---------- */
+  .app{display:flex;height:100vh;}
+
+  /* Sidebar */
+  .sidebar{
+    width:216px;flex-shrink:0;background:var(--ink-900);
+    color:var(--ink-text);display:flex;flex-direction:column;
+    border-right:1px solid var(--ink-line);
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;padding:18px 16px;
+    border-bottom:1px solid var(--ink-line);
+  }
+  .brand img{width:30px;height:30px;border-radius:6px;display:block;}
+  .brand .logo-fallback{
+    width:30px;height:30px;border-radius:6px;background:var(--brass);
+    color:var(--brass-ink);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:13px;flex-shrink:0;
+  }
+  .brand-name{font-size:14px;font-weight:600;letter-spacing:.2px;}
+  .brand-sub{font-size:11px;color:var(--ink-text-dim);margin-top:1px;}
+
+  nav.primary{padding:12px 10px;display:flex;flex-direction:column;gap:2px;flex:1;}
+  nav.primary button{
+    all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;
+    padding:11px 12px;border-radius:var(--radius);font-size:13.5px;
+    color:var(--ink-text-dim);min-height:40px;
+  }
+  nav.primary button:hover{background:var(--ink-700);color:var(--ink-text);}
+  nav.primary button.active{background:var(--ink-700);color:var(--ink-text);font-weight:600;box-shadow:inset 3px 0 0 var(--brass);}
+  nav.primary button .icon{width:16px;height:16px;flex-shrink:0;opacity:.9;}
+  nav.primary .step-no{
+    font-size:10.5px;color:var(--ink-text-dim);background:var(--ink-700);
+    width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  nav.primary button.active .step-no{background:var(--brass);color:var(--brass-ink);}
+
+  .sidebar-foot{padding:14px 14px 16px;border-top:1px solid var(--ink-line);display:flex;flex-direction:column;gap:12px;}
+  .lock-indicator{
+    display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-text);
+    background:var(--ink-700);border:1px solid var(--ink-line);border-radius:var(--radius);
+    padding:8px 10px;text-decoration:none;cursor:pointer;
+  }
+  .lock-indicator:hover{background:var(--ink-600);}
+  .lock-indicator svg{flex-shrink:0;}
+  .lock-indicator strong{font-weight:600;}
+  .storage-meter{font-size:11px;color:var(--ink-text-dim);}
+  .storage-meter .bar{
+    height:5px;border-radius:3px;background:var(--ink-700);overflow:hidden;margin-top:6px;
+    display:flex;
+  }
+  .storage-meter .bar span{display:block;height:100%;}
+  .storage-meter .fill-sessions{background:var(--brass);width:34%;}
+  .storage-meter .fill-settings{background:#5a7a6e;width:6%;}
+  .storage-meter .row{display:flex;justify-content:space-between;margin-top:6px;}
+
+  /* Header */
+  .content-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;height:100vh;}
+  header.topbar{
+    background:var(--ink-800);color:var(--ink-text);
+    padding:14px 28px;border-bottom:1px solid var(--ink-line);
+    display:flex;align-items:center;justify-content:space-between;gap:20px;
+  }
+  header.topbar h1{font-size:16px;margin:0;font-weight:600;}
+  header.topbar p{margin:2px 0 0;font-size:12px;color:var(--ink-text-dim);}
+  .topbar-actions{display:flex;gap:10px;align-items:center;}
+
+  /* Buttons */
+  .btn{
+    all:unset;cursor:pointer;border-radius:var(--radius);font-size:13px;font-weight:600;
+    padding:9px 16px;min-height:38px;display:inline-flex;align-items:center;gap:7px;
+    box-sizing:border-box;
+  }
+  .btn-brass{background:var(--brass);color:var(--brass-ink);}
+  .btn-brass:hover{background:var(--brass-hover);}
+  .btn-ghost-dark{background:transparent;color:var(--ink-text);border:1px solid var(--ink-line);}
+  .btn-ghost-dark:hover{background:var(--ink-700);}
+  .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--paper-line);}
+  .btn-ghost:hover{background:#ffffff;}
+  .btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid #e3bcb0;}
+  .btn-danger:hover{background:#f3d5cb;}
+  .btn-sm{padding:6px 11px;min-height:30px;font-size:12px;}
+
+  /* Main content area */
+  main{flex:1;overflow:auto;padding:24px 28px 48px;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  .panel{
+    background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius);
+    padding:18px 20px;margin-bottom:18px;
+  }
+
+  /* About this design */
+  .about{
+    display:flex;gap:18px;align-items:flex-start;background:var(--ink-800);color:var(--ink-text);
+    border:1px solid var(--ink-line);
+  }
+  .about img{width:64px;height:64px;border-radius:8px;flex-shrink:0;}
+  .about .logo-fallback-lg{
+    width:64px;height:64px;border-radius:8px;background:var(--brass);color:var(--brass-ink);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;flex-shrink:0;
+  }
+  .about h2{margin:0 0 6px;font-size:14px;color:var(--brass);}
+  .about p{margin:0 0 6px;font-size:13px;color:var(--ink-text-dim);line-height:1.55;}
+  .about summary{cursor:pointer;font-size:12px;color:var(--ink-text-dim);margin-top:4px;}
+  details.about-details[open] summary{margin-bottom:2px;}
+
+  h3.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin:0 0 12px;}
+
+  /* Badges */
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+    padding:3px 8px;border-radius:100px;line-height:1.5;
+  }
+  .badge-ok{background:var(--ok-bg);color:var(--ok);}
+  .badge-warn{background:var(--warn-bg);color:var(--warn);}
+  .badge-new{background:#e4e9f5;color:#3a51a3;}
+  .badge-low{background:var(--warn-bg);color:var(--warn);}
+  .badge-danger{background:var(--danger-bg);color:var(--danger);}
+  .badge-confidence-high{background:var(--ok-bg);color:var(--ok);}
+  .badge-confidence-med{background:var(--warn-bg);color:var(--warn);}
+  .badge-confidence-low{background:var(--danger-bg);color:var(--danger);}
+
+  /* --------- Screen 1: Import --------- */
+  .toolbar-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:16px;flex-wrap:wrap;}
+  .dropzone{
+    border:2px dashed var(--paper-line);border-radius:var(--radius);background:#faf8f2;
+    padding:36px 24px;text-align:center;margin-bottom:14px;
+  }
+  .dropzone strong{font-size:15px;display:block;margin-bottom:4px;}
+  .dropzone p{margin:0 0 14px;font-size:13px;color:var(--ink-dim);}
+  .reco-strip{
+    display:flex;align-items:center;gap:8px;justify-content:center;font-size:12.5px;
+    color:var(--ink-dim);background:#efe9d9;border-radius:var(--radius);padding:8px 12px;
+    max-width:520px;margin:0 auto;
+  }
+  .reco-strip strong{color:var(--ink);}
+
+  .merge-notice{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    background:var(--ok-bg);border:1px solid #bfe0cb;border-radius:var(--radius);
+    padding:11px 16px;margin-bottom:16px;font-size:13px;color:#255239;
+  }
+  .merge-notice a{font-weight:600;text-decoration:underline;color:#255239;}
+
+  .file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .file-card{
+    border:1px solid var(--paper-line);border-radius:var(--radius);background:var(--paper-raised);
+    padding:14px 16px;display:flex;flex-direction:column;gap:8px;position:relative;
+  }
+  .file-card .fc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .file-card .fc-name{font-size:13.5px;font-weight:600;}
+  .file-card .fc-meta{font-size:12px;color:var(--ink-dim);}
+  .file-card .fc-stats{display:flex;gap:14px;font-size:12px;color:var(--ink-dim);margin-top:2px;}
+  .file-card .fc-stats .num{color:var(--ink);font-weight:600;}
+  .file-card .fc-actions{display:flex;gap:8px;margin-top:6px;}
+  .fc-expiry{
+    position:absolute;top:-9px;right:12px;background:var(--warn-bg);color:var(--warn);
+    font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:100px;border:1px solid #ecd7a8;
+  }
+  .fc-confidence-q{font-size:12px;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:6px 8px;}
+
+  .dropzone-slim{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:12px 18px;text-align:left;
+  }
+  .dropzone-slim strong{margin:0;font-size:13.5px;}
+
+  .file-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
+  .file-row{
+    display:flex;align-items:center;gap:16px;background:var(--paper-raised);
+    border:1px solid var(--paper-line);border-radius:var(--radius);padding:10px 16px;
+  }
+  .file-row .fr-main{flex:1;min-width:0;}
+  .file-row .fr-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .file-row .fr-line{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+  .prog{width:110px;flex-shrink:0;height:5px;border-radius:3px;background:#ece6d6;overflow:hidden;}
+  .prog span{display:block;height:100%;background:var(--ok);}
+  .prog.prog-active span{background:var(--brass);}
+
+  .export-panel .export-summary{font-size:13px;color:var(--ink-dim);margin:0 0 14px;}
+  .export-warn-note{font-size:12.5px;color:var(--warn);}
+  .drawer-caption{font-size:12px;color:var(--ink-dim);margin:-8px 0 12px;}
+  .empty-explainer{font-size:12.5px;color:var(--ink-dim);margin:14px 0 0;line-height:1.6;}
+
+  /* --------- Screen 2: Review --------- */
+  .review-summary{
+    display:flex;gap:22px;flex-wrap:wrap;align-items:center;background:var(--paper-raised);
+    border:1px solid var(--paper-line);border-radius:var(--radius);padding:12px 18px;margin-bottom:14px;
+  }
+  .rs-item{font-size:12px;color:var(--ink-dim);}
+  .rs-item .num{display:block;font-size:15px;color:var(--ink);font-weight:700;}
+  .rs-item.fail{color:var(--danger);}
+  .rs-item.fail .num{color:var(--danger);}
+  .rs-item.pass .num{color:var(--ok);}
+  .rs-link{font-size:12px;color:var(--danger);text-decoration:underline;font-weight:600;}
+
+  .split{display:flex;gap:16px;height:560px;}
+  .pane{
+    border:1px solid var(--paper-line);border-radius:var(--radius);background:var(--paper-raised);
+    display:flex;flex-direction:column;overflow:hidden;flex:1;min-width:0;
+  }
+  .pane-head{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+    border-bottom:1px solid var(--paper-line);font-size:12px;color:var(--ink-dim);flex-shrink:0;
+  }
+  .pane-head .pn-controls{display:flex;align-items:center;gap:6px;}
+  .pane-head button.mini{
+    all:unset;cursor:pointer;width:24px;height:24px;border-radius:4px;text-align:center;
+    line-height:24px;background:var(--paper);border:1px solid var(--paper-line);font-size:12px;
+  }
+  .pdf-scroll{flex:1;overflow:auto;background:#e8e4d8;padding:20px;display:flex;justify-content:center;}
+  .pdf-page{
+    width:440px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.12);padding:26px 24px;
+    font-family:Georgia,serif;font-size:11px;line-height:1.65;color:#222;
+  }
+  .pdf-page h4{font-size:12.5px;margin:0 0 2px;}
+  .pdf-page .pdf-sub{font-size:10px;color:#666;margin-bottom:14px;}
+  .pdf-page table{width:100%;border-collapse:collapse;font-size:10px;}
+  .pdf-page td,.pdf-page th{padding:3px 4px;border-bottom:1px solid #eee;text-align:left;}
+  .pdf-row-selected{background:#fbeecb;}
+  .pdf-row-warn{background:#fbe4dd;}
+
+  .grid-scroll{flex:1;overflow:auto;}
+  table.txn-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.txn-table th{
+    position:sticky;top:0;background:var(--paper);text-align:left;padding:8px 10px;
+    font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);
+    border-bottom:1px solid var(--paper-line);
+  }
+  table.txn-table td{padding:8px 10px;border-bottom:1px solid #f0ede2;vertical-align:top;}
+  table.txn-table tr.selected td{background:#fbeecb;}
+  table.txn-table tr.warn td{background:#fdf1e4;}
+  table.txn-table tr.excluded td{color:#a6a196;text-decoration:line-through;background:#f7f5ee;}
+  table.txn-table tr.edited td{box-shadow:inset 3px 0 0 var(--brass);}
+  .amount-out{color:var(--danger);}
+  .amount-in{color:var(--ok);}
+  .flag-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-right:5px;}
+  .row-tag{font-size:10px;color:var(--ink-dim);display:block;margin-top:2px;}
+
+  /* --------- Screen 3: Mapping --------- */
+  .stepper{display:flex;align-items:center;gap:0;margin-bottom:20px;}
+  .step{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-dim);padding:6px 14px 6px 0;}
+  .step .dot{width:22px;height:22px;border-radius:50%;background:#e7e2d3;color:var(--ink-dim);
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+  .step.done .dot{background:var(--ok);color:#fff;}
+  .step.current{color:var(--ink);font-weight:700;}
+  .step.current .dot{background:var(--brass);color:var(--brass-ink);}
+  .step-sep{width:34px;height:1px;background:var(--paper-line);margin:0 4px;}
+
+  .confirm-note{
+    background:#efe9d9;border-radius:var(--radius);padding:10px 14px;font-size:12.5px;color:var(--ink);
+    margin-bottom:16px;
+  }
+
+  table.map-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:20px;}
+  table.map-table th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+  table.map-table td{padding:9px 10px;border-bottom:1px solid #f0ede2;vertical-align:middle;}
+  .sample-vals{font-size:11.5px;color:var(--ink-dim);}
+  select.map-select{
+    font-family:inherit;font-size:12.5px;padding:7px 9px;border-radius:5px;border:1px solid var(--paper-line);
+    background:#fff;min-width:170px;
+  }
+
+  .picker-row{display:flex;gap:28px;margin-bottom:20px;flex-wrap:wrap;}
+  .picker-group label.pg-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--ink-dim);margin-bottom:6px;}
+  .picker-group select{font-family:inherit;font-size:12.5px;padding:8px 10px;border-radius:5px;border:1px solid var(--paper-line);background:#fff;}
+
+  /* --------- Screen 4: Export --------- */
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .chip{
+    border:1px solid var(--paper-line);background:#fff;border-radius:100px;padding:8px 15px;
+    font-size:12.5px;cursor:pointer;color:var(--ink);
+  }
+  .chip.active{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
+
+  table.account-cov{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px;}
+  table.account-cov th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+  table.account-cov td{padding:9px 10px;border-bottom:1px solid #f0ede2;}
+
+  .coverage-warn{
+    display:flex;gap:8px;align-items:center;background:var(--warn-bg);color:var(--warn);
+    border:1px solid #ecd7a8;border-radius:var(--radius);padding:10px 14px;font-size:12.5px;margin-bottom:18px;
+  }
+
+  .currency-modes{display:flex;gap:12px;margin-bottom:16px;}
+  .mode-card{
+    flex:1;border:1px solid var(--paper-line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;background:#fff;
+  }
+  .mode-card.active{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass);}
+  .mode-card h4{margin:0 0 4px;font-size:13px;}
+  .mode-card p{margin:0;font-size:12px;color:var(--ink-dim);}
+
+  .rate-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;}
+  .rate-table th{text-align:left;padding:7px 10px;font-size:11px;text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+  .rate-table td{padding:7px 10px;border-bottom:1px solid #f0ede2;}
+  .rate-table input{
+    font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);
+    width:110px;
+  }
+  .rate-table input.missing{border-color:var(--danger);background:var(--danger-bg);}
+
+  .block-notice{font-size:12.5px;color:var(--danger);background:var(--danger-bg);border:1px solid #e3bcb0;
+    border-radius:var(--radius);padding:9px 13px;margin-bottom:16px;}
+
+  .checklist{list-style:none;margin:0 0 20px;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .checklist li{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+  .checklist .ck-ok{color:var(--ok);}
+  .checklist .ck-warn{color:var(--warn);}
+
+  .export-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .toggle-line{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-dim);}
+
+  /* --------- Preset preview + inline edit --------- */
+  .preset-unsaved{
+    display:flex;align-items:center;gap:12px;font-size:12px;margin-left:4px;
+  }
+  .preset-unsaved .tag-unsaved{
+    background:var(--warn-bg);color:var(--warn);font-weight:600;font-size:11px;
+    padding:3px 8px;border-radius:100px;
+  }
+  .preset-unsaved a{font-weight:600;text-decoration:underline;color:var(--ink);}
+  table.preset-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:14px 0;}
+  table.preset-table th{text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;
+    color:var(--ink-dim);border-bottom:1px solid var(--paper-line);}
+  table.preset-table td{padding:7px 8px;border-bottom:1px solid #f0ede2;vertical-align:middle;}
+  table.preset-table tr.col-off td{color:#a6a196;}
+  table.preset-table input[type="text"]{
+    font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;
+    border:1px solid var(--paper-line);width:100%;box-sizing:border-box;
+  }
+  .reorder-btns{display:flex;gap:3px;}
+  .reorder-btns button{
+    all:unset;cursor:pointer;width:20px;height:20px;border-radius:4px;text-align:center;
+    font-size:11px;color:var(--ink-dim);border:1px solid var(--paper-line);line-height:18px;
+  }
+  .reorder-btns button:hover{background:var(--paper);color:var(--ink);}
+  .reorder-btns button:disabled{opacity:.35;cursor:default;}
+  .reorder-btns button:disabled:hover{background:none;}
+
+  /* --------- How it works --------- */
+  .reading-page{max-width:680px;}
+  .reading-page h2{font-size:20px;margin:0 0 6px;}
+  .reading-page .reading-sub{font-size:13px;color:var(--ink-dim);margin:0 0 24px;}
+  .reading-page section{margin-bottom:22px;}
+  .reading-page section h3{font-size:14px;margin:0 0 6px;}
+  .reading-page section p{font-size:13.5px;line-height:1.65;color:var(--ink);margin:0 0 8px;}
+  .reading-page .reading-note{
+    font-size:12.5px;color:var(--ink-dim);border-top:1px solid var(--paper-line);
+    padding-top:16px;margin-top:8px;
+  }
+
+  /* --------- Screen 5: Settings --------- */
+  .settings-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start;}
+  .bank-group{margin-bottom:16px;}
+  .bank-group h4{font-size:13px;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
+  .version-row{
+    display:flex;justify-content:space-between;align-items:center;padding:9px 12px;
+    border:1px solid var(--paper-line);border-radius:5px;margin-bottom:6px;font-size:12.5px;background:#fff;
+  }
+  .version-row .vr-meta{color:var(--ink-dim);font-size:11.5px;}
+  .version-row .vr-actions{display:flex;gap:6px;}
+  .icon-btn{
+    all:unset;cursor:pointer;font-size:11.5px;color:var(--ink-dim);padding:4px 7px;border-radius:4px;
+  }
+  .icon-btn:hover{background:var(--paper);color:var(--ink);}
+  .icon-btn.danger:hover{background:var(--danger-bg);color:var(--danger);}
+
+  .settings-side .panel{margin-bottom:16px;}
+  .kv-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px solid #f0ede2;}
+  .kv-row:last-child{border-bottom:none;}
+
+  .danger-zone{
+    border:1px solid #e3bcb0;background:var(--danger-bg);border-radius:var(--radius);padding:16px 18px;
+  }
+  .danger-zone h3{color:var(--danger);margin:0 0 6px;font-size:13.5px;}
+  .danger-zone p{font-size:12.5px;color:#7a3327;margin:0 0 12px;}
+  .danger-confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .danger-confirm input{
+    font-family:inherit;font-size:12.5px;padding:8px 10px;border-radius:5px;border:1px solid #e3bcb0;width:140px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="../logos/logo-final.png" alt="Statement Bridge logo" width="30" height="30"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <div class="logo-fallback" style="display:none;">SB</div>
+      <div>
+        <div class="brand-name">Statement Bridge</div>
+        <div class="brand-sub">The Vault</div>
+      </div>
+    </div>
+
+    <nav class="primary" aria-label="Main sections">
+      <button data-screen="home" class="active" aria-current="page">
+        <svg class="icon" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0l-3-3m3 3l3-3M2.5 11v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Home
+      </button>
+      <button data-screen="review">
+        <svg class="icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 3v10" stroke="currentColor" stroke-width="1.3"/></svg>
+        Review
+      </button>
+      <button data-screen="profiles">
+        <svg class="icon" viewBox="0 0 16 16" fill="none"><path d="M3 4h4M3 8h4M3 12h4M11 4h2M11 8h2M11 12h2M8 4l1 4-1 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Profiles
+      </button>
+      <button data-screen="settings">
+        <svg class="icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 2.5v1.4M8 12.1v1.4M13.5 8h-1.4M3.9 8H2.5M11.7 4.3l-1 1M5.3 10.7l-1 1M11.7 11.7l-1-1M5.3 5.3l-1-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Settings
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <a class="lock-indicator" href="#" onclick="showScreen('how');return false;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3.5" y="7" width="9" height="6.5" rx="1.3" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span><strong>Offline.</strong> No network access.</span>
+      </a>
+      <div class="storage-meter">
+        <div class="row"><span>Local storage</span><span class="num">18.4 MB</span></div>
+        <div class="bar"><span class="fill-sessions"></span><span class="fill-settings"></span></div>
+        <div class="row"><span>Sessions, auto-clear in 5 days</span><span>Profiles kept</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content-col">
+    <header class="topbar">
+      <div>
+        <h1 id="screen-title">Home</h1>
+        <p id="screen-sub">Drop statements, watch them process, copy to Sheets.</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost-dark btn-sm" type="button">Clear sessions</button>
+      </div>
+    </header>
+
+    <main>
+
+      <!-- ============ SCREEN 1: HOME ============ -->
+      <section class="screen active" id="screen-home">
+
+        <div class="panel about">
+          <img src="../logos/logo-final.png" alt="Statement Bridge logo" width="64" height="64"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="logo-fallback-lg" style="display:none;">SB</div>
+          <div>
+            <details class="about-details" open>
+              <summary>About this design: The Vault</summary>
+              <h2>The 30-second path</h2>
+              <p>Mapping a statement format is the one careful step, done once in the Vault's quiet mapping
+              wizard. After that, Home is built for the other 11 months of the year: drop the files, watch the
+              bar fill, click the brass Copy for Sheets button.</p>
+              <p>Nothing about that fast path hides the offline lock or the storage meter, both stay pinned in
+              the sidebar footer no matter which screen is open.</p>
+              <p>Worth noticing: the export panel at the bottom of Home never asks a question that a warning can
+              answer instead, only real blockers stop the Copy button.</p>
+            </details>
+          </div>
+        </div>
+
+        <div class="toolbar-row">
+          <h3 class="section-title" style="margin:0;">This session</h3>
+        </div>
+
+        <div class="dropzone dropzone-slim">
+          <strong>Drop more statements</strong>
+          <button class="btn btn-ghost btn-sm" type="button">Choose files</button>
+        </div>
+
+        <div class="file-list">
+          <div class="file-row">
+            <div class="fr-main">
+              <div class="fr-name">Meridian Bank savings <span class="badge badge-ok">All checks pass</span></div>
+              <div class="fr-line">****4821 &middot; 1 to 31 Aug 2026 &middot; <span class="num">142 rows</span></div>
+            </div>
+            <div class="prog"><span style="width:100%;"></span></div>
+            <a class="rs-link" style="color:var(--ink-dim);text-decoration:underline;" href="#" onclick="return false;">Review</a>
+          </div>
+          <div class="file-row">
+            <div class="fr-main">
+              <div class="fr-name">Summit Bank One <span class="badge badge-ok">All checks pass</span></div>
+              <div class="fr-line">****2290 &middot; 1 to 31 Aug 2026 &middot; <span class="num">91 rows</span></div>
+            </div>
+            <div class="prog"><span style="width:100%;"></span></div>
+            <a class="rs-link" style="color:var(--ink-dim);text-decoration:underline;" href="#" onclick="return false;">Review</a>
+          </div>
+          <div class="file-row">
+            <div class="fr-main">
+              <div class="fr-name">Riverside Bank 360 <span class="badge badge-ok">All checks pass</span></div>
+              <div class="fr-line">****7710 &middot; 1 to 31 Aug 2026 &middot; <span class="num">54 rows</span></div>
+            </div>
+            <div class="prog"><span style="width:100%;"></span></div>
+            <a class="rs-link" style="color:var(--ink-dim);text-decoration:underline;" href="#" onclick="return false;">Review</a>
+          </div>
+          <div class="file-row">
+            <div class="fr-main">
+              <div class="fr-name">Anchor Bank Card (USD)</div>
+              <div class="fr-line">****9944 &middot; Reading statement, 60%</div>
+            </div>
+            <div class="prog prog-active"><span style="width:60%;"></span></div>
+          </div>
+        </div>
+
+        <h3 class="section-title">Needs a look</h3>
+
+        <div class="file-grid">
+          <div class="file-card">
+            <div class="fc-top">
+              <div>
+                <div class="fc-name">Palisade Bank Save Up</div>
+                <div class="fc-meta">Account not mapped yet &middot; maybank_sep.csv</div>
+              </div>
+              <span class="badge badge-new">New statement</span>
+            </div>
+            <div class="fc-actions">
+              <button class="btn btn-brass btn-sm" type="button" onclick="showScreen('map');return false;">Map this statement</button>
+            </div>
+          </div>
+
+          <div class="file-card">
+            <div class="fc-top">
+              <div>
+                <div class="fc-name">Meridian Bank savings</div>
+                <div class="fc-meta">Account ****4821 &middot; dbs_jun_2026.csv</div>
+              </div>
+              <span class="badge badge-danger">Layout seems to have changed</span>
+            </div>
+            <div class="fc-actions">
+              <button class="btn btn-brass btn-sm" type="button" onclick="showScreen('map');return false;">Update mapping</button>
+              <button class="btn btn-ghost btn-sm" type="button">Use anyway</button>
+            </div>
+          </div>
+
+          <div class="file-card">
+            <div class="fc-top">
+              <div>
+                <div class="fc-name">Summit Bank One</div>
+                <div class="fc-meta">Account ****2290 &middot; 3 rows need a look</div>
+              </div>
+              <span class="badge badge-warn">3 warnings</span>
+            </div>
+            <div class="fc-actions">
+              <button class="btn btn-ghost btn-sm" type="button" onclick="showScreen('review');return false;">Review</button>
+              <button class="btn btn-ghost btn-sm" type="button">Copy anyway</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="merge-notice">
+          <span><strong>3 rows merged</strong> from overlapping files in Meridian Bank savings (Jul to Aug).</span>
+          <a href="#" onclick="return false;">Undo</a>
+        </div>
+
+        <div class="panel export-panel">
+          <h3 class="section-title">Ready to copy</h3>
+          <p class="export-summary">Preset: My budget sheet &middot; Last full month (1 to 31 Aug) &middot; 287 rows across 4 accounts &middot; Original currencies (SGD, USD)</p>
+          <div class="export-actions">
+            <button class="btn btn-brass" type="button">Copy for Sheets</button>
+            <button class="btn btn-ghost" type="button">Download CSV</button>
+            <span class="export-warn-note">3 rows flagged, copying anyway</span>
+            <a class="rs-link" style="color:var(--ink-dim);margin-left:auto;" href="#" onclick="return false;">Change</a>
+          </div>
+        </div>
+
+        <h3 class="section-title">Change drawer, expanded</h3>
+        <p class="drawer-caption">Shown open here so both states are visible without clicking. On the live page this sits collapsed behind the "Change" link above.</p>
+
+        <div class="panel">
+          <h3 class="section-title">Date range</h3>
+          <div class="chip-row">
+            <button class="chip" type="button">Last full month</button>
+            <button class="chip" type="button">This month</button>
+            <button class="chip active" type="button">Since last export</button>
+            <button class="chip" type="button">Last 3 months</button>
+            <button class="chip" type="button">Year to date</button>
+            <button class="chip" type="button">All</button>
+            <button class="chip" type="button">Custom range</button>
+          </div>
+          <div class="picker-row">
+            <div class="picker-group">
+              <label class="pg-label">Filter using</label>
+              <select><option selected>Transaction date</option><option>Posted date</option></select>
+            </div>
+          </div>
+
+          <h3 class="section-title">Coverage by account</h3>
+          <div class="coverage-warn">
+            <strong>&#9888;</strong> No Summit Bank One data after 25 Aug 2026. Import a newer statement to close the gap.
+          </div>
+          <table class="account-cov">
+            <thead><tr><th>Account</th><th>Included</th><th>Excluded</th><th>Range in export</th></tr></thead>
+            <tbody>
+              <tr><td>Meridian Bank savings ****4821</td><td class="num">142</td><td class="num">1</td><td>1 to 31 Aug 2026</td></tr>
+              <tr><td>Summit Bank One ****2290</td><td class="num">91</td><td class="num">0</td><td>1 to 25 Aug 2026</td></tr>
+              <tr><td>Riverside Bank 360 ****7710</td><td class="num">54</td><td class="num">2</td><td>1 to 31 Aug 2026</td></tr>
+              <tr><td>Anchor Bank Card ****9944 (USD)</td><td class="num">0</td><td class="num">0</td><td>Still processing</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h3 class="section-title">Currency</h3>
+          <div class="currency-modes">
+            <div class="mode-card active">
+              <h4>A: Keep original currencies</h4>
+              <p>SGD and USD stay separate. Totals per currency are never added together.</p>
+            </div>
+            <div class="mode-card">
+              <h4>B: Convert everything to SGD</h4>
+              <p>Every USD row is converted using the rate below. Export is blocked until every pair has a rate.</p>
+            </div>
+          </div>
+          <table class="rate-table">
+            <thead><tr><th>Currency pair</th><th>Rate, foreign to SGD</th><th>Rate, SGD to foreign</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>USD &rarr; SGD</td>
+                <td><input class="num" placeholder="1 USD =" value="1.28"> SGD</td>
+                <td><input class="num" placeholder="1 SGD =" value="0.78"> USD</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h3 class="section-title">Export preset</h3>
+          <div class="picker-row" style="align-items:center;">
+            <div class="picker-group">
+              <label class="pg-label">Column layout</label>
+              <select><option>My budget sheet, 2026</option><option>Date, Description, Amount, Balance</option><option>Default Statement Bridge columns</option><option selected>Custom (unsaved)</option></select>
+            </div>
+            <div class="preset-unsaved">
+              <span class="tag-unsaved">Unsaved changes</span>
+              <a href="#" onclick="return false;">Save as preset</a>
+              <a href="#" onclick="return false;">Revert to My budget sheet, 2026</a>
+            </div>
+          </div>
+
+          <table class="preset-table">
+            <thead><tr><th>Order</th><th>Include</th><th>Output column</th><th>Sample 1</th><th>Sample 2</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="reorder-btns"><button type="button" disabled>&uarr;</button><button type="button">&darr;</button></div></td>
+                <td><input type="checkbox" checked></td>
+                <td><input type="text" value="Date"></td>
+                <td>02 Aug 2026</td>
+                <td>05 Aug 2026</td>
+              </tr>
+              <tr>
+                <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button">&darr;</button></div></td>
+                <td><input type="checkbox" checked></td>
+                <td><input type="text" value="Description"></td>
+                <td>NTUC FairPrice, Tampines</td>
+                <td>GIRO salary, Horizon Tech Pte Ltd</td>
+              </tr>
+              <tr>
+                <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button">&darr;</button></div></td>
+                <td><input type="checkbox" checked></td>
+                <td><input type="text" value="Amount"></td>
+                <td>-48.20</td>
+                <td>+4,820.00</td>
+              </tr>
+              <tr>
+                <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button">&darr;</button></div></td>
+                <td><input type="checkbox" checked></td>
+                <td><input type="text" value="Balance"></td>
+                <td>8,214.12</td>
+                <td>13,019.52</td>
+              </tr>
+              <tr class="col-off">
+                <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button" disabled>&darr;</button></div></td>
+                <td><input type="checkbox"></td>
+                <td><input type="text" value="Reference"></td>
+                <td>Not included</td>
+                <td>Not included</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="picker-row">
+            <div class="picker-group">
+              <label class="pg-label">Date format</label>
+              <select><option selected>DD MMM YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select>
+            </div>
+            <div class="picker-group">
+              <label class="pg-label">Sign convention</label>
+              <select><option selected>Negative for money out</option><option>Debit and credit columns</option><option>CR/DR flag</option></select>
+            </div>
+          </div>
+
+          <div class="export-actions" style="margin-top:8px;">
+            <div class="toggle-line">
+              <input type="checkbox" id="skip-header-home" checked>
+              <label for="skip-header-home">Include header row</label>
+            </div>
+            <div class="toggle-line">
+              <input type="checkbox" id="source-cols-home">
+              <label for="source-cols-home">Include original source columns</label>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="section-title">Empty state</h3>
+        <p class="drawer-caption">What Home looks like before the first statement is ever dropped.</p>
+        <div class="panel">
+          <div class="dropzone">
+            <strong>Drop bank statements here</strong>
+            <p>CSV, PDF or XLSX. Processed on this device only.</p>
+            <button class="btn btn-brass" type="button">Choose files</button>
+            <div class="reco-strip" style="margin-top:16px;">
+              <span>CSV is more reliable than PDF: text layout can shift between statement pages.</span>
+            </div>
+          </div>
+          <p class="empty-explainer">
+            Drop a statement. Map it once, about 5 minutes.<br>
+            Every month after that: drop, wait, copy.<br>
+            <a href="#" onclick="showScreen('how');return false;">How does this work?</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 2: REVIEW ============ -->
+      <section class="screen" id="screen-review">
+
+        <div class="review-summary">
+          <div class="rs-item"><span class="num">142</span>rows</div>
+          <div class="rs-item"><span class="num">1 to 31 Aug 2026</span>date range</div>
+          <div class="rs-item pass"><span class="num">+4,820.00 SGD</span>money in</div>
+          <div class="rs-item"><span class="num">-3,910.44 SGD</span>money out</div>
+          <div class="rs-item fail"><span class="num">Fails</span>balance check</div>
+          <a class="rs-link" href="#" onclick="return false;">Jump to row 37</a>
+          <div class="rs-item pass" style="margin-left:auto;"><span class="num">142 / 142</span>count check</div>
+        </div>
+
+        <div class="split">
+          <div class="pane">
+            <div class="pane-head">
+              <span>Source: meridian_savings_aug2026.csv, raw view</span>
+              <div class="pn-controls">
+                <button class="mini" type="button" aria-label="Previous page">&larr;</button>
+                <span>Page 1 of 1</span>
+                <button class="mini" type="button" aria-label="Next page">&rarr;</button>
+                <button class="mini" type="button" aria-label="Zoom out">&minus;</button>
+                <button class="mini" type="button" aria-label="Zoom in">+</button>
+              </div>
+            </div>
+            <div class="pdf-scroll">
+              <div class="pdf-page">
+                <h4>Meridian Bank, Statement of Account</h4>
+                <div class="pdf-sub">Account: 003-4-482100 &middot; Period: 01 Aug 2026 to 31 Aug 2026</div>
+                <table>
+                  <tr><th>Date</th><th>Reference</th><th>Debit</th><th>Credit</th><th>Balance</th></tr>
+                  <tr><td>02/08</td><td>NTUC FAIRPRICE TAMPINES</td><td>48.20</td><td></td><td>8,214.12</td></tr>
+                  <tr><td>03/08</td><td>GRAB* A-1928374</td><td>14.60</td><td></td><td>8,199.52</td></tr>
+                  <tr class="pdf-row-selected"><td>05/08</td><td>GIRO SALARY CREDIT</td><td></td><td>4,820.00</td><td>13,019.52</td></tr>
+                  <tr class="pdf-row-warn"><td>09/08</td><td>SHOPEE SG *8823</td><td>216.30</td><td></td><td>12,803.22</td></tr>
+                  <tr><td>14/08</td><td>AMAZON.COM USD 22.40</td><td>30.71</td><td></td><td>12,772.51</td></tr>
+                  <tr><td>21/08</td><td>NTUC FAIRPRICE FINANCE</td><td>76.05</td><td></td><td>12,696.46</td></tr>
+                  <tr><td>29/08</td><td>GRAB* A-2910384</td><td>9.80</td><td></td><td>12,686.66</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-head">
+              <span>Extracted transactions</span>
+              <span>142 rows</span>
+            </div>
+            <div class="grid-scroll">
+              <table class="txn-table">
+                <thead>
+                  <tr><th>Date</th><th>Description</th><th>Amount</th><th>Balance</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>02 Aug</td><td>NTUC FairPrice, Tampines</td>
+                    <td class="num amount-out">-48.20</td><td class="num">8,214.12</td>
+                  </tr>
+                  <tr>
+                    <td>03 Aug</td><td>Grab</td>
+                    <td class="num amount-out">-14.60</td><td class="num">8,199.52</td>
+                  </tr>
+                  <tr class="selected">
+                    <td>05 Aug</td><td>GIRO salary, Horizon Tech Pte Ltd</td>
+                    <td class="num amount-in">+4,820.00</td><td class="num">13,019.52</td>
+                  </tr>
+                  <tr class="warn">
+                    <td>09 Aug</td>
+                    <td><span class="flag-dot"></span>Shopee SG
+                      <span class="row-tag">Balance jump does not match amount, off by 12.00</span>
+                    </td>
+                    <td class="num amount-out">-216.30</td><td class="num">12,803.22</td>
+                  </tr>
+                  <tr class="edited">
+                    <td>14 Aug</td><td>Amazon.com (USD 22.40)
+                      <span class="row-tag">Description edited from raw text</span>
+                    </td>
+                    <td class="num amount-out">-30.71</td><td class="num">12,772.51</td>
+                  </tr>
+                  <tr class="excluded">
+                    <td>18 Aug</td><td>Internal transfer, own account
+                      <span class="row-tag">Excluded, kept visible</span>
+                    </td>
+                    <td class="num">-500.00</td><td class="num">12,272.51</td>
+                  </tr>
+                  <tr>
+                    <td>21 Aug</td><td>NTUC FairPrice Finance</td>
+                    <td class="num amount-out">-76.05</td><td class="num">12,696.46</td>
+                  </tr>
+                  <tr>
+                    <td>29 Aug</td><td>Grab</td>
+                    <td class="num amount-out">-9.80</td><td class="num">12,686.66</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN 3: MAP FIELDS ============ -->
+      <section class="screen" id="screen-map">
+
+        <a class="rs-link" style="color:var(--ink-dim);display:inline-block;margin-bottom:14px;" href="#"
+           onclick="showScreen('profiles');return false;">&larr; Back to Profiles</a>
+
+        <div class="stepper">
+          <div class="step done"><span class="dot">&#10003;</span>Basics</div>
+          <div class="step-sep"></div>
+          <div class="step done"><span class="dot">&#10003;</span>Locate data</div>
+          <div class="step-sep"></div>
+          <div class="step current"><span class="dot">3</span>Map fields</div>
+          <div class="step-sep"></div>
+          <div class="step"><span class="dot">4</span>Test</div>
+          <div class="step-sep"></div>
+          <div class="step"><span class="dot">5</span>Save</div>
+        </div>
+
+        <div class="confirm-note">Every suggestion below is a guess based on column headers and sample values. Nothing is saved until you confirm each one.</div>
+
+        <div class="panel">
+          <h3 class="section-title">Source columns, Riverside Bank 360 statement</h3>
+          <table class="map-table">
+            <thead>
+              <tr><th>Source column</th><th>Sample values</th><th>Maps to</th><th>Confidence</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Transaction Date</td>
+                <td class="sample-vals">03/09/2026, 07/09/2026</td>
+                <td><select class="map-select"><option selected>date</option><option>post_date</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-high">High</span></td>
+              </tr>
+              <tr>
+                <td>Value Date</td>
+                <td class="sample-vals">04/09/2026, 08/09/2026</td>
+                <td><select class="map-select"><option>date</option><option selected>post_date</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-high">High</span></td>
+              </tr>
+              <tr>
+                <td>Transaction Description</td>
+                <td class="sample-vals">GRAB* A-2910384, NTUC FAIRPRICE</td>
+                <td><select class="map-select"><option selected>description_raw</option><option>reference</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-high">High</span></td>
+              </tr>
+              <tr>
+                <td>Withdrawal</td>
+                <td class="sample-vals">9.80, 76.05</td>
+                <td><select class="map-select"><option selected>amount, debit</option><option>amount, signed</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-high">High</span></td>
+              </tr>
+              <tr>
+                <td>Deposit</td>
+                <td class="sample-vals">(blank), (blank)</td>
+                <td><select class="map-select"><option selected>amount, credit</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-med">Medium</span></td>
+              </tr>
+              <tr>
+                <td>Available Balance</td>
+                <td class="sample-vals">6,204.10, 6,180.30</td>
+                <td><select class="map-select"><option selected>balance</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-high">High</span></td>
+              </tr>
+              <tr>
+                <td>Ref No.</td>
+                <td class="sample-vals">SG2609031A, SG2609071B</td>
+                <td><select class="map-select"><option selected>reference</option><option>extra, pass-through</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-med">Medium</span></td>
+              </tr>
+              <tr>
+                <td>Channel</td>
+                <td class="sample-vals">ATM, FAST, PayNow</td>
+                <td><select class="map-select"><option>reference</option><option selected>extra, pass-through</option><option>Unmapped</option></select></td>
+                <td><span class="badge badge-confidence-low">Low, check this one</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="picker-row">
+            <div class="picker-group">
+              <label class="pg-label">Date format</label>
+              <select><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select>
+            </div>
+            <div class="picker-group">
+              <label class="pg-label">Sign convention</label>
+              <select><option selected>Debit and credit columns</option><option>Single column, signed</option><option>Single column with CR/DR flag</option></select>
+            </div>
+            <div class="picker-group">
+              <label class="pg-label">Number format</label>
+              <select><option selected>1,234.56</option><option>1.234,56</option></select>
+            </div>
+          </div>
+
+          <h3 class="section-title">Live preview</h3>
+          <table class="txn-table">
+            <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Balance</th><th>Reference</th></tr></thead>
+            <tbody>
+              <tr><td>03 Sep 2026</td><td>Grab</td><td class="num amount-out">-9.80</td><td class="num">6,204.10</td><td>SG2609031A</td></tr>
+              <tr><td>07 Sep 2026</td><td>NTUC FairPrice</td><td class="num amount-out">-76.05</td><td class="num">6,180.30</td><td>SG2609071B</td></tr>
+              <tr><td>11 Sep 2026</td><td>GIRO salary, Horizon Tech Pte Ltd</td><td class="num amount-in">+4,820.00</td><td class="num">11,000.30</td><td>SG2609111C</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="export-actions">
+          <button class="btn btn-ghost" type="button">Back: Locate data</button>
+          <button class="btn btn-brass" type="button">Continue: Test</button>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN: PROFILES ============ -->
+      <section class="screen" id="screen-profiles">
+
+        <div class="toolbar-row">
+          <h3 class="section-title" style="margin:0;">Statement profiles</h3>
+          <button class="btn btn-brass" type="button" onclick="showScreen('map');return false;">Map a new statement</button>
+        </div>
+
+        <div class="settings-grid">
+          <div>
+            <div class="panel">
+              <h3 class="section-title">Profiles</h3>
+
+              <div class="bank-group">
+                <h4>Meridian Bank <span class="badge badge-ok" style="font-weight:600;">2 versions</span></h4>
+                <div class="version-row">
+                  <div>
+                    <strong>Multiplier savings, CSV</strong>
+                    <div class="vr-meta">Current version, created 2 Sep 2026 &middot; used by 3 files</div>
+                  </div>
+                  <div class="vr-actions">
+                    <button class="icon-btn" type="button">Rename</button>
+                    <button class="icon-btn" type="button">Duplicate</button>
+                    <button class="icon-btn danger" type="button">Delete</button>
+                  </div>
+                </div>
+                <div class="version-row">
+                  <div>
+                    <strong>Multiplier savings, CSV (v1)</strong>
+                    <div class="vr-meta">Superseded 2 Sep 2026 &middot; used by 6 older files</div>
+                  </div>
+                  <div class="vr-actions">
+                    <button class="icon-btn" type="button">Restore</button>
+                    <button class="icon-btn danger" type="button">Delete</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bank-group">
+                <h4>Summit Bank <span class="badge badge-ok" style="font-weight:600;">1 version</span></h4>
+                <div class="version-row">
+                  <div>
+                    <strong>One account, PDF</strong>
+                    <div class="vr-meta">Current version, created 14 Jul 2026 &middot; used by 4 files</div>
+                  </div>
+                  <div class="vr-actions">
+                    <button class="icon-btn" type="button">Rename</button>
+                    <button class="icon-btn" type="button">Duplicate</button>
+                    <button class="icon-btn danger" type="button">Delete</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bank-group">
+                <h4>Riverside Bank <span class="badge badge-ok" style="font-weight:600;">1 version</span></h4>
+                <div class="version-row">
+                  <div>
+                    <strong>360 account, CSV</strong>
+                    <div class="vr-meta">Current version, created 10 Sep 2026 &middot; used by 2 files</div>
+                  </div>
+                  <div class="vr-actions">
+                    <button class="icon-btn" type="button">Rename</button>
+                    <button class="icon-btn" type="button">Duplicate</button>
+                    <button class="icon-btn danger" type="button">Delete</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bank-group">
+                <h4>Anchor Bank <span class="badge badge-ok" style="font-weight:600;">1 version</span></h4>
+                <div class="version-row">
+                  <div>
+                    <strong>Sapphire, CSV (USD)</strong>
+                    <div class="vr-meta">Current version, created 3 Aug 2026 &middot; used by 1 file</div>
+                  </div>
+                  <div class="vr-actions">
+                    <button class="icon-btn" type="button">Rename</button>
+                    <button class="icon-btn" type="button">Duplicate</button>
+                    <button class="icon-btn danger" type="button">Delete</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-side">
+            <div class="panel">
+              <h3 class="section-title">Backup and restore</h3>
+              <p style="font-size:12.5px;color:var(--ink-dim);margin:0 0 12px;">Profiles and saved rates only. Statement data and sessions are never included.</p>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost btn-sm" type="button">Backup to file</button>
+                <button class="btn btn-ghost btn-sm" type="button">Restore from file</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN: SETTINGS ============ -->
+      <section class="screen" id="screen-settings">
+
+        <div class="settings-grid">
+          <div>
+            <div class="panel">
+              <h3 class="section-title">Preferences</h3>
+              <div class="picker-row">
+                <div class="picker-group">
+                  <label class="pg-label">Default export preset</label>
+                  <select><option selected>My budget sheet, 2026</option><option>Date, Description, Amount, Balance</option><option>Default Statement Bridge columns</option></select>
+                </div>
+                <div class="picker-group">
+                  <label class="pg-label">Default date range</label>
+                  <select><option selected>Since last export</option><option>Last full month</option><option>This month</option><option>Year to date</option></select>
+                </div>
+                <div class="picker-group">
+                  <label class="pg-label">Home currency</label>
+                  <select><option selected>SGD</option><option>USD</option></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3 class="section-title">Export preset</h3>
+              <div class="picker-row">
+                <div class="picker-group">
+                  <label class="pg-label">Column layout</label>
+                  <select><option selected>My budget sheet, 2026</option><option>Date, Description, Amount, Balance</option><option>Default Statement Bridge columns</option><option>Custom (unsaved)</option></select>
+                </div>
+              </div>
+
+              <table class="preset-table">
+                <thead><tr><th>Order</th><th>Include</th><th>Output column</th><th>Sample 1</th><th>Sample 2</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><div class="reorder-btns"><button type="button" disabled>&uarr;</button><button type="button">&darr;</button></div></td>
+                    <td><input type="checkbox" checked></td>
+                    <td><input type="text" value="Date"></td>
+                    <td>02 Aug 2026</td>
+                    <td>05 Aug 2026</td>
+                  </tr>
+                  <tr>
+                    <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button">&darr;</button></div></td>
+                    <td><input type="checkbox" checked></td>
+                    <td><input type="text" value="Description"></td>
+                    <td>NTUC FairPrice, Tampines</td>
+                    <td>GIRO salary, Horizon Tech Pte Ltd</td>
+                  </tr>
+                  <tr>
+                    <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button">&darr;</button></div></td>
+                    <td><input type="checkbox" checked></td>
+                    <td><input type="text" value="Amount"></td>
+                    <td>-48.20</td>
+                    <td>+4,820.00</td>
+                  </tr>
+                  <tr>
+                    <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button">&darr;</button></div></td>
+                    <td><input type="checkbox" checked></td>
+                    <td><input type="text" value="Balance"></td>
+                    <td>8,214.12</td>
+                    <td>13,019.52</td>
+                  </tr>
+                  <tr class="col-off">
+                    <td><div class="reorder-btns"><button type="button">&uarr;</button><button type="button" disabled>&darr;</button></div></td>
+                    <td><input type="checkbox"></td>
+                    <td><input type="text" value="Reference"></td>
+                    <td>Not included</td>
+                    <td>Not included</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="picker-row">
+                <div class="picker-group">
+                  <label class="pg-label">Date format</label>
+                  <select><option selected>DD MMM YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select>
+                </div>
+                <div class="picker-group">
+                  <label class="pg-label">Sign convention</label>
+                  <select><option selected>Negative for money out</option><option>Debit and credit columns</option><option>CR/DR flag</option></select>
+                </div>
+              </div>
+
+              <div class="export-actions" style="margin-top:8px;">
+                <div class="toggle-line">
+                  <input type="checkbox" id="skip-header-settings" checked>
+                  <label for="skip-header-settings">Include header row</label>
+                </div>
+                <div class="toggle-line">
+                  <input type="checkbox" id="source-cols-settings">
+                  <label for="source-cols-settings">Include original source columns</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3 class="section-title">Saved exchange rates</h3>
+              <div class="kv-row"><span>USD to SGD</span><span class="num">1.28</span></div>
+              <div class="kv-row"><span>Set</span><span>16 Sep 2026</span></div>
+            </div>
+          </div>
+
+          <div class="settings-side">
+            <div class="panel">
+              <h3 class="section-title">Storage</h3>
+              <div class="kv-row"><span>Sessions, files and extracted rows</span><span class="num">17.1 MB</span></div>
+              <div class="kv-row"><span>Settings, profiles and rates</span><span class="num">1.3 MB</span></div>
+              <div class="kv-row"><span>Total</span><span class="num">18.4 MB</span></div>
+              <div style="margin-top:12px;">
+                <button class="btn btn-ghost btn-sm" type="button">Clear sessions</button>
+              </div>
+            </div>
+
+            <div class="danger-zone">
+              <h3>Delete everything</h3>
+              <p>Removes every profile, session, rate and saved preference from this browser. This cannot be undone. Type DELETE to confirm.</p>
+              <div class="danger-confirm">
+                <input type="text" placeholder="Type DELETE" aria-label="Type DELETE to confirm">
+                <button class="btn btn-danger" type="button">Delete everything</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SCREEN: HOW IT WORKS ============ -->
+      <section class="screen" id="screen-how">
+
+        <a class="rs-link" style="color:var(--ink-dim);display:inline-block;margin-bottom:14px;" href="#"
+           onclick="showScreen('home');return false;">&larr; Back to Home</a>
+
+        <div class="panel reading-page">
+          <h2>How Statement Bridge works</h2>
+          <p class="reading-sub">Plain language, no marketing. This is what actually happens when you drop a file.</p>
+
+          <section>
+            <h3>1. Everything happens in this tab</h3>
+            <p>Your files are read by code bundled inside the extension: pdf.js for PDFs, Papa Parse for CSV, SheetJS for Excel. Nothing is uploaded. There is no server.</p>
+          </section>
+
+          <section>
+            <h3>2. No AI</h3>
+            <p>Suggestions for mapping columns come from simple rules: known header names in a few languages, and the shape of values such as dates, amounts and currency codes. You confirm every suggestion, and the rules never change on their own.</p>
+          </section>
+
+          <section>
+            <h3>3. It remembers formats, not your data</h3>
+            <p>A profile is a small description of a layout: which row is the header, which column is the date. It is saved on this computer. Statement contents live only in this browser's storage and are deleted after 30 days, or sooner when you clear sessions.</p>
+          </section>
+
+          <section>
+            <h3>4. The extension cannot reach the internet</h3>
+            <p>Its security policy is set to connect-src 'none' and it asks for no website permissions, so Chrome itself blocks any network request. You can check: open chrome://extensions, click Details on Statement Bridge and see it has no site access, or open DevTools on this tab, choose Network, and run an import. The list stays empty.</p>
+          </section>
+
+          <section>
+            <h3>5. What is stored where</h3>
+            <p>Settings such as profiles, presets, saved rates and preferences stay until you delete them. Session data, meaning file contents, extracted rows and edits, is kept 30 days from last opened. "Clear sessions" and "Delete everything" in Settings remove them immediately.</p>
+          </section>
+
+          <p class="reading-note">Passwords for encrypted PDFs are used once to open the file and never stored.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  var titles = {
+    home: ["Home", "Drop statements, watch them process, copy to Sheets."],
+    review: ["Review", "Check the extracted rows against the source, side by side."],
+    map: ["Map fields", "Step 3 of 5. Confirm how each column becomes a standard field."],
+    profiles: ["Profiles", "Bank statement profiles: versions, rename, duplicate, backup."],
+    settings: ["Settings", "Preferences, saved rates, storage and account deletion."],
+    how: ["How it works", "What happens on this device when you drop a statement."]
+  };
+  var buttons = document.querySelectorAll('nav.primary button');
+  var screens = document.querySelectorAll('.screen');
+  function showScreen(target){
+    buttons.forEach(function(b){ b.classList.remove('active'); b.removeAttribute('aria-current'); });
+    var navBtn = document.querySelector('nav.primary button[data-screen="' + target + '"]');
+    if (navBtn) { navBtn.classList.add('active'); navBtn.setAttribute('aria-current', 'page'); }
+    screens.forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('screen-' + target).classList.add('active');
+    document.getElementById('screen-title').textContent = titles[target][0];
+    document.getElementById('screen-sub').textContent = titles[target][1];
+  }
+  buttons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      showScreen(btn.getAttribute('data-screen'));
+    });
+  });
+  if (location.hash && titles[location.hash.slice(1)]) { showScreen(location.hash.slice(1)); }
+
+  document.querySelectorAll('.chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      chip.parentElement.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); });
+      chip.classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.mode-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      card.parentElement.querySelectorAll('.mode-card').forEach(function(c){ c.classList.remove('active'); });
+      card.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

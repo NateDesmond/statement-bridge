@@ -1,0 +1,57 @@
+{
+  "axes": {
+    "fileType": "pdf-columns",
+    "bank": "Anchor",
+    "lang": "it",
+    "dateFormat": "DD MMM YYYY",
+    "numberFormat": "no-decimal",
+    "signConvention": "debitCredit",
+    "preamble": "quoted",
+    "footer": "pagemarkers",
+    "encoding": "utf-16le",
+    "hasBalance": true,
+    "currency": "USD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -128500,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 9100,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": 17400,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": 31000,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-14",
+      "minor": -102700,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": 141400,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-18",
+      "minor": 135600,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": 86800,
+      "description": "Refund"
+    }
+  ]
+}

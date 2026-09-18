@@ -1,0 +1,19 @@
+<!doctype html><html><body><div id="out">running</div>
+<script type="module">
+import { withPdfjs, groupItemsIntoLines, lineText } from '/src/core/pdf.js';
+import { renderPageToCanvas } from '/src/core/pdf-image.js';
+import { ocrPageCanvas } from '/src/core/ocr.js';
+async function main(){
+  const bytes = new Uint8Array(await (await fetch('/test/private/aug_2026_dbs.pdf')).arrayBuffer());
+  const out = await withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
+    const doc = await pdfjsLib.getDocument({ data: bytes, standardFontDataUrl }).promise;
+    const page = await doc.getPage(1);
+    const { canvas } = await renderPageToCanvas(page, 2.5);
+    const items = await ocrPageCanvas(canvas, { scale:2.5, restrictNumbers:true });
+    const lines = groupItemsIntoLines(items);
+    return lines.slice(8, 13).map(l => lineText(l));
+  });
+  document.getElementById('out').textContent = JSON.stringify(out, null, 2);
+}
+main().catch(e=>{document.getElementById('out').textContent='ERR:'+e.stack;});
+</script></body></html>

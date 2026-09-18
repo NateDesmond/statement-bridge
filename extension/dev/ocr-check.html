@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>OCR integration check</title></head>
+<body>
+<div id="out">running...</div>
+<script type="module">
+import { withPdfjs } from '../src/core/pdf.js';
+import { renderPageToCanvas, isImageOnly, opNamesFromOperatorList } from '../src/core/pdf-image.js';
+import { ocrPageCanvas } from '../src/core/ocr.js';
+import { groupItemsIntoLines, lineText } from '../src/core/pdf.js';
+
+// Re-rasterize a canvas through a PNG round trip so OCR only ever sees flat
+// pixels (no live vector/text content survives), per FASTPATH.md's OCR check.
+async function toFlatPixels(canvas) {
+  const dataUrl = canvas.toDataURL('image/png');
+  const img = new Image();
+  await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = dataUrl; });
+  const flat = document.createElement('canvas');
+  flat.width = canvas.width;
+  flat.height = canvas.height;
+  flat.getContext('2d').drawImage(img, 0, 0);
+  return flat;
+}
+
+async function runOnFile(url, { allPages = false } = {}) {
+  const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  return withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
+    const doc = await pdfjsLib.getDocument({ data: bytes, standardFontDataUrl }).promise;
+    const numPages = allPages ? doc.numPages : 1;
+    const pageResults = [];
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const [content, opList] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
+      const opNames = opNamesFromOperatorList(opList.fnArray, pdfjsLib.OPS);
+      const imageOnly = isImageOnly(content.items, opNames);
+
+      const { canvas, scale } = await renderPageToCanvas(page, 2.5);
+      const flat = await toFlatPixels(canvas);
+      const items = await ocrPageCanvas(flat, { scale, restrictNumbers: true });
+      const lines = groupItemsIntoLines(items).map(lineText);
+      pageResults.push({ pageNum, imageOnly, itemCount: items.length, avgConfidence: items.length ? items.reduce((s, i) => s + i.confidence, 0) / items.length : 0, confidences: items.map((i) => i.confidence), lines });
+    }
+    return { numPages: doc.numPages, pageResults };
+  });
+}
+
+async function main() {
+  const result = { synthetic: null, real: null, error: null };
+  try {
+    result.synthetic = await runOnFile('../test/fixtures/northwind_transaction_history_sample.pdf');
+  } catch (e) {
+    result.error = 'synthetic: ' + (e && e.message);
+  }
+  try {
+    const r = await fetch('../test/private/aug_2026_dbs.pdf');
+    if (r.ok) {
+      result.real = await runOnFile('../test/private/aug_2026_dbs.pdf', { allPages: true });
+    } else {
+      result.real = { skipped: 'no private fixture (' + r.status + ')' };
+    }
+  } catch (e) {
+    result.real = { skipped: 'error: ' + (e && e.message) };
+  }
+  document.getElementById('out').textContent = JSON.stringify(result);
+}
+main();
+</script>
+</body>
+</html>

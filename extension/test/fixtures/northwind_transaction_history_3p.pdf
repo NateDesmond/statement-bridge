@@ -1,0 +1,97 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 9 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 983 >>
+stream
+/F1 12 Tf
+BT 1 0 0 1 50 760 Tm (Northwind Bank) Tj ET
+/F1 9 Tf
+BT 1 0 0 1 50 744 Tm (JANE SAMPLE TAN) Tj ET
+BT 1 0 0 1 50 730 Tm (123 Example Avenue, #01-01, Singapore 123456) Tj ET
+/F1 11 Tf
+BT 1 0 0 1 50 712 Tm (Northwind Current Account) Tj ET
+/F1 9 Tf
+BT 1 0 0 1 50 696 Tm (Account No: 123-4-567890) Tj ET
+BT 1 0 0 1 50 680 Tm (Available Balance SGD 8,214.12 as of statement date) Tj ET
+/F1 11 Tf
+BT 1 0 0 1 50 656 Tm (Transaction History) Tj ET
+/F1 9 Tf
+BT 1 0 0 1 50 640 Tm (September 2026) Tj ET
+BT 1 0 0 1 50 610 Tm (Wednesday, 16 Sep 2026) Tj ET
+BT 1 0 0 1 50 592 Tm (STARBUCKS COFFEE #4471 SGP) Tj ET
+BT 1 0 0 1 430 592 Tm (SGD - 7.80) Tj ET
+BT 1 0 0 1 50 578 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 554 Tm (Tuesday, 15 Sep 2026) Tj ET
+BT 1 0 0 1 50 536 Tm (BAT 2C2*LAZADA Singapore SGP 12SEP 4628-XXXX) Tj ET
+BT 1 0 0 1 430 536 Tm (SGD - 20.83) Tj ET
+BT 1 0 0 1 50 522 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 500 15 Tm (Page 1 of 3) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 9 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 610 >>
+stream
+/F1 9 Tf
+BT 1 0 0 1 50 760 Tm (GIRO SALARY CREDIT ACME PTE LTD) Tj ET
+BT 1 0 0 1 430 760 Tm (SGD + 4,200.00) Tj ET
+BT 1 0 0 1 50 746 Tm (Advice · ADV) Tj ET
+BT 1 0 0 1 50 722 Tm (Monday, 14 Sep 2026) Tj ET
+BT 1 0 0 1 50 704 Tm (NTUC FAIRPRICE FINEST SGP) Tj ET
+BT 1 0 0 1 430 704 Tm (SGD - 48.20) Tj ET
+BT 1 0 0 1 50 690 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 666 Tm (12 Sep 2026) Tj ET
+BT 1 0 0 1 50 648 Tm (GRAB* A-1928374 SINGAPORE SG) Tj ET
+BT 1 0 0 1 430 648 Tm (SGD - 14.60) Tj ET
+BT 1 0 0 1 50 634 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 500 15 Tm (Page 2 of 3) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 9 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 426 >>
+stream
+/F1 9 Tf
+BT 1 0 0 1 50 760 Tm (10 Sep 2026) Tj ET
+BT 1 0 0 1 50 742 Tm (SHOPEE SG *8823) Tj ET
+BT 1 0 0 1 430 742 Tm (SGD - 216.30) Tj ET
+BT 1 0 0 1 50 728 Tm (Point-of-Sale Transaction · POS) Tj ET
+BT 1 0 0 1 50 710 Tm (CIRCLES.LIFE SGP) Tj ET
+BT 1 0 0 1 430 710 Tm (SGD - 28.00) Tj ET
+BT 1 0 0 1 50 696 Tm (GIRO · RCP) Tj ET
+BT 1 0 0 1 50 676 Tm (End of Transaction History) Tj ET
+BT 1 0 0 1 500 15 Tm (Page 3 of 3) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000253 00000 n 
+0000001284 00000 n 
+0000001410 00000 n 
+0000002067 00000 n 
+0000002193 00000 n 
+0000002667 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+2764
+%%EOF

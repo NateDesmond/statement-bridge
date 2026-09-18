@@ -1,0 +1,681 @@
+<title>Statement Bridge, The Grid</title>
+<meta charset="utf-8">
+<style>
+  :root{
+    --ink:#000;
+    --paper:#fff;
+    --signal:#D9231D;
+    --muted:#6b6b6b;
+    --rule:#000;
+    --hair:#d8d8d8;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box; border-radius:0 !important; box-shadow:none !important;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;}
+  body{font-size:14px;line-height:1.4;font-variant-numeric:tabular-nums;}
+  a{color:var(--ink);}
+  button, select, input{font-family:var(--sans); font-size:13px; color:var(--ink); background:var(--paper);}
+  table{font-variant-numeric:tabular-nums;}
+
+  /* ---------- grid scaffold ---------- */
+  .wrap{max-width:1600px; margin:0 auto; padding:0 40px;}
+  .grid{display:grid; grid-template-columns:repeat(12, 1fr); column-gap:24px; position:relative;}
+  .gridlines{position:absolute; inset:0; display:grid; grid-template-columns:repeat(12,1fr); column-gap:24px; pointer-events:none; z-index:0;}
+  .gridlines div{border-left:1px solid var(--hair); border-right:1px solid var(--hair);}
+  .grid > *{position:relative; z-index:1;}
+
+  /* ---------- header ---------- */
+  header.top{border-bottom:2px solid var(--ink);}
+  .toprow{display:flex; align-items:center; justify-content:space-between; padding:16px 0;}
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand img{width:32px; height:32px; display:block; object-fit:contain;}
+  .brand .wordmark{font-weight:700; font-size:15px; letter-spacing:0.06em; text-transform:uppercase;}
+  .brand .sub{font-size:11px; color:var(--muted); letter-spacing:0.04em; margin-top:2px;}
+  .clear-sessions{border:1px solid var(--ink); background:var(--paper); padding:8px 14px; font-size:11px;
+    text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;}
+  .clear-sessions:hover{background:var(--ink); color:var(--paper);}
+
+  nav.section-nav{display:flex; border-bottom:2px solid var(--ink);}
+  nav.section-nav button{flex:0 0 auto; background:none; border:none; padding:14px 22px 12px;
+    font-size:13px; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; color:var(--muted);
+    border-bottom:3px solid transparent; margin-bottom:-2px;}
+  nav.section-nav button .num{font-weight:700; margin-right:8px; color:inherit;}
+  nav.section-nav button.active{color:var(--ink); border-bottom-color:var(--signal); font-weight:700;}
+  nav.section-nav button.active .num{color:var(--signal);}
+  nav.section-nav button:hover{color:var(--ink);}
+
+  /* ---------- about panel ---------- */
+  .about{border-bottom:1px solid var(--ink); padding:28px 0;}
+  .about .logo-showcase{display:flex; align-items:center; justify-content:center; height:180px; border:1px solid var(--ink);}
+  .about .logo-showcase img{width:96px; height:96px; object-fit:contain;}
+  .about h2{font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:0 0 10px;}
+  .about p{margin:0 0 10px; max-width:64ch;}
+  .about p:last-child{margin-bottom:0;}
+  .about .toggle{font-size:11px; text-transform:uppercase; letter-spacing:0.06em; background:none;
+    border:1px solid var(--ink); padding:6px 12px; cursor:pointer; margin-top:12px;}
+
+  /* ---------- screens ---------- */
+  main{padding:36px 0 80px;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+  .screen-head{display:flex; align-items:baseline; gap:18px; margin-bottom:8px;}
+  .screen-head .no{font-size:40px; font-weight:700; color:var(--signal); line-height:1;}
+  .screen-head h1{font-size:40px; font-weight:700; letter-spacing:-0.01em; margin:0; text-transform:uppercase;}
+  .screen-sub{color:var(--muted); font-size:13px; max-width:70ch; margin:0 0 32px;}
+
+  h3.block-label{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
+    margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid var(--ink);}
+
+  /* ---------- arrows (only icon allowed) ---------- */
+  .arr{display:inline-block; width:10px; height:10px; position:relative; top:1px;}
+  .arr svg{display:block; width:100%; height:100%;}
+  .btn{display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border:1px solid var(--ink);
+    background:var(--paper); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;}
+  .btn:hover{background:var(--ink); color:var(--paper);}
+  .btn:hover svg line, .btn:hover svg polyline{stroke:var(--paper);}
+  .btn.primary{background:var(--signal); border-color:var(--signal); color:var(--paper);}
+  .btn.primary svg line, .btn.primary svg polyline{stroke:var(--paper);}
+  .btn.primary:hover{background:var(--ink); border-color:var(--ink);}
+  .btn[disabled]{opacity:0.35; cursor:not-allowed;}
+  .btn[disabled]:hover{background:var(--paper); color:var(--ink);}
+  .link-arrow{background:none; border:none; padding:0; color:var(--ink); cursor:pointer; font-size:12px;
+    text-transform:uppercase; letter-spacing:0.04em; display:inline-flex; gap:6px; align-items:center;}
+  .link-arrow.signal{color:var(--signal);}
+
+  /* ---------- tables (hero) ---------- */
+  table.hero{width:100%; border-collapse:collapse; font-size:13px;}
+  table.hero thead th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.06em;
+    font-weight:700; padding:10px 12px; border-bottom:2px solid var(--ink); background:var(--paper); white-space:nowrap;}
+  table.hero tbody td{padding:11px 12px; border-bottom:1px solid var(--hair); vertical-align:top;}
+  table.hero tbody tr:last-child td{border-bottom:1px solid var(--ink);}
+  table.hero td.num, table.hero th.num{text-align:right;}
+  table.hero tr.selected td{background:var(--ink); color:var(--paper);}
+  table.hero tr.excluded td{color:var(--muted); text-decoration:line-through;}
+  table.hero tr.warn td{color:var(--signal);}
+  .tag{display:inline-block; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; padding:2px 6px;
+    border:1px solid currentColor;}
+  .tag.signal{color:var(--signal); border-color:var(--signal);}
+  .badge-txt{font-size:11px; text-transform:uppercase; letter-spacing:0.04em;}
+  .badge-txt.signal{color:var(--signal); font-weight:700;}
+
+  fieldset{border:1px solid var(--ink); padding:16px; margin:0;}
+  legend{font-size:11px; text-transform:uppercase; letter-spacing:0.06em; padding:0 6px;}
+  label.field{display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); margin-bottom:6px;}
+  select, input[type=text], input[type=number]{border:1px solid var(--ink); background:var(--paper); padding:9px 10px; width:100%;}
+  input[type=checkbox], input[type=radio]{accent-color:var(--ink); width:14px; height:14px;}
+
+  .preset-row{display:flex; flex-wrap:wrap; gap:10px;}
+  .preset{border:1px solid var(--ink); background:var(--paper); padding:9px 14px; font-size:12px;
+    text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;}
+  .preset.active{background:var(--ink); color:var(--paper);}
+
+  .split{display:grid; grid-template-columns:1fr 1fr; column-gap:24px; align-items:start;}
+  .panel{border:1px solid var(--ink);}
+  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--ink);}
+  .panel-head h4{margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.06em;}
+  .panel-controls{display:flex; align-items:center; gap:10px; font-size:11px; color:var(--muted);}
+  .panel-controls button{background:none; border:1px solid var(--ink); width:22px; height:22px; display:inline-flex;
+    align-items:center; justify-content:center; cursor:pointer; padding:0;}
+  .src-page{padding:0; height:520px; overflow:auto; background:#fafafa;}
+  .fake-statement{padding:28px; font-family:var(--mono); font-size:11px; line-height:1.9; color:#222; background:#fff; min-height:100%;}
+  .fake-statement .hdr{font-family:var(--sans); font-weight:700; font-size:13px; margin-bottom:6px;}
+  .fake-statement .line{white-space:pre;}
+  .fake-statement .hl{background:#000; color:#fff;}
+
+  .csv-grid{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:11px;}
+  .csv-grid td{border:1px solid var(--hair); padding:5px 8px; white-space:nowrap;}
+  .csv-grid tr.hl td{background:var(--ink); color:var(--paper);}
+
+  .summary-bar{display:flex; flex-wrap:wrap; gap:0; border:1px solid var(--ink); margin-top:24px;}
+  .summary-cell{flex:1; min-width:150px; padding:14px 16px; border-right:1px solid var(--ink);}
+  .summary-cell:last-child{border-right:none;}
+  .summary-cell .k{font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:6px;}
+  .summary-cell .v{font-size:16px; font-weight:700;}
+  .summary-cell .v.signal{color:var(--signal);}
+
+  .stepper{display:flex; align-items:center; margin-bottom:32px;}
+  .step{display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.04em;}
+  .step .n{width:22px; height:22px; border:1px solid var(--muted); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;}
+  .step.done .n{border-color:var(--ink); color:var(--ink);}
+  .step.current{color:var(--ink); font-weight:700;}
+  .step.current .n{background:var(--signal); border-color:var(--signal); color:var(--paper);}
+  .step-line{flex:1; height:1px; background:var(--hair); margin:0 12px; min-width:20px;}
+
+  .conf{font-weight:700;}
+  .conf.high{color:var(--ink);}
+  .conf.med{color:var(--muted);}
+  .conf.low{color:var(--signal);}
+
+  .callout{border:1px solid var(--ink); padding:16px 18px; margin:20px 0;}
+  .callout.signal{border-color:var(--signal); color:var(--signal);}
+  .callout.signal strong{color:var(--signal);}
+  .callout p{margin:0;}
+
+  .kv-table{width:100%; border-collapse:collapse; font-size:12px;}
+  .kv-table td{padding:6px 0; border-bottom:1px solid var(--hair);}
+  .kv-table td:first-child{color:var(--muted); width:40%;}
+  .kv-table td.num{text-align:right;}
+
+  .storage-bar{display:flex; height:26px; border:1px solid var(--ink); overflow:hidden; margin:10px 0;}
+  .storage-bar .seg{height:100%;}
+  .storage-bar .seg.a{background:var(--ink);}
+  .storage-bar .seg.b{background:var(--paper); border-right:1px solid var(--ink);}
+  .storage-legend{display:flex; gap:22px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted);}
+  .swatch{display:inline-block; width:10px; height:10px; margin-right:6px; position:relative; top:1px; border:1px solid var(--ink);}
+  .swatch.a{background:var(--ink);}
+  .swatch.b{background:var(--paper);}
+
+  .danger-box{border:2px solid var(--signal); padding:20px;}
+  .danger-box h4{margin:0 0 8px; color:var(--signal); font-size:13px; text-transform:uppercase; letter-spacing:0.05em;}
+  .danger-box p{margin:0 0 14px; font-size:12px;}
+  .danger-box input[type=text]{border-color:var(--signal); max-width:260px; display:inline-block; margin-right:12px;}
+  .btn.danger{background:var(--paper); border-color:var(--signal); color:var(--signal);}
+  .btn.danger:hover{background:var(--signal); color:var(--paper);}
+
+  .col-span-8{grid-column:span 8;}
+  .col-span-4{grid-column:span 4;}
+  .col-span-6{grid-column:span 6;}
+  .col-span-12{grid-column:span 12;}
+  .col-span-3{grid-column:span 3;}
+  .col-span-9{grid-column:span 9;}
+
+  .mt24{margin-top:24px;}
+  .mt32{margin-top:32px;}
+  .mb0{margin-bottom:0;}
+
+  footer.legal{border-top:1px solid var(--ink); padding:18px 0; font-size:11px; color:var(--muted);}
+
+  @media (max-width:1100px){
+    .split{grid-template-columns:1fr;}
+    .grid{grid-template-columns:repeat(6,1fr);}
+    .col-span-8, .col-span-4, .col-span-9, .col-span-3{grid-column:span 6;}
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="toprow">
+      <div class="brand">
+        <img src="../logos/logo-4.png" width="32" height="32" alt="Statement Bridge logo">
+        <div>
+          <div class="wordmark">Statement Bridge</div>
+          <div class="sub">Statements in. Clean rows out. Offline.</div>
+        </div>
+      </div>
+      <button class="clear-sessions">Clear sessions</button>
+    </div>
+  </header>
+
+  <section class="about">
+    <div class="grid">
+      <div class="col-span-3">
+        <div class="logo-showcase">
+          <img src="../logos/logo-4.png" width="96" height="96" alt="Statement Bridge logo, large">
+        </div>
+      </div>
+      <div class="col-span-9">
+        <h2>About this design, Option 4: The Grid</h2>
+        <p>A strict twelve-column Swiss layout: flush left, ragged right, one grotesk typeface stretched from a 40px screen title down to a 13px table row. Black ink on white paper, with a single signal red kept for warnings and the two real actions that matter, download and copy.</p>
+        <p>Spreadsheet budgeters already think in rows and columns. This direction treats the extracted table as the main event rather than decoration around it: every value lines up, every number is tabular, and nothing competes with the data for attention.</p>
+        <p>One thing to notice: the review screen's balance check failure and the export screen's missing rate both point straight at the offending row with a plain arrow, no dialog, no colour beyond the one red.</p>
+      </div>
+    </div>
+  </section>
+
+  <nav class="section-nav" id="sectionNav">
+    <button class="active" data-target="s1"><span class="num">01</span>Import</button>
+    <button data-target="s2"><span class="num">02</span>Review</button>
+    <button data-target="s3"><span class="num">03</span>Map</button>
+    <button data-target="s4"><span class="num">04</span>Export</button>
+    <button data-target="s5"><span class="num">05</span>Settings</button>
+  </nav>
+
+  <main>
+
+    <!-- ================= 01 IMPORT ================= -->
+    <section class="screen active" id="s1">
+      <div class="screen-head"><span class="no">01</span><h1>Import</h1></div>
+      <p class="screen-sub">Drop statements below. CSV is more reliable than PDF, banks change PDF layouts without notice and CSV rarely breaks a match.</p>
+
+      <div class="grid">
+        <div class="col-span-8">
+          <fieldset style="height:100%;">
+            <legend>Drop zone</legend>
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:14px; padding:24px 4px;">
+              <div style="font-size:20px; font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Drop statements here</div>
+              <div style="color:var(--muted); font-size:12px;">CSV, or text PDF. Multiple files at once, multiple accounts at once.</div>
+              <button class="btn">Select files <span class="arr">
+                <svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg>
+              </span></button>
+            </div>
+          </fieldset>
+        </div>
+        <div class="col-span-4">
+          <fieldset style="height:100%;">
+            <legend>Duplicate merge</legend>
+            <p style="font-size:12px; margin:4px 0 10px;">3 rows merged from overlapping files.</p>
+            <button class="link-arrow">Undo <span class="arr"><svg viewBox="0 0 10 10"><line x1="9" y1="5" x2="1" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 1,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg></span></button>
+          </fieldset>
+        </div>
+      </div>
+
+      <h3 class="block-label mt32">Sessions, 5</h3>
+      <table class="hero">
+        <thead>
+          <tr>
+            <th>File</th><th>Matched profile</th><th>Account</th><th>Date range</th><th class="num">Rows</th><th>Status</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>dbs_multiplier_aug.csv</td>
+            <td>Meridian Bank savings, CSV</td>
+            <td>Meridian Bank ****4821</td>
+            <td>01 Aug to 31 Aug 2026</td>
+            <td class="num">38</td>
+            <td class="badge-txt">All checks pass</td>
+            <td><button class="link-arrow">Open <span class="arr"><svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg></span></button></td>
+          </tr>
+          <tr>
+            <td>summit_one_aug.pdf</td>
+            <td>Summit Bank One, PDF</td>
+            <td>Summit Bank One ****2290</td>
+            <td>01 Aug to 25 Aug 2026</td>
+            <td class="num">21</td>
+            <td class="badge-txt signal">2 warnings</td>
+            <td><button class="link-arrow">Open <span class="arr"><svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg></span></button></td>
+          </tr>
+          <tr>
+            <td>ocbc_360_sep.csv</td>
+            <td>None yet</td>
+            <td>Unassigned</td>
+            <td>01 Sep to 15 Sep 2026</td>
+            <td class="num">17</td>
+            <td class="badge-txt">New statement</td>
+            <td><button class="link-arrow">Map it <span class="arr"><svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg></span></button></td>
+          </tr>
+          <tr>
+            <td>chase_sapphire_aug.csv</td>
+            <td>Anchor Bank Card, CSV (85% match)</td>
+            <td>Anchor Bank Card ****7710</td>
+            <td>02 Aug to 29 Aug 2026</td>
+            <td class="num">24</td>
+            <td>
+              <div class="badge-txt">Looks like Meridian Bank savings, is that right?</div>
+              <div style="margin-top:4px; display:flex; gap:12px;">
+                <button class="link-arrow">Confirm</button>
+                <button class="link-arrow">Reject</button>
+              </div>
+            </td>
+            <td>&#8212;</td>
+          </tr>
+          <tr>
+            <td>uob_one_jun.pdf</td>
+            <td>Summit Bank One, PDF</td>
+            <td>Summit Bank One ****2290</td>
+            <td>01 Jun to 30 Jun 2026</td>
+            <td class="num">19</td>
+            <td>
+              <div class="badge-txt signal">Layout seems to have changed</div>
+              <div style="margin-top:4px;"><span class="tag signal">Deletes in 5 days</span></div>
+            </td>
+            <td><button class="link-arrow signal">Update mapping <span class="arr"><svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#D9231D" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#D9231D" stroke-width="1"/></svg></span></button></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ================= 02 REVIEW ================= -->
+    <section class="screen" id="s2">
+      <div class="screen-head"><span class="no">02</span><h1>Review</h1></div>
+      <p class="screen-sub">summit_one_aug.pdf, matched to Summit Bank One, PDF. Source on the left, extracted rows on the right. Click a row to line it up on both sides.</p>
+
+      <div class="split">
+        <div class="panel">
+          <div class="panel-head">
+            <h4>Source, PDF page</h4>
+            <div class="panel-controls">
+              <button aria-label="Zoom out">&minus;</button>
+              <span>100%</span>
+              <button aria-label="Zoom in">+</button>
+              <span style="margin-left:10px;">Page 1 / 2</span>
+              <button aria-label="Previous page"><span class="arr"><svg viewBox="0 0 10 10"><line x1="9" y1="5" x2="1" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 1,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg></span></button>
+              <button aria-label="Next page"><span class="arr"><svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#000" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#000" stroke-width="1"/></svg></span></button>
+            </div>
+          </div>
+          <div class="src-page">
+            <div class="fake-statement">
+              <div class="hdr">Summit Bank One Account ****2290</div>
+              <div class="line">Statement Period: 01 Aug 2026 to 25 Aug 2026</div>
+              <div class="line">&#160;</div>
+              <div class="line">Transaction Date   Description                  Withdrawal   Deposit    Balance</div>
+              <div class="line">01/08              GIRO SALARY CREDIT                          5,200.00   9,840.12</div>
+              <div class="line hl">03/08              GRAB* RIDE SG                 12.50                  9,827.62</div>
+              <div class="line">05/08              NTUC FAIRPRICE                 84.30                  9,743.32</div>
+              <div class="line">08/08              SHOPEE SG                      45.90                  9,697.42</div>
+              <div class="line">14/08              AMAZON.COM USD 22.10                              9,660.87</div>
+              <div class="line">19/08              GRAB* RIDE SG                 9.80                   9,651.07</div>
+              <div class="line">25/08              INTEREST CREDIT                              3.21     9,654.28</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h4>Extracted rows, 21</h4>
+            <div class="panel-controls"><span>3 flagged</span></div>
+          </div>
+          <div class="src-page">
+            <table class="hero">
+              <thead>
+                <tr><th>Date</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th>Flag</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>01 Aug</td><td>GIRO salary credit</td><td class="num">&#8212;</td><td class="num">5,200.00</td><td class="num">9,840.12</td><td></td></tr>
+                <tr class="selected"><td>03 Aug</td><td>Grab ride SG</td><td class="num">12.50</td><td class="num">&#8212;</td><td class="num">9,827.62</td><td></td></tr>
+                <tr class="warn"><td>05 Aug</td><td>NTUC FairPrice</td><td class="num">84.30</td><td class="num">&#8212;</td><td class="num">9,743.32</td><td>Amount unclear</td></tr>
+                <tr><td>08 Aug</td><td>Shopee SG <span class="tag" style="margin-left:6px;">Edited</span></td><td class="num">45.90</td><td class="num">&#8212;</td><td class="num">9,697.42</td><td></td></tr>
+                <tr class="excluded"><td>14 Aug</td><td>Amazon.com, USD 22.10</td><td class="num">22.10</td><td class="num">&#8212;</td><td class="num">9,660.87</td><td>Excluded</td></tr>
+                <tr class="warn"><td>19 Aug</td><td>Grab ride SG</td><td class="num">9.80</td><td class="num">&#8212;</td><td class="num">9,651.07</td><td>Possible duplicate</td></tr>
+                <tr><td>25 Aug</td><td>Interest credit</td><td class="num">&#8212;</td><td class="num">3.21</td><td class="num">9,654.28</td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-cell"><div class="k">Rows</div><div class="v">21</div></div>
+        <div class="summary-cell"><div class="k">Date range</div><div class="v" style="font-size:13px;">01 to 25 Aug 2026</div></div>
+        <div class="summary-cell"><div class="k">Money in, SGD</div><div class="v">5,203.21</div></div>
+        <div class="summary-cell"><div class="k">Money out, SGD</div><div class="v">152.50</div></div>
+        <div class="summary-cell"><div class="k">Balance check</div><div class="v signal">Fail, row 5 &#8594;</div></div>
+        <div class="summary-cell"><div class="k">Count check</div><div class="v">21 / 21 rows</div></div>
+      </div>
+    </section>
+
+    <!-- ================= 03 MAP ================= -->
+    <section class="screen" id="s3">
+      <div class="screen-head"><span class="no">03</span><h1>Map fields</h1></div>
+      <p class="screen-sub">ocbc_360_sep.csv, new format. Every suggestion below needs your confirmation before it is saved.</p>
+
+      <div class="stepper">
+        <div class="step done"><span class="n">1</span>Basics</div>
+        <div class="step-line"></div>
+        <div class="step done"><span class="n">2</span>Locate data</div>
+        <div class="step-line"></div>
+        <div class="step current"><span class="n">3</span>Map fields</div>
+        <div class="step-line"></div>
+        <div class="step"><span class="n">4</span>Test</div>
+        <div class="step-line"></div>
+        <div class="step"><span class="n">5</span>Save</div>
+      </div>
+
+      <h3 class="block-label">Source columns</h3>
+      <table class="hero">
+        <thead>
+          <tr><th>Source column</th><th>Sample values</th><th>Standard field</th><th>Confidence</th><th>Confirm</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Transaction Date</td>
+            <td style="color:var(--muted);">03/09/2026, 05/09/2026</td>
+            <td>date</td>
+            <td class="conf high">High</td>
+            <td><input type="checkbox" checked aria-label="Confirm date mapping"></td>
+          </tr>
+          <tr>
+            <td>Value Date</td>
+            <td style="color:var(--muted);">03/09/2026, 05/09/2026</td>
+            <td>post_date</td>
+            <td class="conf high">High</td>
+            <td><input type="checkbox" checked aria-label="Confirm post_date mapping"></td>
+          </tr>
+          <tr>
+            <td>Transaction Description</td>
+            <td style="color:var(--muted);">NTUC FAIRPRICE, GRAB* RIDE SG</td>
+            <td>description_raw</td>
+            <td class="conf high">High</td>
+            <td><input type="checkbox" checked aria-label="Confirm description mapping"></td>
+          </tr>
+          <tr>
+            <td>Withdrawal (SGD)</td>
+            <td style="color:var(--muted);">45.90, 12.50</td>
+            <td>amount, debit side</td>
+            <td class="conf med">Medium</td>
+            <td><input type="checkbox" aria-label="Confirm debit mapping"></td>
+          </tr>
+          <tr>
+            <td>Deposit (SGD)</td>
+            <td style="color:var(--muted);">3,200.00</td>
+            <td>amount, credit side</td>
+            <td class="conf med">Medium</td>
+            <td><input type="checkbox" aria-label="Confirm credit mapping"></td>
+          </tr>
+          <tr>
+            <td>Ledger Balance</td>
+            <td style="color:var(--muted);">14,203.55</td>
+            <td>balance</td>
+            <td class="conf high">High</td>
+            <td><input type="checkbox" checked aria-label="Confirm balance mapping"></td>
+          </tr>
+          <tr>
+            <td>Cheque No.</td>
+            <td style="color:var(--muted);">(blank)</td>
+            <td class="conf low" style="color:var(--signal);">Unmapped</td>
+            <td class="conf low">Low</td>
+            <td><input type="checkbox" aria-label="Confirm unmapped"></td>
+          </tr>
+          <tr>
+            <td>Remarks</td>
+            <td style="color:var(--muted);">SALARY, BILL PAYMENT</td>
+            <td>extra, pass-through</td>
+            <td class="conf med">Medium</td>
+            <td><input type="checkbox" aria-label="Confirm extra mapping"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="grid mt32">
+        <div class="col-span-4">
+          <label class="field" for="dateFmt">Date format</label>
+          <select id="dateFmt">
+            <option>DD/MM/YYYY</option>
+            <option>MM/DD/YYYY</option>
+            <option>YYYY-MM-DD</option>
+          </select>
+        </div>
+        <div class="col-span-4">
+          <label class="field" for="signConv">Sign convention</label>
+          <select id="signConv">
+            <option>Debit and credit columns</option>
+            <option>Single signed amount</option>
+            <option>Negative is money out</option>
+            <option>Positive is money out</option>
+          </select>
+        </div>
+        <div class="col-span-4">
+          <label class="field" for="curMode">Currency</label>
+          <select id="curMode">
+            <option>Profile default, SGD</option>
+            <option>Column in file</option>
+          </select>
+        </div>
+      </div>
+
+      <h3 class="block-label mt32">Live preview</h3>
+      <table class="hero">
+        <thead>
+          <tr><th>Date</th><th>Description</th><th class="num">Amount</th><th class="num">Balance</th><th>Currency</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>2026-09-03</td><td>Grab ride SG</td><td class="num">&minus;12.50</td><td class="num">14,190.05</td><td>SGD</td></tr>
+          <tr><td>2026-09-05</td><td>NTUC FairPrice</td><td class="num">&minus;45.90</td><td class="num">14,144.15</td><td>SGD</td></tr>
+        </tbody>
+      </table>
+
+      <div style="display:flex; justify-content:space-between; margin-top:28px;">
+        <button class="btn">Back</button>
+        <button class="btn primary">Continue to Test <span class="arr"><svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#fff" stroke-width="1"/><polyline points="5,1 9,5 5,9" fill="none" stroke="#fff" stroke-width="1"/></svg></span></button>
+      </div>
+    </section>
+
+    <!-- ================= 04 EXPORT ================= -->
+    <section class="screen" id="s4">
+      <div class="screen-head"><span class="no">04</span><h1>Export</h1></div>
+      <p class="screen-sub">4 accounts ready. Pick a range, a currency mode, and a layout, then send the rows to a file or your clipboard.</p>
+
+      <h3 class="block-label">Date range</h3>
+      <div class="preset-row">
+        <button class="preset">Last full month</button>
+        <button class="preset active">This month</button>
+        <button class="preset">Last 3 months</button>
+        <button class="preset">Year to date</button>
+        <button class="preset">All</button>
+        <button class="preset">Custom</button>
+      </div>
+
+      <h3 class="block-label mt32">Rows by account</h3>
+      <table class="hero">
+        <thead><tr><th>Account</th><th class="num">Included</th><th class="num">Excluded</th><th>Coverage</th></tr></thead>
+        <tbody>
+          <tr><td>Meridian Bank ****4821</td><td class="num">38</td><td class="num">0</td><td class="badge-txt">Full month</td></tr>
+          <tr class="warn"><td>Summit Bank One ****2290</td><td class="num">17</td><td class="num">2</td><td class="badge-txt signal">No Summit Bank data after 25 Aug &#8594;</td></tr>
+          <tr><td>Riverside Bank 360 ****0093</td><td class="num">22</td><td class="num">1</td><td class="badge-txt">Full month</td></tr>
+          <tr><td>Anchor Bank Card ****7710</td><td class="num">24</td><td class="num">0</td><td class="badge-txt">Full month</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="block-label mt32">Currency</h3>
+      <div class="grid">
+        <div class="col-span-6">
+          <fieldset>
+            <legend>Mode</legend>
+            <label style="display:flex; gap:8px; align-items:center; margin-bottom:10px; font-size:13px;">
+              <input type="radio" name="curmode" checked> Keep original currencies, totals per currency, never summed
+            </label>
+            <label style="display:flex; gap:8px; align-items:center; font-size:13px;">
+              <input type="radio" name="curmode"> Convert everything to SGD
+            </label>
+          </fieldset>
+        </div>
+        <div class="col-span-6">
+          <fieldset>
+            <legend>Saved rates</legend>
+            <table class="kv-table">
+              <tr><td>1 USD = 1.28 SGD</td><td class="num">1 SGD = 0.78 USD</td></tr>
+              <tr><td style="color:var(--signal);">1 EUR = &#8212;</td><td class="num" style="color:var(--signal);">Missing rate</td></tr>
+            </table>
+          </fieldset>
+        </div>
+      </div>
+      <div class="callout signal">
+        <p><strong>Export blocked.</strong> 1 currency pair is missing a rate. Add a rate for EUR to SGD before converting, or switch back to original currencies.</p>
+      </div>
+
+      <div class="grid mt32">
+        <div class="col-span-4">
+          <label class="field" for="preset">Export preset</label>
+          <select id="preset">
+            <option>My Sheets layout</option>
+            <option>Default columns</option>
+            <option>Minimal, date/description/amount</option>
+          </select>
+        </div>
+        <div class="col-span-8">
+          <label class="field">Final checks</label>
+          <table class="kv-table">
+            <tr><td>Balance checks pass on 3 of 4 accounts</td><td class="num">&#8212;</td></tr>
+            <tr><td style="color:var(--signal);">1 account has a coverage gap</td><td class="num" style="color:var(--signal);">Review</td></tr>
+            <tr><td style="color:var(--signal);">1 currency pair missing a rate</td><td class="num" style="color:var(--signal);">Add rate</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:32px; border-top:1px solid var(--ink); padding-top:24px;">
+        <label style="display:flex; gap:8px; align-items:center; font-size:12px; text-transform:uppercase; letter-spacing:0.04em;">
+          <input type="checkbox" checked> Skip header row
+        </label>
+        <div style="display:flex; gap:14px;">
+          <button class="btn primary" disabled>Download CSV</button>
+          <button class="btn primary" disabled>Copy for Sheets</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 05 SETTINGS ================= -->
+    <section class="screen" id="s5">
+      <div class="screen-head"><span class="no">05</span><h1>Settings</h1></div>
+      <p class="screen-sub">Profiles, saved rates, and storage. Nothing here leaves this browser.</p>
+
+      <h3 class="block-label">Profiles by bank</h3>
+      <table class="hero">
+        <thead><tr><th>Bank</th><th>Profile</th><th>Version</th><th>Created</th><th class="num">Files used</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Meridian Bank</td><td>Savings, CSV</td><td>v2</td><td>20 Aug 2026</td><td class="num">12</td>
+            <td><button class="link-arrow">Rename</button> &nbsp; <button class="link-arrow">Duplicate</button> &nbsp; <button class="link-arrow signal">Delete</button></td></tr>
+          <tr><td>&#160;</td><td style="color:var(--muted);">Savings, CSV (older)</td><td>v1</td><td>01 Jun 2026</td><td class="num">3</td>
+            <td><button class="link-arrow">Duplicate</button> &nbsp; <button class="link-arrow signal">Delete</button></td></tr>
+          <tr><td>Summit Bank</td><td>One, PDF</td><td>v3</td><td>10 Sep 2026</td><td class="num">2</td>
+            <td><button class="link-arrow">Rename</button> &nbsp; <button class="link-arrow">Duplicate</button> &nbsp; <button class="link-arrow signal">Delete</button></td></tr>
+          <tr><td>Riverside Bank</td><td>360, CSV</td><td>v1</td><td>15 Sep 2026</td><td class="num">1</td>
+            <td><button class="link-arrow">Rename</button> &nbsp; <button class="link-arrow">Duplicate</button> &nbsp; <button class="link-arrow signal">Delete</button></td></tr>
+          <tr><td>Anchor Bank</td><td>Sapphire, CSV</td><td>v1</td><td>02 Aug 2026</td><td class="num">1</td>
+            <td><button class="link-arrow">Rename</button> &nbsp; <button class="link-arrow">Duplicate</button> &nbsp; <button class="link-arrow signal">Delete</button></td></tr>
+        </tbody>
+      </table>
+
+      <div class="grid mt32">
+        <div class="col-span-6">
+          <h3 class="block-label">Backup</h3>
+          <p style="font-size:12px; color:var(--muted); margin:0 0 14px;">Profiles and rates as one file, no transaction data included.</p>
+          <div style="display:flex; gap:12px;">
+            <button class="btn">Backup profiles</button>
+            <button class="btn">Restore from file</button>
+          </div>
+        </div>
+        <div class="col-span-6">
+          <h3 class="block-label">Saved rates</h3>
+          <table class="kv-table">
+            <tr><td>1 USD = 1.28 SGD</td><td class="num">Updated 12 Sep 2026</td></tr>
+            <tr><td>1 GBP = 1.66 SGD</td><td class="num">Updated 02 Sep 2026</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <h3 class="block-label mt32">Storage</h3>
+      <div class="storage-bar"><div class="seg a" style="width:78%;"></div><div class="seg b" style="width:22%;"></div></div>
+      <div class="storage-legend">
+        <span><span class="swatch a"></span>Sessions, 2.4 MB</span>
+        <span><span class="swatch b"></span>Settings, 0.1 MB</span>
+      </div>
+
+      <h3 class="block-label mt32">Delete everything</h3>
+      <div class="danger-box">
+        <h4>This removes every session, profile, and saved rate</h4>
+        <p>Type DELETE to confirm. This cannot be undone.</p>
+        <input type="text" placeholder="Type DELETE" aria-label="Type DELETE to confirm">
+        <button class="btn danger">Delete everything</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="legal">Statement Bridge runs entirely in this browser tab. No network requests, no accounts, no data leaves your machine.</footer>
+</div>
+
+<script>
+  var nav = document.getElementById('sectionNav');
+  nav.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-target]');
+    if(!btn) return;
+    nav.querySelectorAll('button').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById(btn.getAttribute('data-target')).classList.add('active');
+    window.scrollTo(0,0);
+  });
+</script>

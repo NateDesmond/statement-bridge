@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statement Bridge</title>
+<link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+<!-- Item A2: shared live region for the whole app. nav.js exports announce(text)
+     - every screen calls that instead of touching this element directly. -->
+<div id="sr-status" role="status" aria-live="polite" class="sr-only"></div>
+<div class="app">
+
+  <header class="brand-bar">
+    <div class="brand-left">
+      <img src="icons/logo.png" alt="Statement Bridge logo" width="34" height="34">
+      <div class="name">Statement Bridge</div>
+    </div>
+    <button type="button" class="shell-back-btn" id="shell-back-btn" hidden>&larr; Back</button>
+    <button class="gear-btn" type="button" id="gear-btn" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.4"/><path d="M8 2.5v1.4M8 12.1v1.4M13.5 8h-1.4M3.9 8H2.5M11.7 4.3l-1 1M5.3 10.7l-1 1M11.7 11.7l-1-1M5.3 5.3l-1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <div class="progress-strip" id="progress-strip">
+    <div class="steps">
+      <div class="step-item" id="strip-1" data-test="step-drop">
+        <div class="step-circle">1</div>
+        <div class="step-label">Drop</div>
+      </div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step-item" id="strip-2" data-test="step-read">
+        <div class="step-circle">2</div>
+        <div class="step-label">Read</div>
+      </div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step-item" id="strip-3" data-test="step-copy">
+        <div class="step-circle">3</div>
+        <div class="step-label">Copy</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-col">
+    <main>
+
+      <!-- ============ HOME (fast path) ============ -->
+      <section class="screen active" id="screen-home">
+
+        <div class="panel" id="restore-banner" hidden>
+          <p style="margin:0 0 10px;font-size:13.5px;">Restore your last statements? <span id="restore-deletes-in" style="color:var(--warn);"></span></p>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-brass btn-sm" type="button" id="restore-yes">Restore</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="restore-no">Start fresh</button>
+          </div>
+        </div>
+
+        <!-- Empty state: first run -->
+        <div id="empty-state">
+          <div class="dropzone dropzone-hero" id="dropzone-full">
+            <svg class="drop-icon" width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3v13m0 0l-5-5m5 5l5-5" stroke="#c6a15b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 19v1.5A1.5 1.5 0 0 0 5.5 22h13a1.5 1.5 0 0 0 1.5-1.5V19" stroke="#c6a15b" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <strong>Drop your bank statements here</strong>
+            <div class="choose-wrap">
+              <button class="btn btn-brass btn-giant" type="button" id="choose-files-btn">Choose files</button>
+            </div>
+            <p>Works with the CSV or PDF your bank gives you. Nothing leaves your computer.</p>
+          </div>
+          <p class="empty-explainer">
+            Set it up once for each bank, about a minute.<br>
+            Every month after that: drop, wait, copy.<br>
+            <button type="button" class="first-run-how-link" id="first-run-how-link">How does this work?</button>
+          </p>
+        </div>
+
+        <!-- Slim bar once files exist -->
+        <div class="toolbar-row" id="dropzone-slim" hidden></div>
+        <div class="dropzone dropzone-slim" id="dropzone" hidden>
+          <strong>Drop more statements</strong>
+          <button class="btn btn-ghost btn-sm" type="button" id="choose-files-btn-slim">Choose files</button>
+        </div>
+        <input type="file" id="file-input" multiple hidden>
+        <p class="pdf-anchor-hint" id="batch-warning" hidden></p>
+
+        <div class="file-list" id="file-rows" role="list"></div>
+
+        <div class="dedupe-notice-line" id="dedupe-notice-line" hidden></div>
+
+        <div class="file-grid" id="attention-cards" role="list"></div>
+
+        <!-- Item 1: the drawer expands INSIDE this same "Ready to copy" card
+             (one .panel that grows) - #change-drawer is a plain div nested
+             here, not its own sibling .panel. -->
+        <div class="panel export-panel result-card" id="export-panel" hidden>
+          <h2 class="result-heading">Your transactions are ready.</h2>
+          <p class="export-summary" id="export-summary"></p>
+          <div class="export-actions">
+            <button class="btn btn-brass btn-giant" type="button" id="copy-tsv-btn">Copy to Google Sheets</button>
+            <button class="btn btn-ghost" type="button" id="download-csv-btn">Download CSV</button>
+          </div>
+          <span class="export-warn-note" id="export-warn-note"></span>
+          <p class="pdf-anchor-hint" id="export-blocked-note" style="color:var(--danger);"></p>
+
+          <div id="result-table"></div>
+
+          <div class="result-links">
+            <button type="button" class="btn-quiet" id="change-link" aria-expanded="false" aria-controls="change-drawer">Adjust what's exported</button>
+            <button type="button" class="btn-quiet" id="add-more-link">Add more statements</button>
+          </div>
+
+          <div class="drawer-body" id="change-drawer" hidden>
+            <h2 class="section-title" id="change-drawer-title">Export settings</h2>
+            <h2 class="section-title">Date range</h2>
+            <div class="chip-row" id="range-chip-row"></div>
+            <p class="pdf-anchor-hint" id="since-export-overlap" style="color:var(--warn);"></p>
+            <div class="picker-row">
+              <div class="picker-group">
+                <label class="pg-label" for="date-field-select">Filter using</label>
+                <select id="date-field-select"><option value="date">Transaction date</option><option value="post_date">Posted date</option></select>
+              </div>
+            </div>
+
+            <h2 class="section-title">Coverage by account</h2>
+            <table class="account-cov">
+              <thead><tr><th>Account</th><th>Included</th><th>Excluded</th><th>Range in export</th></tr></thead>
+              <tbody id="account-coverage-body"></tbody>
+            </table>
+
+            <h2 class="section-title">Currency</h2>
+            <div class="currency-modes">
+              <div class="mode-card" id="currency-mode-a">
+                <h3>A: Keep original currencies</h3>
+                <p>Rows keep their own currency. Totals per currency are never added together.</p>
+              </div>
+              <div class="mode-card" id="currency-mode-b">
+                <h3>B: Convert to a target currency</h3>
+                <p>Every row is converted using the rate below. Export is blocked until every pair has a rate.</p>
+              </div>
+            </div>
+            <div id="rate-table-wrap" hidden>
+              <div class="chip-row" id="rate-mode-row">
+                <button type="button" class="chip" id="rate-mode-flat">One rate for all</button>
+                <button type="button" class="chip" id="rate-mode-permonth">Rate per month</button>
+              </div>
+              <table class="rate-table">
+                <thead><tr><th>Currency pair</th><th>Rate, foreign to target</th><th>Both directions</th></tr></thead>
+                <tbody id="rate-table-body"></tbody>
+              </table>
+            </div>
+
+            <h2 class="section-title">Columns</h2>
+            <div class="picker-row" style="align-items:center;">
+              <div class="picker-group">
+                <label class="pg-label" for="preset-select-home">Column layout</label>
+                <select id="preset-select-home"></select>
+              </div>
+            </div>
+            <div id="home-preset-editor"></div>
+            <div class="export-actions" style="margin-top:8px;">
+              <div class="toggle-line">
+                <input type="checkbox" id="source-cols-home">
+                <label for="source-cols-home">Include original source columns</label>
+              </div>
+            </div>
+
+            <!-- Item 7: Mapping sits above the drawer's closing action bar,
+                 each mapped file getting both a Review and an Update mapping
+                 link (previously "Update mapping" alone, at the very bottom). -->
+            <h2 class="section-title drawer-mapping-title">Sources</h2>
+            <div id="drawer-mapping-list" class="mapping-list"></div>
+
+            <div class="drawer-footer-actions">
+              <span class="preset-unsaved" id="preset-dirty-note-home" hidden>
+                <button type="button" class="first-run-how-link" id="preset-revert-link-home"></button>
+              </span>
+              <button type="button" class="btn btn-brass btn-sm" id="preset-save-as-home" style="margin-left:auto;">Save this column layout</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-toast" id="home-toast" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <!-- ============ REVIEW ============ -->
+      <section class="screen" id="screen-review">
+        <p class="pdf-anchor-hint" data-test="review-intro">Look at any row next to the page it came from, and settle the ones that need a quick look.</p>
+        <div id="review-empty" class="panel">No files checked yet. Bring in a statement and use a statement type from Home first.</div>
+        <div id="review-body" hidden>
+          <div class="review-summary" id="review-summary"></div>
+          <!-- Section B: parse agent -->
+          <div class="review-warnings-bar" id="review-warnings-bar">
+            <button type="button" class="chip" id="review-warnings-filter">Quick look</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="review-prev-warning">Previous <kbd>P</kbd></button>
+            <span class="warning-position" id="review-warning-position"></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="review-next-warning">Next quick look <kbd>N</kbd></button>
+            <button type="button" class="btn btn-ghost btn-sm" id="review-confirm-all-btn" hidden></button>
+            <div class="layout-toggle" id="review-layout-toggle">
+              <button type="button" id="review-layout-side">Side by side</button>
+              <button type="button" id="review-layout-stacked">Stacked</button>
+            </div>
+          </div>
+          <div class="skipped-group" id="review-skipped-group" hidden></div>
+          <!-- Item 3: undo bar for the last resolve action, visible 8s. -->
+          <div class="undo-bar" id="review-undo-bar" hidden>
+            <span id="review-undo-bar-text"></span>
+            <button type="button" id="review-undo-bar-btn">Undo</button>
+          </div>
+          <!-- Item 3/6: shown at the top of the table instead of a blank list once
+               every warning in this file is resolved, when another statement
+               still has warnings left to look at. -->
+          <div class="review-complete panel" id="review-complete" hidden>
+            <p id="review-complete-msg">This statement is reviewed.</p>
+            <div class="countdown-bar" id="review-complete-countdown" hidden><div class="countdown-fill" id="review-complete-countdown-fill"></div></div>
+            <div class="review-complete-actions">
+              <button type="button" class="btn btn-brass btn-sm" id="review-complete-primary"></button>
+              <button type="button" class="btn btn-ghost btn-sm" id="review-complete-secondary">Stay here</button>
+            </div>
+          </div>
+          <!-- Item 6c: replaces the whole content area (both panes hidden) once
+               every statement has zero warnings left. -->
+          <div class="review-all-done panel" id="review-all-done" hidden>
+            <div class="all-done-check" aria-hidden="true">✓</div>
+            <h2 class="section-title">All statements reviewed</h2>
+            <p id="review-all-done-summary"></p>
+            <div class="review-complete-actions">
+              <button type="button" class="btn btn-brass btn-sm" id="review-all-done-home">Back to Home to copy</button>
+              <select id="review-all-done-reselect" aria-label="Review a statement again">
+                <option value="">Review a statement again</option>
+              </select>
+              <button type="button" class="btn btn-ghost btn-sm" id="review-all-done-add">Add a statement</button>
+            </div>
+          </div>
+          <!-- /Section B -->
+          <div class="split" id="review-split">
+            <div class="pane" id="source-pane">
+              <div class="pane-head">
+                <span id="source-pane-label">Source</span>
+                <div class="pn-controls">
+                  <span id="source-pdf-controls" hidden style="display:contents;">
+                    <button type="button" class="mini" id="pdf-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+                    <span id="pdf-zoom-label">100%</span>
+                    <button type="button" class="mini" id="pdf-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+                    <button type="button" class="mini" id="pdf-prev-page" title="Previous page" aria-label="Previous page">‹</button>
+                    <span id="pdf-page-label">1/1</span>
+                    <button type="button" class="mini" id="pdf-next-page" title="Next page" aria-label="Next page">›</button>
+                  </span>
+                  <button type="button" class="mini" id="source-pane-collapse" title="Collapse the source pane" aria-label="Collapse the source pane">▾</button>
+                </div>
+              </div>
+              <div class="pane-body">
+                <p class="showing-label" id="source-showing-label" hidden></p>
+                <p class="pdf-anchor-hint" id="source-not-kept" hidden>Source not kept after reload. Drop the file again to see the page.</p>
+                <div class="csv-grid" id="source-csv-grid" hidden tabindex="0" aria-label="Source file, raw rows"></div>
+                <div class="pdf-scroll" id="source-pdf-scroll" hidden tabindex="0" aria-label="Source PDF page"></div>
+              </div>
+            </div>
+            <div class="pane">
+              <div class="pane-head">
+                <span>Extracted transactions</span>
+                <span id="extracted-count"></span>
+              </div>
+              <div class="grid-scroll">
+                <table class="txn-table" id="review-table">
+                  <thead id="review-thead"></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <form class="add-row-form" id="add-row-form">
+                <input name="date" placeholder="YYYY-MM-DD" aria-label="Date for the missing row">
+                <input name="description_raw" placeholder="Description" aria-label="Description for the missing row">
+                <input name="amount" placeholder="Amount" aria-label="Amount for the missing row">
+                <button type="submit" class="btn btn-ghost btn-sm">Add missing row</button>
+              </form>
+            </div>
+          </div>
+          <!-- Item 3: persistent footer bar so a next action always exists,
+               regardless of whether this file itself has warnings left. -->
+          <div class="review-footer-actions" id="review-footer-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="review-footer-next" hidden>Review next statement</button>
+            <button type="button" class="btn btn-brass btn-sm" id="review-footer-export" hidden>Export</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="review-footer-add">Add a statement</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PROFILES ============ -->
+      <section class="screen" id="screen-profiles">
+        <p class="pdf-anchor-hint" data-test="profiles-intro">One entry per bank statement you have set up. Statement Bridge recognises them automatically next time.</p>
+        <div class="settings-grid">
+          <div>
+            <div class="panel">
+              <div class="toolbar-row">
+                <h2 class="section-title" style="margin:0;">Statement types</h2>
+                <button class="btn btn-brass btn-sm" type="button" id="map-new-statement-btn">Map a new statement</button>
+              </div>
+              <div id="profiles-list"></div>
+            </div>
+          </div>
+          <div class="settings-side">
+            <div class="panel">
+              <h2 class="section-title">Backup and restore</h2>
+              <p style="font-size:12.5px;color:var(--ink-dim);margin:0 0 12px;">Statement types and saved rates only. Statement data is never included.</p>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost btn-sm" type="button" id="profiles-backup-btn">Backup to file</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="profiles-restore-btn">Restore from file</button>
+                <input type="file" id="profiles-restore-input" accept="application/json" hidden>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="screen" id="screen-settings">
+        <p class="pdf-anchor-hint" data-test="settings-intro">Change what gets exported, what's kept on this device, and a few things you won't need often.</p>
+        <div class="settings-grid">
+          <div>
+            <div class="panel">
+              <h2 class="section-title">Export</h2>
+              <div class="picker-row">
+                <div class="picker-group">
+                  <label class="pg-label" for="pref-default-preset">Start from</label>
+                  <select id="pref-default-preset"></select>
+                </div>
+                <div class="picker-group">
+                  <label class="pg-label" for="pref-default-range">Default date range</label>
+                  <select id="pref-default-range">
+                    <option value="all">All</option>
+                    <option value="lastFullMonth">Last full month</option>
+                    <option value="thisMonth">This month</option>
+                    <option value="last3Months">Last 3 months</option>
+                    <option value="ytd">Year to date</option>
+                  </select>
+                </div>
+                <div class="picker-group">
+                  <label class="pg-label" for="pref-home-currency">Home currency</label>
+                  <input id="pref-home-currency" value="SGD" size="6">
+                </div>
+              </div>
+
+              <div class="toolbar-row" style="margin-top:16px;">
+                <h3 class="section-title" style="margin:0;">Columns</h3>
+                <span id="preset-dirty-note" class="pdf-anchor-hint" style="margin:0;" hidden>Custom (unsaved) &middot; <button type="button" class="first-run-how-link" id="preset-revert-link" style="margin:0;"></button></span>
+              </div>
+              <div class="picker-row">
+                <div class="picker-group">
+                  <label class="pg-label" for="preset-select">Editing column layout</label>
+                  <select id="preset-select"></select>
+                </div>
+                <div class="picker-group">
+                  <label class="pg-label" for="preset-name">Column layout name</label>
+                  <input id="preset-name">
+                </div>
+              </div>
+              <div id="preset-editor-container"></div>
+              <div class="topbar-actions" style="margin-top:12px;">
+                <button class="btn btn-ghost btn-sm" type="button" id="preset-new-btn">New column layout</button>
+                <button class="btn btn-brass btn-sm" type="button" id="preset-save-btn">Save column layout</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-side">
+            <div class="panel">
+              <h2 class="section-title">Privacy and storage</h2>
+              <p class="pdf-anchor-hint" style="margin:0 0 12px;"><strong>On this device only.</strong> Nothing you drop here ever leaves your computer.</p>
+              <div class="kv-row"><span>Statements, files and extracted rows</span><span class="num" id="storage-sessions-kv">-</span></div>
+              <div class="kv-row"><span>Settings, statement types and rates</span><span class="num" id="storage-settings-kv">-</span></div>
+              <div class="kv-row"><span>Total</span><span class="num" id="storage-total-kv">-</span></div>
+              <p class="pdf-anchor-hint" style="margin:12px 0 0;">Clear statements removes imported files and extracted rows only. Erase everything below also removes your statement types, column layouts and saved rates.</p>
+              <button class="btn btn-ghost btn-sm" type="button" id="clear-sessions-btn" style="margin-top:8px;">Clear statements</button>
+
+              <div class="danger-zone" style="margin-top:16px;">
+                <h2>Erase everything</h2>
+                <p>The only action that also removes your statement types: every statement type, statement, rate and saved preference is deleted from this browser. This cannot be undone. Type ERASE to confirm.</p>
+                <div class="danger-confirm">
+                  <input type="text" id="delete-everything-confirm" placeholder="Type ERASE" aria-label="Type ERASE to confirm">
+                  <button class="btn btn-danger" type="button" id="delete-everything-btn" disabled>Erase everything</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h2 class="section-title">Advanced</h2>
+              <h3 class="section-title">Saved exchange rates</h3>
+              <div id="rates-list"></div>
+              <div class="picker-row" style="margin-top:10px;">
+                <input id="rate-pair" placeholder="USD_SGD" size="10" aria-label="Currency pair, e.g. USD_SGD">
+                <input id="rate-value" placeholder="1.28" size="8" aria-label="Rate, foreign to target">
+                <button class="btn btn-ghost btn-sm" type="button" id="rate-add-btn">Save rate</button>
+              </div>
+
+              <!-- Section C (home agent) -->
+              <h3 class="section-title" style="margin-top:16px;">Debugging</h3>
+              <p class="pdf-anchor-hint" style="margin:0 0 12px;">The log contains statement descriptions and amounts, but never full account numbers.</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" type="button" id="settings-copy-debuglog-btn">Copy debug log</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="settings-download-debuglog-btn">Download log</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="settings-clear-debuglog-btn">Clear log</button>
+                <!-- Section D (report agent) -->
+                <button class="btn btn-ghost btn-sm" type="button" id="settings-report-problem-btn">Report a problem</button>
+                <!-- /Section D -->
+              </div>
+              <!-- /Section C -->
+
+              <h3 class="section-title" style="margin-top:16px;">Setup tour</h3>
+              <button type="button" class="first-run-how-link" id="settings-show-tour-link">Show the welcome tour again</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ HOW IT WORKS (from the sidebar lock, or Home first-run) ============ -->
+      <section class="screen" id="screen-how">
+        <button class="btn btn-ghost btn-sm" type="button" id="how-back-btn" style="margin-bottom:14px;">&larr; Back</button>
+        <div class="reading">
+          <p class="how-lede" data-test="how-lede">Drop your statements. Statement Bridge reads them on your computer and gives you a table you can copy into Google Sheets.</p>
+
+          <h2>Everything happens in this tab</h2>
+          <p>Your files are read by code bundled inside the extension (pdf.js for PDFs, Papa Parse for CSV, SheetJS for Excel). Nothing is uploaded; there is no server.</p>
+
+          <h2>No AI</h2>
+          <p>Suggestions for mapping columns come from simple rules: known header names in a few languages, and the shape of values (dates, amounts, currency codes). You confirm every suggestion, and the rules never change on their own.</p>
+
+          <h2>It remembers formats, not your data</h2>
+          <p>A statement type is a small description of a layout (which row is the header, which column is the date). It is saved on this computer. Statement contents live only in this browser's storage and are deleted after 30 days, or sooner when you clear statements.</p>
+
+          <h2>The extension cannot reach the internet</h2>
+          <p>Its security policy is set to connect-src 'none' and it asks for no website permissions, so Chrome itself blocks any network request. You can check: open chrome://extensions, click Details on Statement Bridge and see it has no site access; or open DevTools on this tab, choose Network, and run an import. The list stays empty.</p>
+
+          <h2>What is stored where</h2>
+          <p>Settings (statement types, column layouts, saved rates, preferences) stay until you delete them. Statement data (file contents, extracted rows, edits) is kept 30 days from last opened. "Clear statements" removes only the statement data, right away; "Erase everything" in Settings removes both.</p>
+
+          <div class="password-note">Passwords for encrypted PDFs are used once to open the file and never stored.</div>
+
+          <p style="margin-top:22px;"><button type="button" class="first-run-how-link" id="how-show-tour-link">Show the welcome tour again</button></p>
+        </div>
+      </section>
+
+      <!-- ============ REPORT A PROBLEM (gear menu, Settings, wizard errors, "could not read" cards) ============ -->
+      <!-- Section D (report agent) -->
+      <section class="screen" id="screen-report">
+        <p class="pdf-anchor-hint" data-test="report-intro">Tell us what happened. Nothing about your files leaves this device except what you choose to send in this email.</p>
+        <div class="panel">
+          <h2 class="section-title">What happened?</h2>
+          <p class="pdf-anchor-hint" style="margin:0 0 10px;">Plain words are fine, e.g. "the amount was wrong on row 3".</p>
+          <textarea id="report-what" rows="4" style="width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--paper-line);" placeholder="What did you expect, and what happened instead?"></textarea>
+
+          <h2 class="section-title" style="margin-top:16px;">Which file?</h2>
+          <select id="report-file" style="width:100%;max-width:360px;"><option value="">(not one file in particular)</option></select>
+
+          <h2 class="section-title" style="margin-top:16px;">
+            <label style="display:flex;align-items:center;gap:8px;font:inherit;font-weight:inherit;">
+              <input type="checkbox" id="report-include-log" checked>
+              Include the debug log
+            </label>
+          </h2>
+          <p class="pdf-anchor-hint" id="report-log-summary" style="margin:0 0 12px;"></p>
+
+          <h2 class="section-title">What will be sent</h2>
+          <p class="pdf-anchor-hint" style="margin:0 0 8px;">Descriptions, statement types and amounts are masked or stripped before this ever leaves the device. This is exactly what will be copied:</p>
+          <pre class="signatures-preview" id="report-preview" style="max-height:220px;overflow:auto;"></pre>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;">
+            <button class="btn btn-brass btn-sm" type="button" id="report-send-btn">Copy report and open email</button>
+            <span id="report-status" class="pdf-anchor-hint" role="status" aria-live="polite" style="margin:0;"></span>
+          </div>
+
+          <div id="report-done" hidden style="margin-top:14px;">
+            <p class="pdf-anchor-hint">Copied. An email draft should be open, addressed to <strong id="report-email"></strong>. If it did not open, write to that address from any email app and paste the report from your clipboard.</p>
+            <p style="margin:8px 0;"><a id="report-mailto-link" href="#" class="first-run-how-link">Open email app</a></p>
+            <button class="btn btn-ghost btn-sm" type="button" id="report-copy-again-btn">Copy the report again</button>
+          </div>
+        </div>
+      </section>
+      <!-- /Section D -->
+
+      <!-- ============ MAPPING WIZARD (opened from Home or Profiles) ============ -->
+      <!-- Section A (wizard agent) -->
+      <section class="screen" id="screen-wizard">
+        <button class="btn btn-ghost btn-sm" type="button" id="wizard-back-btn" style="margin-bottom:14px;">&larr; Back to files</button>
+
+        <!-- Confirm-first setup: the default entry for a new or changed statement.
+             Screens A (confirm)/B (what's wrong)/focus (fix one thing)/C (name it).
+             The full step-by-step wizard below stays reachable via B's "Something
+             else" tile, or directly when detection can't produce any rows at all. -->
+        <div id="wizard-confirm" hidden>
+          <div id="confirm-a" class="confirm-step">
+            <h2 class="section-title confirm-heading" id="confirm-a-heading" tabindex="-1"></h2>
+            <div class="confirm-totals" id="confirm-a-totals"></div>
+            <div id="confirm-a-preview"></div>
+            <div class="confirm-actions">
+              <button class="btn btn-brass btn-confirm-giant" type="button" id="confirm-yes" data-test="confirm-yes">Yes, looks right</button>
+              <button class="btn btn-ghost" type="button" id="confirm-off" data-test="confirm-off">Something's off</button>
+            </div>
+          </div>
+
+          <div id="confirm-b" class="confirm-step" hidden>
+            <h2 class="section-title confirm-heading" tabindex="-1">What's wrong?</h2>
+            <div class="confirm-choice-grid">
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-dates" data-test="confirm-fix-dates">Dates are wrong</button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-amounts" data-test="confirm-fix-amounts">Amounts or +/- are wrong</button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-rows" data-test="confirm-fix-rows">Rows are missing or extra</button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-other" data-test="confirm-fix-other">Something else</button>
+            </div>
+          </div>
+
+          <div id="confirm-focus" class="confirm-step" hidden>
+            <div id="confirm-focus-host"></div>
+            <div class="confirm-actions">
+              <button class="btn btn-brass" type="button" id="confirm-focus-done" data-test="confirm-focus-done">Done</button>
+            </div>
+          </div>
+
+          <div id="confirm-c" class="confirm-step" hidden>
+            <h2 class="section-title confirm-heading" tabindex="-1">Name this statement</h2>
+            <input class="confirm-name-input" id="confirm-name" type="text" data-test="confirm-name">
+            <div class="confirm-actions">
+              <button class="btn btn-brass btn-confirm-giant" type="button" id="confirm-save" data-test="confirm-save">Save and finish</button>
+            </div>
+          </div>
+        </div>
+
+        <nav class="stepper" id="wizard-stepper" aria-label="Mapping wizard steps">
+          <button class="step current" type="button" data-step="0" aria-current="step"><span class="dot">1</span>Basics</button>
+          <div class="step-sep"></div>
+          <button class="step" type="button" data-step="1"><span class="dot">2</span>Locate data</button>
+          <div class="step-sep"></div>
+          <button class="step" type="button" data-step="2"><span class="dot">3</span>Map fields</button>
+          <div class="step-sep"></div>
+          <button class="step" type="button" data-step="3"><span class="dot">4</span>Test</button>
+          <div class="step-sep"></div>
+          <button class="step" type="button" data-step="4"><span class="dot">5</span>Save</button>
+        </nav>
+
+        <h2 class="section-title" id="wizard-step-heading" tabindex="-1"></h2>
+        <p class="pdf-anchor-hint" id="wizard-step-intro" hidden></p>
+
+        <div id="wizard-steps">
+          <div id="step-0" class="panel active">
+            <div class="picker-row">
+              <div class="picker-group">
+                <label class="pg-label" for="w-bank">Bank</label><input id="w-bank">
+                <span class="suggest-cap" id="w-bank-cap" hidden>Suggested from your file</span>
+              </div>
+              <div class="picker-group">
+                <label class="pg-label" for="w-type">Statement type</label>
+                <select id="w-type"><option value="savings">Savings</option><option value="current">Current</option><option value="credit_card">Credit card</option><option value="other">Other</option></select>
+                <span class="suggest-cap" id="w-type-cap" hidden>Suggested from your file</span>
+              </div>
+              <div class="picker-group">
+                <label class="pg-label" for="w-currency">Default currency</label><input id="w-currency" value="SGD" size="6">
+                <span class="suggest-cap" id="w-currency-cap" hidden>Suggested from your file</span>
+              </div>
+              <div class="picker-group">
+                <label class="pg-label" for="w-country">Country</label><input id="w-country">
+                <span class="suggest-cap" id="w-country-cap" hidden>Suggested from your file</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="step-1" class="panel">
+            <div id="csv-header-picker">
+              <p class="pdf-anchor-hint" id="w-lowconfidence-hint" hidden>We were not sure where the table starts. Click the header row.</p>
+              <p class="pdf-anchor-hint">Suggested header row: <span id="w-headerrow-suggestion"></span>. Click any row below to change it, or use a row's "1st"/"last" buttons to mark the first/last data row; click a row's checkbox to skip it as a footer/summary line, or a column's checkbox to exclude that column.</p>
+              <div id="w-sheet-picker" class="picker-row" hidden></div>
+              <div id="w-rawgrid" class="raw-grid-scroll"></div>
+            </div>
+            <div id="pdf-anchor-picker" hidden></div>
+          </div>
+
+          <div id="step-2" class="panel">
+            <p class="pdf-anchor-hint" id="w-locate-summary" hidden></p>
+            <div class="confirm-note">Every suggestion below is a guess based on column headers and sample values. Nothing is saved until you confirm each one.</div>
+            <div id="w-mapping-table"></div>
+            <label class="pending-prefix-row" id="w-pending-prefix-row" hidden>
+              <input type="checkbox" id="w-pending-prefix" />
+              Treat <code id="w-pending-prefix-marker">[UNPOSTED]</code> rows as pending
+            </label>
+            <div class="picker-row">
+              <div class="picker-group">
+                <label class="pg-label" for="w-dateformat">Date format in source</label>
+                <select id="w-dateformat"><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option><option value="DD MMM YYYY">DD MMM YYYY</option><option value="DD MMM">DD MMM (year from statement)</option></select>
+                <span class="suggest-cap" id="w-dateformat-cap" hidden>Detected from your file</span>
+                <span class="sample-cap" id="w-dateformat-samples" hidden></span>
+                <p class="pdf-anchor-hint" id="w-dateformat-example" hidden></p>
+                <p class="pdf-anchor-hint picker-warn" id="w-dateformat-warn" hidden></p>
+              </div>
+              <div class="picker-group">
+                <label class="pg-label" for="w-signconvention">Sign convention in source</label>
+                <select id="w-signconvention">
+                  <option value="signed">One amount column, sign already included</option>
+                  <option value="debitCredit">Separate money-out and money-in columns</option>
+                  <option value="crdr">One amount column with CR/DR markers</option>
+                  <option value="positiveIsOut">One amount column, positive means money out (typical for credit cards)</option>
+                  <option value="positiveIsIn">One amount column, positive means money in</option>
+                  <option value="columnBands">Separate debit/credit columns (by position on the page, PDF only)</option>
+                </select>
+                <span class="suggest-cap" id="w-signconvention-cap" hidden>Detected from your file</span>
+                <span class="sample-cap" id="w-signconvention-samples" hidden></span>
+                <p class="pdf-anchor-hint" id="w-signconvention-example" hidden></p>
+                <p class="pdf-anchor-hint picker-warn" id="w-signconvention-warn" hidden></p>
+              </div>
+              <div class="picker-group">
+                <label class="pg-label" for="w-numberformat">Number format in source</label>
+                <select id="w-numberformat"><option value="1,234.56">1,234.56</option><option value="1.234,56">1.234,56</option></select>
+                <span class="suggest-cap" id="w-numberformat-cap" hidden>Detected from your file</span>
+                <span class="sample-cap" id="w-numberformat-samples" hidden></span>
+                <p class="pdf-anchor-hint" id="w-numberformat-example" hidden></p>
+                <p class="pdf-anchor-hint picker-warn" id="w-numberformat-warn" hidden></p>
+              </div>
+            </div>
+            <div class="transforms-editor">
+              <h2 class="section-title">Transforms</h2>
+              <div id="transforms-list"></div>
+              <button class="btn btn-ghost btn-sm" type="button" id="transform-add-btn">Add transform</button>
+            </div>
+            <div class="live-preview">
+              <h2 class="section-title">Preview: first 8 mapped rows</h2>
+              <div id="w-live-preview"></div>
+            </div>
+          </div>
+
+          <div id="step-3" class="panel">
+            <div id="w-test-results"></div>
+          </div>
+
+          <div id="step-4" class="panel">
+            <h2 class="section-title">Whole file</h2>
+            <div id="w-save-totals"></div>
+            <div class="picker-row">
+              <div class="picker-group"><label class="pg-label" for="w-name">Statement name</label><input id="w-name"></div>
+            </div>
+            <h2 class="section-title">Recognised next time by</h2>
+            <p class="pdf-anchor-hint">Recognised when most of these match. Remove anything that looks wrong.</p>
+            <ul id="w-signatures-human" class="signatures-human"></ul>
+            <div class="picker-row">
+              <div class="picker-group">
+                <label class="pg-label" for="w-signature-add-input">Add phrase</label>
+                <input id="w-signature-add-input" placeholder="A phrase from the statement or file name" size="30">
+              </div>
+              <button class="btn btn-ghost btn-sm" type="button" id="w-signature-add-btn" style="align-self:flex-end;">Add phrase</button>
+            </div>
+            <a href="#" class="rs-link" id="w-signatures-details-toggle">Show details</a>
+            <pre id="w-signatures-preview" class="signatures-preview" hidden></pre>
+          </div>
+        </div>
+
+        <p class="pdf-anchor-hint" id="wizard-footer-reason" hidden></p>
+        <div class="wizard-footer" id="wizard-footer">
+          <button class="btn btn-ghost" type="button" id="wizard-back" hidden></button>
+          <span class="wizard-footer-stepname" id="wizard-footer-stepname"></span>
+          <button class="btn btn-brass" type="button" id="wizard-next"></button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============ GEAR MENU (the only door outside the drop-to-copy path) ============ -->
+  <div class="gear-overlay" id="gear-overlay">
+    <div class="gear-head">
+      <h1>Menu</h1>
+      <button class="close-btn" id="gear-close-btn" type="button" aria-label="Close menu">&times;</button>
+    </div>
+    <div class="tile-grid">
+      <button class="tile" type="button" id="tile-export">
+        <span class="t-title">Adjust what's exported</span>
+        <span class="t-sub">Date range, columns, currency and where rows come from.</span>
+      </button>
+      <button class="tile" type="button" data-screen="profiles">
+        <span class="t-title">Statement types</span>
+        <span class="t-sub">One entry per bank statement you've set up. Manage or add one.</span>
+      </button>
+      <button class="tile" type="button" data-screen="review">
+        <span class="t-title">Check a statement</span>
+        <span class="t-sub">Look at any row next to the original page.</span>
+      </button>
+      <button class="tile" type="button" data-screen="settings">
+        <span class="t-title">Settings</span>
+        <span class="t-sub">Defaults, storage and privacy, and a few advanced things.</span>
+      </button>
+      <button class="tile" type="button" data-screen="how">
+        <span class="t-title">How it works</span>
+        <span class="t-sub">A plain-language walkthrough of the three steps.</span>
+      </button>
+      <button class="tile" type="button" id="tile-clear">
+        <span class="t-title">Clear statements</span>
+        <span class="t-sub">Removes statements from this tab. Statement types are kept.</span>
+      </button>
+      <button class="tile" type="button" data-screen="report">
+        <span class="t-title">Report a problem</span>
+        <span class="t-sub">Tell us what went wrong, with a preview of exactly what gets sent.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/papaparse.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script type="module" src="src/ui/app.js"></script>
+</body>
+</html>

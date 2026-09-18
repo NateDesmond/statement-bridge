@@ -1,0 +1,108 @@
+{
+  "grid": [
+    [
+      "Beacon Bank"
+    ],
+    [
+      "Account Number:",
+      "1234-461906"
+    ],
+    [
+      "Statement Period:",
+      "01 Jun 2026 - 30 Jun 2026"
+    ],
+    [
+      ""
+    ],
+    [
+      "Tarikh Nilai",
+      "Butiran",
+      "Jumlah Urus Niaga"
+    ],
+    [
+      "4 Jun 2026",
+      "Grab Ride",
+      "-1,595"
+    ],
+    [
+      "6 Jun 2026",
+      "Mobile Plan",
+      "-966"
+    ],
+    [
+      "7 Jun 2026",
+      "Salary Payment",
+      "1,911"
+    ],
+    [
+      "8 Jun 2026",
+      "Cinema Tickets",
+      "-1,955"
+    ],
+    [
+      "10 Jun 2026",
+      "Coffee House",
+      "1,052"
+    ],
+    [
+      "12 Jun 2026",
+      "Hardware Store",
+      "580"
+    ],
+    [
+      "13 Jun 2026",
+      "Freelance Invoice",
+      "1,556"
+    ],
+    [
+      "15 Jun 2026",
+      "Grab Ride",
+      "-1,422"
+    ],
+    [
+      "16 Jun 2026",
+      "Cinema Tickets",
+      "-1,720"
+    ],
+    [
+      "17 Jun 2026",
+      "Pharmacy",
+      "-1,326"
+    ],
+    [
+      "19 Jun 2026",
+      "Grocery Mart",
+      "-1,339"
+    ],
+    [
+      "22 Jun 2026",
+      "Pharmacy",
+      "-1,627"
+    ],
+    [
+      "23 Jun 2026",
+      "Amazon Purchase",
+      "1,539"
+    ],
+    [
+      "24 Jun 2026",
+      "Bakery",
+      "-722"
+    ],
+    [
+      "26 Jun 2026",
+      "Transfer From Savings",
+      "1,100"
+    ],
+    [
+      "27 Jun 2026",
+      "Transfer From Savings",
+      "-301"
+    ],
+    [
+      "Total",
+      "",
+      "494,765"
+    ]
+  ]
+}

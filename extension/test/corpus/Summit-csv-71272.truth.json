@@ -1,0 +1,87 @@
+{
+  "axes": {
+    "fileType": "csv",
+    "bank": "Summit",
+    "lang": "es",
+    "dateFormat": "YYYY-MM-DD",
+    "numberFormat": "1.234,56",
+    "signConvention": "signed",
+    "preamble": "keyvalue",
+    "footer": "pagemarkers",
+    "encoding": "utf-16le",
+    "hasBalance": false,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-03",
+      "minor": -55171,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-05",
+      "minor": 79228,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -83953,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-10",
+      "minor": -167099,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": -131972,
+      "description": "Cinema Tickets"
+    },
+    {
+      "date": "2026-06-14",
+      "minor": 24738,
+      "description": "Salary Payment"
+    },
+    {
+      "date": "2026-06-17",
+      "minor": 50754,
+      "description": "Coffee House"
+    },
+    {
+      "date": "2026-06-20",
+      "minor": -68670,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": -192654,
+      "description": "Refund"
+    },
+    {
+      "date": "2026-06-23",
+      "minor": 29853,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-24",
+      "minor": -132754,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-25",
+      "minor": -114102,
+      "description": "Transfer From Savings"
+    },
+    {
+      "date": "2026-06-27",
+      "minor": -12537,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-28",
+      "minor": -189858,
+      "description": "Transfer From Savings"
+    }
+  ]
+}

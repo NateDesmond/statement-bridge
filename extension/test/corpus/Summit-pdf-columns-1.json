@@ -1,0 +1,277 @@
+{
+  "items": [
+    {
+      "str": "Date",
+      "x": 40,
+      "y": 700,
+      "width": 20,
+      "height": 10
+    },
+    {
+      "str": "Description",
+      "x": 140,
+      "y": 700,
+      "width": 55,
+      "height": 10
+    },
+    {
+      "str": "Amount",
+      "x": 380,
+      "y": 700,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "02/06/2026",
+      "x": 40,
+      "y": 684,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Amazon Purchase",
+      "x": 140,
+      "y": 684,
+      "width": 75,
+      "height": 10
+    },
+    {
+      "str": "496 DR",
+      "x": 380,
+      "y": 684,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "04/06/2026",
+      "x": 40,
+      "y": 668,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Salary Payment",
+      "x": 140,
+      "y": 668,
+      "width": 70,
+      "height": 10
+    },
+    {
+      "str": "790 DR",
+      "x": 380,
+      "y": 668,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "05/06/2026",
+      "x": 40,
+      "y": 652,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Bookstore",
+      "x": 140,
+      "y": 652,
+      "width": 45,
+      "height": 10
+    },
+    {
+      "str": "86 DR",
+      "x": 380,
+      "y": 652,
+      "width": 25,
+      "height": 10
+    },
+    {
+      "str": "07/06/2026",
+      "x": 40,
+      "y": 636,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Grocery Mart",
+      "x": 140,
+      "y": 636,
+      "width": 60,
+      "height": 10
+    },
+    {
+      "str": "590 CR",
+      "x": 380,
+      "y": 636,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "09/06/2026",
+      "x": 40,
+      "y": 620,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Amazon Purchase",
+      "x": 140,
+      "y": 620,
+      "width": 75,
+      "height": 10
+    },
+    {
+      "str": "1,517 DR",
+      "x": 380,
+      "y": 620,
+      "width": 40,
+      "height": 10
+    },
+    {
+      "str": "12/06/2026",
+      "x": 40,
+      "y": 604,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Transfer From Savings",
+      "x": 140,
+      "y": 604,
+      "width": 105,
+      "height": 10
+    },
+    {
+      "str": "1,541 DR",
+      "x": 380,
+      "y": 604,
+      "width": 40,
+      "height": 10
+    },
+    {
+      "str": "13/06/2026",
+      "x": 40,
+      "y": 588,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Electric Co Bill",
+      "x": 140,
+      "y": 588,
+      "width": 80,
+      "height": 10
+    },
+    {
+      "str": "307 CR",
+      "x": 380,
+      "y": 588,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "15/06/2026",
+      "x": 40,
+      "y": 572,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Hardware Store",
+      "x": 140,
+      "y": 572,
+      "width": 70,
+      "height": 10
+    },
+    {
+      "str": "305 DR",
+      "x": 380,
+      "y": 572,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "17/06/2026",
+      "x": 40,
+      "y": 556,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Coffee House",
+      "x": 140,
+      "y": 556,
+      "width": 60,
+      "height": 10
+    },
+    {
+      "str": "530 DR",
+      "x": 380,
+      "y": 556,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "19/06/2026",
+      "x": 40,
+      "y": 540,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Transfer From Savings",
+      "x": 140,
+      "y": 540,
+      "width": 105,
+      "height": 10
+    },
+    {
+      "str": "477 CR",
+      "x": 380,
+      "y": 540,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "22/06/2026",
+      "x": 40,
+      "y": 524,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Hardware Store",
+      "x": 140,
+      "y": 524,
+      "width": 70,
+      "height": 10
+    },
+    {
+      "str": "605 DR",
+      "x": 380,
+      "y": 524,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "25/06/2026",
+      "x": 40,
+      "y": 508,
+      "width": 50,
+      "height": 10
+    },
+    {
+      "str": "Refund",
+      "x": 140,
+      "y": 508,
+      "width": 30,
+      "height": 10
+    },
+    {
+      "str": "1,386 CR",
+      "x": 380,
+      "y": 508,
+      "width": 40,
+      "height": 10
+    }
+  ]
+}

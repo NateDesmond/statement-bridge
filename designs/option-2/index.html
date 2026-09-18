@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Statement Bridge: The Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#141416;
+    --bg-raised:#1a1a1d;
+    --bg-panel:#1e1e21;
+    --bg-inset:#101012;
+    --border:#2b2b2f;
+    --border-soft:#232326;
+    --text:#e9e6df;
+    --text-dim:#98958d;
+    --text-faint:#5f5d58;
+    --accent:#f2a824;
+    --accent-dim:#8a651c;
+    --accent-text:#1a1206;
+    --good:#3ecf8e;
+    --warn:#f2a824;
+    --bad:#e5594f;
+    --new:#7d93a8;
+    --paper:#e9e6de;
+    --paper-text:#26241f;
+    --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+    --ui: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--ui);
+    font-size:13px;
+    line-height:1.4;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent);color:var(--accent-text);}
+  a{color:var(--accent);}
+  button, select, input{font-family:inherit;font-size:inherit;color:inherit;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .app{height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ---------- About panel ---------- */
+  .about{
+    background:var(--bg-raised);
+    border-bottom:1px solid var(--border);
+    padding:12px 20px;
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+    flex-shrink:0;
+  }
+  .about.closed{display:none;}
+  .about-logo{
+    width:56px;height:56px;border-radius:10px;
+    background:var(--bg-inset);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;overflow:hidden;
+  }
+  .about-logo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .about-logo .logo-fallback{color:var(--accent);font-family:var(--mono);font-weight:700;font-size:16px;}
+  .about-body{flex:1;min-width:0;}
+  .about-body h2{margin:0 0 4px;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--accent);}
+  .about-body p{margin:0;color:var(--text-dim);max-width:78ch;}
+  .about-close{
+    background:none;border:1px solid var(--border);color:var(--text-dim);
+    border-radius:5px;width:24px;height:24px;cursor:pointer;flex-shrink:0;
+  }
+  .about-close:hover{color:var(--text);border-color:var(--text-faint);}
+
+  /* ---------- Command bar ---------- */
+  .cmdbar{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:18px;
+    padding:0 16px;
+    height:46px;
+    background:var(--bg-raised);
+    border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .brand img{width:22px;height:22px;border-radius:5px;display:block;}
+  .logo-slot{width:22px;height:22px;border-radius:5px;background:var(--bg-inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+  .logo-slot img{width:100%;height:100%;object-fit:cover;}
+  .logo-slot .logo-fallback{display:none;color:var(--accent);font-family:var(--mono);font-weight:700;font-size:10px;}
+  .brand-name{font-weight:600;letter-spacing:.01em;color:var(--text);white-space:nowrap;}
+  .brand-name b{color:var(--accent);font-weight:600;}
+
+  .tabs{display:flex;gap:2px;flex:1;min-width:0;}
+  .tab{
+    background:none;border:1px solid transparent;color:var(--text-dim);
+    padding:7px 12px;border-radius:6px;cursor:pointer;
+    display:flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+  .tab .k{
+    font-family:var(--mono);font-size:10px;color:var(--text-faint);
+    border:1px solid var(--border);border-radius:3px;padding:0 4px;line-height:1.5;
+  }
+  .tab:hover{color:var(--text);background:var(--bg-panel);}
+  .tab.active{color:var(--text);background:var(--bg-panel);border-color:var(--border);}
+  .tab.active::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+
+  .hints{
+    display:flex;gap:14px;align-items:center;flex-shrink:0;
+    color:var(--text-faint);font-size:11px;
+  }
+  .hints .hint{display:flex;align-items:center;gap:5px;}
+  .hints kbd{
+    font-family:var(--mono);background:var(--bg-inset);border:1px solid var(--border);
+    border-radius:3px;padding:1px 5px;color:var(--text-dim);font-size:10px;
+  }
+  @media (max-width:1180px){ .hints{display:none;} }
+
+  main{flex:1;min-height:0;position:relative;}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;}
+  .screen.active{display:flex;}
+
+  .screen-toolbar{
+    flex-shrink:0;display:flex;align-items:center;gap:10px;
+    padding:10px 16px;border-bottom:1px solid var(--border);
+    background:var(--bg);
+  }
+  .screen-toolbar h1{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);font-weight:600;margin:0;}
+  .spacer{flex:1;}
+
+  .btn{
+    background:var(--bg-panel);border:1px solid var(--border);color:var(--text);
+    padding:6px 11px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn:hover{border-color:var(--text-faint);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600;}
+  .btn.primary:hover{background:#ffb63a;}
+  .btn.ghost{background:none;border-color:transparent;color:var(--text-dim);}
+  .btn.ghost:hover{color:var(--text);}
+  .btn.danger{border-color:var(--bad);color:var(--bad);background:none;}
+  .btn.danger:hover{background:rgba(229,89,79,.12);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn .k{font-family:var(--mono);font-size:10px;opacity:.7;border:1px solid currentColor;border-radius:3px;padding:0 4px;}
+
+  .status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
+  .status-dot.good{background:var(--good);}
+  .status-dot.warn{background:var(--warn);}
+  .status-dot.bad{background:var(--bad);}
+  .status-dot.new{background:var(--new);}
+  .status-dot.off{background:var(--text-faint);}
+
+  .status-line{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);}
+
+  .mono{font-family:var(--mono);}
+
+  /* ============ SCREEN 1: IMPORT ============ */
+  #tab-import .body{flex:1;min-height:0;overflow-y:auto;padding:18px 20px;}
+  .dropzone{
+    border:1px dashed var(--border);border-radius:10px;
+    padding:26px 20px;display:flex;align-items:center;gap:18px;
+    background:var(--bg-raised);margin-bottom:14px;
+  }
+  .dropzone .icon{
+    width:40px;height:40px;border-radius:8px;background:var(--bg-inset);
+    border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+    color:var(--accent);font-size:18px;flex-shrink:0;
+  }
+  .dropzone .msg{flex:1;}
+  .dropzone .msg strong{display:block;font-size:14px;margin-bottom:2px;}
+  .dropzone .msg span{color:var(--text-dim);font-size:12px;}
+  .reco{color:var(--text-faint);font-size:11px;margin-top:6px;}
+  .reco b{color:var(--text-dim);font-weight:600;}
+
+  .notice{
+    display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
+    border:1px solid var(--border);background:var(--bg-raised);border-left:3px solid var(--accent);
+    font-size:12px;color:var(--text-dim);margin-bottom:14px;
+  }
+  .notice a{margin-left:auto;flex-shrink:0;}
+
+  .section-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin:18px 0 8px;display:flex;align-items:center;gap:8px;}
+  .section-label .btn{margin-left:auto;}
+
+  .files{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}
+  .file-card{
+    background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;
+  }
+  .file-card .row1{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .file-card .name{font-weight:600;font-size:12.5px;}
+  .file-card .meta{color:var(--text-dim);font-size:11px;margin-top:3px;}
+  .file-card .stats{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--text-dim);}
+  .file-card .stats .mono{color:var(--text);}
+  .file-card .health{display:flex;align-items:center;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-soft);font-size:11.5px;}
+  .file-card .health .txt{flex:1;color:var(--text-dim);}
+  .file-card .health.warn .txt{color:var(--warn);}
+  .file-card .health.bad .txt{color:var(--bad);}
+  .file-card .health .action{color:var(--accent);cursor:pointer;flex-shrink:0;font-weight:600;}
+  .file-card .expiry{margin-top:8px;font-size:10.5px;color:var(--text-faint);}
+
+  /* ============ SCREEN 2: REVIEW ============ */
+  .split{flex:1;min-height:0;display:flex;overflow:hidden;}
+  .pane-left{width:46%;min-width:260px;background:var(--bg-inset);display:flex;flex-direction:column;overflow:hidden;}
+  .pane-right{flex:1;min-width:300px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+  .resizer{
+    width:9px;flex-shrink:0;cursor:col-resize;background:var(--bg);position:relative;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .resizer::before{content:"";width:1px;height:100%;background:var(--border);position:absolute;}
+  .resizer .grip{width:4px;height:26px;border-radius:2px;background:var(--border);z-index:1;}
+  .resizer:hover .grip, .resizer.active .grip{background:var(--accent);}
+
+  .pane-toolbar{
+    flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;
+    border-bottom:1px solid var(--border);font-size:11px;color:var(--text-dim);
+  }
+  .pane-toolbar .btn{padding:3px 8px;font-size:11px;}
+
+  .paper-wrap{flex:1;overflow:auto;padding:16px;}
+  .paper{
+    background:var(--paper);color:var(--paper-text);border-radius:4px;
+    max-width:520px;margin:0 auto;padding:26px 24px;font-family:var(--mono);
+    font-size:11px;line-height:1.85;box-shadow:0 0 0 1px rgba(0,0,0,.3);
+  }
+  .paper .doc-title{font-family:var(--ui);font-weight:700;font-size:13px;margin-bottom:2px;}
+  .paper .doc-sub{font-family:var(--ui);color:#555;font-size:10.5px;margin-bottom:14px;}
+  .paper .ln{padding:2px 6px;border-radius:3px;white-space:pre;}
+  .paper .ln.hit{background:#f2a82455;outline:1px solid #b57a12;}
+  @media (max-width:1100px){ .paper{font-size:9px;padding:18px 14px;} }
+
+  .grid-table{flex:1;overflow:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{
+    position:sticky;top:0;background:var(--bg-raised);text-align:left;
+    padding:7px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--text-faint);border-bottom:1px solid var(--border);white-space:nowrap;
+  }
+  tbody td{padding:6px 10px;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover{background:var(--bg-raised);}
+  tbody tr.selected{background:#f2a82418;box-shadow:inset 3px 0 0 var(--accent);}
+  tbody tr.excluded td{color:var(--text-faint);text-decoration:line-through;}
+  .amt-out{color:var(--bad);}
+  .amt-in{color:var(--good);}
+  .row-flags{display:flex;gap:4px;align-items:center;}
+  .tag{font-size:9.5px;padding:1px 5px;border-radius:3px;border:1px solid var(--border);color:var(--text-dim);white-space:nowrap;}
+  .tag.edited{color:var(--accent);border-color:var(--accent-dim);}
+
+  .summary-bar{
+    flex-shrink:0;display:flex;gap:22px;align-items:center;padding:10px 16px;
+    border-top:1px solid var(--border);background:var(--bg-raised);font-size:11.5px;flex-wrap:wrap;
+  }
+  .summary-item{display:flex;flex-direction:column;gap:2px;}
+  .summary-item .lbl{color:var(--text-faint);font-size:10px;text-transform:uppercase;letter-spacing:.04em;}
+  .summary-item .val{font-family:var(--mono);}
+  .summary-item .val.bad{color:var(--bad);}
+  .summary-item .val.good{color:var(--good);}
+  .summary-item a{font-family:var(--ui);font-size:10.5px;}
+
+  /* ============ SCREEN 3: MAPPING ============ */
+  .stepper{
+    flex-shrink:0;display:flex;align-items:center;gap:0;padding:12px 20px;
+    border-bottom:1px solid var(--border);background:var(--bg-raised);
+  }
+  .step{display:flex;align-items:center;gap:8px;color:var(--text-faint);font-size:11.5px;}
+  .step .num{width:19px;height:19px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--mono);}
+  .step.done .num{background:var(--good);border-color:var(--good);color:#0a0a0a;}
+  .step.done{color:var(--text-dim);}
+  .step.current{color:var(--text);}
+  .step.current .num{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:700;}
+  .step-line{width:34px;height:1px;background:var(--border);margin:0 10px;}
+
+  .map-body{flex:1;min-height:0;display:flex;overflow:hidden;}
+  .map-cols{width:52%;min-width:340px;overflow-y:auto;padding:14px 16px;border-right:1px solid var(--border);}
+  .map-preview{flex:1;min-width:280px;display:flex;flex-direction:column;overflow:hidden;}
+
+  .col-row{
+    display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-soft);
+  }
+  .col-row .src{width:150px;flex-shrink:0;}
+  .col-row .src .name{font-weight:600;font-size:12px;}
+  .col-row .src .sample{color:var(--text-faint);font-size:10.5px;font-family:var(--mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .col-row select{
+    background:var(--bg-panel);border:1px solid var(--border);color:var(--text);
+    padding:5px 8px;border-radius:5px;flex:1;min-width:0;
+  }
+  .conf{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim);flex-shrink:0;width:74px;}
+  .conf .status-dot{width:6px;height:6px;}
+  .col-row .confirm{
+    width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--text-faint);
+    cursor:pointer;flex-shrink:0;
+  }
+  .col-row.confirmed .confirm{background:var(--good);border-color:var(--good);color:#0a0a0a;}
+
+  .confirm-note{font-size:11px;color:var(--text-faint);padding:10px 0 4px;border-top:1px solid var(--border-soft);margin-top:6px;}
+
+  .pickers{display:flex;gap:16px;padding:14px 16px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg-raised);}
+  .picker{display:flex;flex-direction:column;gap:5px;}
+  .picker label{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .picker select{background:var(--bg-panel);border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:6px;}
+
+  .wizard-footer{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:12px 20px;border-top:1px solid var(--border);}
+
+  /* ============ SCREEN 4: EXPORT ============ */
+  #tab-export .body{flex:1;overflow-y:auto;padding:18px 20px;}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+  .seg button{background:var(--bg-panel);border:none;border-right:1px solid var(--border);color:var(--text-dim);padding:6px 12px;cursor:pointer;}
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent);color:var(--accent-text);font-weight:600;}
+
+  .export-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-top:16px;}
+  @media (max-width:1180px){.export-grid{grid-template-columns:1fr;}}
+  .panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+  .panel h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);}
+
+  .acct-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-soft);font-size:12px;}
+  .acct-row:last-child{border-bottom:none;}
+  .acct-row .nm{flex:1;}
+  .acct-row .cnt{font-family:var(--mono);color:var(--text-dim);}
+  .acct-row .cnt.excl{color:var(--bad);}
+
+  .rate-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border-soft);}
+  .rate-row:last-child{border-bottom:none;}
+  .rate-row .pair{font-family:var(--mono);font-size:12px;}
+  .rate-row input{
+    width:78px;background:var(--bg-inset);border:1px solid var(--border);color:var(--text);
+    padding:5px 7px;border-radius:5px;font-family:var(--mono);text-align:right;
+  }
+  .rate-row .inv{color:var(--text-faint);font-size:10.5px;font-family:var(--mono);}
+  .rate-row.missing input{border-color:var(--bad);}
+
+  .checklist{display:flex;flex-direction:column;gap:7px;}
+  .check-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);}
+  .check-item.ok{color:var(--text);}
+
+  .export-actions{display:flex;align-items:center;gap:14px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .toggle-line{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim);}
+  .toggle-line input{accent-color:var(--accent);}
+
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .field select{background:var(--bg-panel);border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:6px;}
+
+  /* ============ SCREEN 5: SETTINGS ============ */
+  #tab-settings .body{flex:1;overflow-y:auto;padding:18px 20px;}
+  .settings-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;}
+  @media (max-width:1180px){.settings-grid{grid-template-columns:1fr;}}
+
+  .bank-group{margin-bottom:16px;}
+  .bank-group h4{margin:0 0 6px;font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+  .profile-row{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);
+    border-radius:7px;margin-bottom:6px;background:var(--bg-panel);
+  }
+  .profile-row .info{flex:1;min-width:0;}
+  .profile-row .info .n{font-size:12px;font-weight:600;}
+  .profile-row .info .v{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+  .profile-row .iconbtn{
+    width:24px;height:24px;border-radius:5px;border:1px solid var(--border);background:none;
+    color:var(--text-dim);cursor:pointer;font-size:11px;
+  }
+  .profile-row .iconbtn:hover{color:var(--text);border-color:var(--text-faint);}
+  .profile-row .iconbtn.danger:hover{color:var(--bad);border-color:var(--bad);}
+
+  .meter{height:6px;border-radius:3px;background:var(--bg-inset);overflow:hidden;display:flex;margin:8px 0;}
+  .meter .a{background:var(--accent);}
+  .meter .b{background:var(--text-faint);}
+  .meter-legend{display:flex;gap:16px;font-size:11px;color:var(--text-dim);}
+  .meter-legend span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .meter-legend .a::before{background:var(--accent);}
+  .meter-legend .b::before{background:var(--text-faint);}
+
+  .danger-zone{border:1px solid var(--bad);border-radius:8px;padding:14px 16px;margin-top:16px;}
+  .danger-zone h3{color:var(--bad);}
+  .danger-zone p{color:var(--text-dim);font-size:12px;margin:0 0 10px;}
+  .danger-zone .confirm-input{
+    background:var(--bg-inset);border:1px solid var(--border);color:var(--text);
+    padding:6px 9px;border-radius:6px;font-family:var(--mono);width:160px;margin-right:8px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="about" id="about">
+    <div class="about-logo">
+      <img src="../logos/logo-2.png" alt="Statement Bridge logo" width="56" height="56"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="logo-fallback" style="display:none">SB</span>
+    </div>
+    <div class="about-body">
+      <h2>About this design: The Console</h2>
+      <p>A dense, keyboard-first tool built for someone who imports statements every month and wants zero friction the second time. The warm charcoal base and single amber accent keep long review sessions easy on the eyes without reading as a generic dark-mode template, and status dots plus visible key hints (J/K, X, E, &#8984;&#8629;) make the interface feel operable, not just readable. One thing worth a look: the resizer between the PDF and the extracted table on the Review screen actually drags.</p>
+    </div>
+    <button class="about-close" onclick="document.getElementById('about').classList.add('closed')" aria-label="Close about panel">&times;</button>
+  </div>
+
+  <header class="cmdbar">
+    <div class="brand">
+      <span class="logo-slot">
+        <img src="../logos/logo-2.png" alt="Statement Bridge logo" width="22" height="22"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <span class="logo-fallback">SB</span>
+      </span>
+      <span class="brand-name">Statement <b>Bridge</b></span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Screens">
+      <button class="tab active" data-tab="import" role="tab" aria-selected="true"><span class="k">1</span> Import</button>
+      <button class="tab" data-tab="review" role="tab" aria-selected="false"><span class="k">2</span> Review</button>
+      <button class="tab" data-tab="mapping" role="tab" aria-selected="false"><span class="k">3</span> Mapping</button>
+      <button class="tab" data-tab="export" role="tab" aria-selected="false"><span class="k">4</span> Export</button>
+      <button class="tab" data-tab="settings" role="tab" aria-selected="false"><span class="k">5</span> Settings</button>
+    </nav>
+    <div class="hints">
+      <span class="hint"><kbd>J</kbd><kbd>K</kbd> next row</span>
+      <span class="hint"><kbd>X</kbd> exclude</span>
+      <span class="hint"><kbd>E</kbd> edit</span>
+      <span class="hint"><kbd>&#8984;&#8629;</kbd> export</span>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ SCREEN 1: IMPORT ============ -->
+    <section id="tab-import" class="screen active">
+      <div class="body">
+
+        <div class="dropzone">
+          <div class="icon">&#8593;</div>
+          <div class="msg">
+            <strong>Drop CSV or PDF statements here, or</strong>
+            <span>browse your files. Nothing leaves this device.</span>
+            <div class="reco"><b>CSV is more reliable than PDF.</b> Exact text, no layout guessing. Export CSV from your bank when you can.</div>
+          </div>
+          <button class="btn primary">Browse files</button>
+        </div>
+
+        <div class="notice">
+          <span class="status-dot warn"></span>
+          3 rows merged from overlapping files.
+          <a href="#">Undo</a>
+        </div>
+
+        <div class="section-label">
+          Current session &middot; 4 files
+          <button class="btn ghost">Clear sessions</button>
+        </div>
+
+        <div class="files">
+
+          <div class="file-card">
+            <div class="row1">
+              <div>
+                <div class="name">dbs_multiplier_aug.csv</div>
+                <div class="meta">Meridian Bank savings &middot; ****4821</div>
+              </div>
+            </div>
+            <div class="stats">
+              <span>01 Aug &ndash; 31 Aug 2026</span>
+              <span class="mono">42 rows</span>
+            </div>
+            <div class="health">
+              <span class="status-dot good"></span>
+              <span class="txt">All checks pass</span>
+            </div>
+          </div>
+
+          <div class="file-card">
+            <div class="row1">
+              <div>
+                <div class="name">uob_one_statement.pdf</div>
+                <div class="meta">Summit Bank One &middot; ****7790</div>
+              </div>
+            </div>
+            <div class="stats">
+              <span>01 Aug &ndash; 25 Aug 2026</span>
+              <span class="mono">28 rows</span>
+            </div>
+            <div class="health warn">
+              <span class="status-dot warn"></span>
+              <span class="txt">3 warnings</span>
+              <span class="action">Review</span>
+            </div>
+          </div>
+
+          <div class="file-card">
+            <div class="row1">
+              <div>
+                <div class="name">ocbc_360_sep.csv</div>
+                <div class="meta">Matched: Riverside Bank 360 &middot; ****3352</div>
+              </div>
+            </div>
+            <div class="stats">
+              <span>01 Sep &ndash; 15 Sep 2026</span>
+              <span class="mono">19 rows</span>
+            </div>
+            <div class="health warn">
+              <span class="status-dot warn"></span>
+              <span class="txt">Looks like Riverside Bank 360, is that right?</span>
+              <span class="action">Confirm</span>
+            </div>
+          </div>
+
+          <div class="file-card">
+            <div class="row1">
+              <div>
+                <div class="name">chase_sapphire_aug.pdf</div>
+                <div class="meta">Anchor Bank Card &middot; ****9014 &middot; USD</div>
+              </div>
+            </div>
+            <div class="stats">
+              <span>02 Aug &ndash; 30 Aug 2026</span>
+              <span class="mono">31 rows</span>
+            </div>
+            <div class="health bad">
+              <span class="status-dot bad"></span>
+              <span class="txt">Layout seems to have changed</span>
+              <span class="action">Update mapping</span>
+            </div>
+            <div class="expiry">Session deletes in 5 days</div>
+          </div>
+
+          <div class="file-card">
+            <div class="row1">
+              <div>
+                <div class="name">grab_receipts.csv</div>
+                <div class="meta">No matching profile</div>
+              </div>
+            </div>
+            <div class="stats">
+              <span>&mdash;</span>
+              <span class="mono">0 rows</span>
+            </div>
+            <div class="health">
+              <span class="status-dot new"></span>
+              <span class="txt">New statement, needs mapping</span>
+              <span class="action">Map now</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 2: REVIEW ============ -->
+    <section id="tab-review" class="screen">
+      <div class="screen-toolbar">
+        <h1>Review</h1>
+        <span class="status-line mono">uob_one_statement.pdf</span>
+        <div class="spacer"></div>
+        <span class="status-line">Page 2 of 3</span>
+        <button class="btn ghost">&larr;</button>
+        <button class="btn ghost">&rarr;</button>
+        <button class="btn ghost">&minus;</button>
+        <span class="mono" style="color:var(--text-dim)">100%</span>
+        <button class="btn ghost">+</button>
+      </div>
+      <div class="split" id="reviewSplit">
+        <div class="pane-left" id="paneLeft">
+          <div class="pane-toolbar">Source &middot; rendered PDF page</div>
+          <div class="paper-wrap">
+            <div class="paper">
+              <div class="doc-title">Summit Bank One Account</div>
+              <div class="doc-sub">Statement period: 01 Aug 2026 to 25 Aug 2026 &middot; ****7790</div>
+              <div class="ln">Date       Description                Withdrawal   Deposit    Balance</div>
+              <div class="ln">01/08      GIRO SALARY CREDIT                      5,200.00   12,880.44</div>
+              <div class="ln">03/08      NTUC FAIRPRICE TAMPINES     42.15                   12,838.29</div>
+              <div class="ln hit">05/08      GRAB* A-1B2C3D4             18.60                   12,819.69</div>
+              <div class="ln">08/08      SHOPEE SINGAPORE            56.90                   12,762.79</div>
+              <div class="ln">12/08      AMAZON.COM USD 24.99         33.85                   12,728.94</div>
+              <div class="ln">18/08      PAYNOW TRANSFER OUT         200.00                  12,528.94</div>
+              <div class="ln">25/08      INTEREST CREDIT                          4.12       12,533.06</div>
+            </div>
+          </div>
+        </div>
+        <div class="resizer" id="resizer"><div class="grip"></div></div>
+        <div class="pane-right">
+          <div class="pane-toolbar">Extracted table &middot; 28 rows</div>
+          <div class="grid-table">
+            <table>
+              <thead><tr>
+                <th></th><th>Date</th><th>Description</th><th>Amount</th><th>Balance</th><th>Flags</th>
+              </tr></thead>
+              <tbody>
+                <tr><td class="mono">01</td><td class="mono">2026-08-01</td><td>GIRO SALARY CREDIT</td><td class="mono amt-in">+5,200.00</td><td class="mono">12,880.44</td><td></td></tr>
+                <tr><td class="mono">02</td><td class="mono">2026-08-03</td><td>NTUC FairPrice Tampines</td><td class="mono amt-out">&minus;42.15</td><td class="mono">12,838.29</td><td></td></tr>
+                <tr class="selected"><td class="mono">03</td><td class="mono">2026-08-05</td><td>Grab* A-1B2C3D4</td><td class="mono amt-out">&minus;18.60</td><td class="mono">12,819.69</td><td class="row-flags"><span class="tag edited">edited</span></td></tr>
+                <tr><td class="mono">04</td><td class="mono">2026-08-08</td><td>Shopee Singapore</td><td class="mono amt-out">&minus;56.90</td><td class="mono">12,762.79</td><td></td></tr>
+                <tr><td class="mono">05</td><td class="mono">2026-08-12</td><td>Amazon.com USD 24.99</td><td class="mono amt-out">&minus;33.85</td><td class="mono">12,728.94</td><td class="row-flags"><span class="status-dot warn"></span><span class="tag">fx unclear</span></td></tr>
+                <tr class="excluded"><td class="mono">06</td><td class="mono">2026-08-18</td><td>PayNow Transfer Out</td><td class="mono amt-out">&minus;200.00</td><td class="mono">12,528.94</td><td class="row-flags"><span class="tag">excluded</span></td></tr>
+                <tr><td class="mono">07</td><td class="mono">2026-08-25</td><td>Interest Credit</td><td class="mono amt-in">+4.12</td><td class="mono">12,533.06</td><td></td></tr>
+                <tr><td class="mono">08</td><td class="mono">2026-08-26</td><td>NTUC FairPrice Tampines</td><td class="mono amt-out">&minus;61.20</td><td class="mono">12,471.86</td><td></td></tr>
+                <tr><td class="mono">09</td><td class="mono">2026-08-27</td><td>Grab* F9K2L1M</td><td class="mono amt-out">&minus;9.40</td><td class="mono">12,462.46</td><td></td></tr>
+                <tr><td class="mono">10</td><td class="mono">2026-08-28</td><td>Shopee Singapore</td><td class="mono amt-out">&minus;120.00</td><td class="mono">12,342.46</td><td class="row-flags"><span class="status-dot bad"></span><span class="tag">balance gap</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="summary-bar">
+            <div class="summary-item"><span class="lbl">Rows</span><span class="val">27 in, 1 excluded</span></div>
+            <div class="summary-item"><span class="lbl">Range</span><span class="val">01 Aug &ndash; 25 Aug 2026</span></div>
+            <div class="summary-item"><span class="lbl">Money in</span><span class="val good">+5,204.12 SGD</span></div>
+            <div class="summary-item"><span class="lbl">Money out</span><span class="val bad">&minus;541.90 SGD</span></div>
+            <div class="summary-item"><span class="lbl">Balance check</span><span class="val bad">Fails &middot; <a href="#">row 10</a></span></div>
+            <div class="summary-item"><span class="lbl">Count check</span><span class="val good">Pass</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 3: MAPPING ============ -->
+    <section id="tab-mapping" class="screen">
+      <div class="stepper">
+        <div class="step done"><span class="num">&check;</span> Basics</div>
+        <div class="step-line"></div>
+        <div class="step done"><span class="num">&check;</span> Locate data</div>
+        <div class="step-line"></div>
+        <div class="step current"><span class="num">3</span> Map fields</div>
+        <div class="step-line"></div>
+        <div class="step"><span class="num">4</span> Test</div>
+        <div class="step-line"></div>
+        <div class="step"><span class="num">5</span> Save</div>
+      </div>
+      <div class="map-body">
+        <div class="map-cols">
+          <div class="section-label" style="margin-top:0">Source columns &middot; grab_receipts.csv</div>
+
+          <div class="col-row confirmed">
+            <div class="src"><div class="name">Transaction Date</div><div class="sample">05/09/2026, 06/09/2026</div></div>
+            <select><option selected>date</option><option>post_date</option><option>unmapped</option></select>
+            <div class="conf"><span class="status-dot good"></span>98% match</div>
+            <button class="confirm" title="Confirmed">&check;</button>
+          </div>
+
+          <div class="col-row confirmed">
+            <div class="src"><div class="name">Description</div><div class="sample">GRAB *A1B2C3, SHOPEE SG</div></div>
+            <select><option selected>description_raw</option><option>reference</option><option>unmapped</option></select>
+            <div class="conf"><span class="status-dot good"></span>95% match</div>
+            <button class="confirm" title="Confirmed">&check;</button>
+          </div>
+
+          <div class="col-row">
+            <div class="src"><div class="name">Debit</div><div class="sample">18.60, 56.90, &ndash;</div></div>
+            <select><option selected>amount (debit)</option><option>amount (signed)</option><option>unmapped</option></select>
+            <div class="conf"><span class="status-dot warn"></span>81% match</div>
+            <button class="confirm" title="Confirm this suggestion">&nbsp;</button>
+          </div>
+
+          <div class="col-row">
+            <div class="src"><div class="name">Credit</div><div class="sample">&ndash;, &ndash;, 4.12</div></div>
+            <select><option selected>amount (credit)</option><option>balance</option><option>unmapped</option></select>
+            <div class="conf"><span class="status-dot warn"></span>81% match</div>
+            <button class="confirm" title="Confirm this suggestion">&nbsp;</button>
+          </div>
+
+          <div class="col-row">
+            <div class="src"><div class="name">Running Bal</div><div class="sample">12,819.69, 12,762.79</div></div>
+            <select><option selected>balance</option><option>unmapped</option></select>
+            <div class="conf"><span class="status-dot good"></span>92% match</div>
+            <button class="confirm" title="Confirm this suggestion">&nbsp;</button>
+          </div>
+
+          <div class="col-row">
+            <div class="src"><div class="name">Ref No</div><div class="sample">A1B2C3D4, F9K2L1M</div></div>
+            <select><option>reference</option><option selected>unmapped</option></select>
+            <div class="conf"><span class="status-dot off"></span>no match</div>
+            <button class="confirm" title="Confirm this suggestion">&nbsp;</button>
+          </div>
+
+          <div class="col-row">
+            <div class="src"><div class="name">Category</div><div class="sample">Transport, Groceries</div></div>
+            <select><option selected>extra (pass-through)</option><option>unmapped</option></select>
+            <div class="conf"><span class="status-dot new"></span>heuristic</div>
+            <button class="confirm" title="Confirm this suggestion">&nbsp;</button>
+          </div>
+
+          <div class="confirm-note">Every suggestion needs your confirmation before it is saved to this profile.</div>
+        </div>
+
+        <div class="map-preview">
+          <div class="pane-toolbar">Live preview</div>
+          <div class="grid-table">
+            <table>
+              <thead><tr><th>date</th><th>description_raw</th><th>amount</th><th>balance</th><th>extra_category</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">2026-09-05</td><td>GRAB *A1B2C3</td><td class="mono amt-out">&minus;18.60</td><td class="mono">12,819.69</td><td>Transport</td></tr>
+                <tr><td class="mono">2026-09-06</td><td>SHOPEE SG</td><td class="mono amt-out">&minus;56.90</td><td class="mono">12,762.79</td><td>Groceries</td></tr>
+                <tr><td class="mono">2026-09-08</td><td>INTEREST CREDIT</td><td class="mono amt-in">+4.12</td><td class="mono">12,766.91</td><td>&mdash;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="pickers">
+        <div class="picker">
+          <label>Date format</label>
+          <select><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select>
+        </div>
+        <div class="picker">
+          <label>Sign convention</label>
+          <select><option selected>Debit + credit columns</option><option>Signed amount</option><option>CR/DR suffix</option><option>Negative is out</option></select>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn ghost">&larr; Back: Locate data</button>
+        <div class="spacer"></div>
+        <span class="status-line">4 of 7 columns confirmed</span>
+        <button class="btn primary">Next: Test &rarr;</button>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 4: EXPORT ============ -->
+    <section id="tab-export" class="screen">
+      <div class="body">
+
+        <div class="section-label" style="margin-top:0">Date range</div>
+        <div class="seg">
+          <button>Last full month</button>
+          <button class="active">This month</button>
+          <button>Last 3 months</button>
+          <button>Year to date</button>
+          <button>All</button>
+          <button>Custom</button>
+        </div>
+
+        <div class="notice" style="margin-top:14px">
+          <span class="status-dot warn"></span>
+          No Summit Bank data after 25 Aug 2026. Rows for later dates are missing from this export.
+        </div>
+
+        <div class="export-grid">
+          <div class="panel">
+            <h3>Rows by account</h3>
+            <div class="acct-row"><span class="status-dot good"></span><span class="nm">Meridian Bank &middot; ****4821</span><span class="cnt">42 included</span></div>
+            <div class="acct-row"><span class="status-dot warn"></span><span class="nm">Summit Bank One &middot; ****7790</span><span class="cnt">27 included</span><span class="cnt excl">1 excluded</span></div>
+            <div class="acct-row"><span class="status-dot good"></span><span class="nm">Riverside Bank 360 &middot; ****3352</span><span class="cnt">19 included</span></div>
+            <div class="acct-row"><span class="status-dot good"></span><span class="nm">Anchor Bank Card &middot; ****9014</span><span class="cnt">31 included</span></div>
+          </div>
+
+          <div class="panel">
+            <h3>Currency handling</h3>
+            <div class="seg" style="margin-bottom:12px">
+              <button>Keep original</button>
+              <button class="active">Convert to SGD</button>
+            </div>
+            <div class="rate-row">
+              <span class="pair">USD &rarr; SGD</span>
+              <input value="1.28" class="mono">
+              <span class="inv">1 SGD = 0.78 USD</span>
+            </div>
+            <div class="rate-row missing">
+              <span class="pair">MYR &rarr; SGD</span>
+              <input placeholder="rate" class="mono">
+              <span class="inv">1 SGD = &mdash; MYR</span>
+            </div>
+            <div class="confirm-note" style="color:var(--bad)">Export is blocked until every currency pair has a rate.</div>
+          </div>
+        </div>
+
+        <div class="export-grid" style="margin-top:18px">
+          <div class="panel">
+            <h3>Export preset</h3>
+            <div class="field">
+              <label>Column layout</label>
+              <select>
+                <option selected>My Sheet columns (Date, Merchant, Amount, Account, Category)</option>
+                <option>Standard columns (all fields)</option>
+                <option>Minimal (Date, Amount, Description)</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Final check</h3>
+            <div class="checklist">
+              <div class="check-item ok"><span class="status-dot good"></span>All date formats confirmed</div>
+              <div class="check-item"><span class="status-dot bad"></span>1 currency pair missing a rate</div>
+              <div class="check-item ok"><span class="status-dot good"></span>No unmapped fields in export set</div>
+              <div class="check-item ok"><span class="status-dot good"></span>119 rows ready, 1 excluded on purpose</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="export-actions">
+          <button class="btn primary">Download CSV</button>
+          <button class="btn primary">Copy for Sheets <span class="k">&#8984;&#8629;</span></button>
+          <label class="toggle-line"><input type="checkbox" checked> Skip header row</label>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 5: SETTINGS ============ -->
+    <section id="tab-settings" class="screen">
+      <div class="body">
+        <div class="settings-grid">
+          <div>
+            <div class="section-label" style="margin-top:0">Profiles</div>
+
+            <div class="bank-group">
+              <h4>Meridian Bank</h4>
+              <div class="profile-row">
+                <div class="info"><div class="n">Meridian Bank savings &middot; CSV</div><div class="v">v3 &middot; created 12 Jul 2026 &middot; used by 6 files</div></div>
+                <button class="iconbtn" title="Rename">R</button>
+                <button class="iconbtn" title="Duplicate">D</button>
+                <button class="iconbtn danger" title="Delete">&times;</button>
+              </div>
+            </div>
+
+            <div class="bank-group">
+              <h4>Summit Bank</h4>
+              <div class="profile-row">
+                <div class="info"><div class="n">Summit Bank One &middot; PDF</div><div class="v">v2 &middot; created 03 Aug 2026 &middot; used by 3 files</div></div>
+                <button class="iconbtn" title="Rename">R</button>
+                <button class="iconbtn" title="Duplicate">D</button>
+                <button class="iconbtn danger" title="Delete">&times;</button>
+              </div>
+            </div>
+
+            <div class="bank-group">
+              <h4>Riverside Bank</h4>
+              <div class="profile-row">
+                <div class="info"><div class="n">Riverside Bank 360 &middot; CSV</div><div class="v">v1 &middot; created 15 Sep 2026 &middot; used by 1 file</div></div>
+                <button class="iconbtn" title="Rename">R</button>
+                <button class="iconbtn" title="Duplicate">D</button>
+                <button class="iconbtn danger" title="Delete">&times;</button>
+              </div>
+            </div>
+
+            <div class="bank-group">
+              <h4>Anchor Bank</h4>
+              <div class="profile-row">
+                <div class="info"><div class="n">Anchor Bank Card &middot; PDF &middot; USD</div><div class="v">v4 &middot; created 20 Jun 2026 &middot; used by 8 files</div></div>
+                <button class="iconbtn" title="Rename">R</button>
+                <button class="iconbtn" title="Duplicate">D</button>
+                <button class="iconbtn danger" title="Delete">&times;</button>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button class="btn">Backup profiles</button>
+              <button class="btn">Restore from file</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-label" style="margin-top:0">Saved exchange rates</div>
+            <div class="panel" style="margin-bottom:16px">
+              <div class="rate-row"><span class="pair">USD &rarr; SGD</span><span class="mono">1.28</span><span class="inv">updated 14 Sep 2026</span></div>
+              <div class="rate-row"><span class="pair">MYR &rarr; SGD</span><span class="mono">0.30</span><span class="inv">updated 02 Sep 2026</span></div>
+            </div>
+
+            <div class="section-label">Storage</div>
+            <div class="panel">
+              <div class="meter"><div class="a" style="width:62%"></div><div class="b" style="width:14%"></div></div>
+              <div class="meter-legend"><span class="a">Sessions &middot; 1.8 MB</span><span class="b">Settings &middot; 40 KB</span></div>
+            </div>
+
+            <div class="danger-zone">
+              <h3 style="margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em">Delete everything</h3>
+              <p>Removes all profiles, sessions, and saved rates from this browser. Statement files on disk are not touched. This cannot be undone.</p>
+              <input class="confirm-input" placeholder="Type DELETE">
+              <button class="btn danger">Delete everything</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  var tabs = document.querySelectorAll('.tab');
+  var screens = document.querySelectorAll('.screen');
+  function activate(name){
+    tabs.forEach(function(t){
+      var on = t.getAttribute('data-tab') === name;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    screens.forEach(function(s){
+      s.classList.toggle('active', s.id === 'tab-' + name);
+    });
+  }
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){ activate(t.getAttribute('data-tab')); });
+  });
+  document.addEventListener('keydown', function(e){
+    var map = {'1':'import','2':'review','3':'mapping','4':'export','5':'settings'};
+    if (map[e.key] && !e.metaKey && !e.ctrlKey) activate(map[e.key]);
+  });
+
+  var resizer = document.getElementById('resizer');
+  var left = document.getElementById('paneLeft');
+  var split = document.getElementById('reviewSplit');
+  if (resizer && left && split){
+    var dragging = false;
+    resizer.addEventListener('mousedown', function(){ dragging = true; resizer.classList.add('active'); });
+    window.addEventListener('mouseup', function(){ dragging = false; resizer.classList.remove('active'); });
+    window.addEventListener('mousemove', function(e){
+      if (!dragging) return;
+      var rect = split.getBoundingClientRect();
+      var pct = (e.clientX - rect.left) / rect.width * 100;
+      pct = Math.max(25, Math.min(70, pct));
+      left.style.width = pct + '%';
+    });
+  }
+})();
+</script>
+</body>
+</html>

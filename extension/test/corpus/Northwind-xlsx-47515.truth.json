@@ -1,0 +1,77 @@
+{
+  "axes": {
+    "fileType": "xlsx",
+    "bank": "Northwind",
+    "lang": "ms",
+    "dateFormat": "MM/DD/YYYY",
+    "numberFormat": "1,234.56",
+    "signConvention": "positiveIsOut",
+    "preamble": "none",
+    "footer": "pagemarkers",
+    "encoding": "windows-1252",
+    "hasBalance": true,
+    "currency": "SGD"
+  },
+  "truth": [
+    {
+      "date": "2026-06-02",
+      "minor": -162151,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-04",
+      "minor": -131464,
+      "description": "Bookstore"
+    },
+    {
+      "date": "2026-06-06",
+      "minor": -168734,
+      "description": "Pharmacy"
+    },
+    {
+      "date": "2026-06-08",
+      "minor": -53546,
+      "description": "Bakery"
+    },
+    {
+      "date": "2026-06-09",
+      "minor": -30857,
+      "description": "Grocery Mart"
+    },
+    {
+      "date": "2026-06-11",
+      "minor": -104471,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-12",
+      "minor": 48167,
+      "description": "Amazon Purchase"
+    },
+    {
+      "date": "2026-06-15",
+      "minor": -160341,
+      "description": "Hardware Store"
+    },
+    {
+      "date": "2026-06-16",
+      "minor": -100962,
+      "description": "Grab Ride"
+    },
+    {
+      "date": "2026-06-19",
+      "minor": 76434,
+      "description": "Mobile Plan"
+    },
+    {
+      "date": "2026-06-22",
+      "minor": -172700,
+      "description": "Electric Co Bill"
+    },
+    {
+      "date": "2026-06-23",
+      "minor": 199210,
+      "description": "Mobile Plan"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+<!doctype html>
+<html><body>
+<div id="out">running</div>
+<script type="module">
+import { withPdfjs, groupItemsIntoLines, lineText } from '../src/core/pdf.js';
+import { renderPageToCanvas } from '../src/core/pdf-image.js';
+import { ocrPageCanvas } from '../src/core/ocr.js';
+
+const AMOUNT_END_RE = /([A-Z]{3})\s*([+-])\s*([\d,]+\.\d{2})\s*$/;
+const LOOSE_NUM_END_RE = /[\d,]+\.\d{2}\s*$/;
+
+function redact(t) {
+  // Keep digits, currency-like 3-letter tokens, +/- signs, dots, commas visible; mask words.
+  return t.replace(/[A-Za-z][A-Za-z'*.\-]*/g, (w) => {
+    if (/^[A-Z]{2,4}$/.test(w)) return w; // keep currency-ish codes visible (SGD, SGO, etc)
+    return 'x'.repeat(Math.min(w.length, 4));
+  });
+}
+
+async function main() {
+  const bytes = new Uint8Array(await (await fetch('../test/private/aug_2026_dbs.pdf')).arrayBuffer());
+  const out = await withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
+    const doc = await pdfjsLib.getDocument({ data: bytes, standardFontDataUrl }).promise;
+    const allLines = [];
+    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const { canvas } = await renderPageToCanvas(page, 2.5);
+      const items = await ocrPageCanvas(canvas, { scale: 2.5, restrictNumbers: true });
+      const lines = groupItemsIntoLines(items);
+      lines.forEach((l) => allLines.push({ page: pageNum, y: Math.round(l.y), text: lineText(l), itemCount: l.items.length }));
+    }
+    // Find lines mentioning "11 Sep" / "5 Sep" (with or without OCR word-merge) as date-groups,
+    // and dump a window of lines around each.
+    const dateHits = allLines
+      .map((l, i) => ({ i, l }))
+      .filter(({ l }) => /\b(11|5)\s*Sep\s*2026\b/i.test(l.text) || /\bSep\s*2026\b/i.test(l.text));
+    const windows = dateHits.map(({ i }) => {
+      const start = Math.max(0, i - 1);
+      const end = Math.min(allLines.length - 1, i + 4);
+      return allLines.slice(start, end + 1).map((l, k) => ({
+        idx: start + k, page: l.page, y: l.y, itemCount: l.itemCount,
+        text: redact(l.text),
+        matchesAmountEnd: AMOUNT_END_RE.test(l.text),
+        matchesLooseNum: LOOSE_NUM_END_RE.test(l.text),
+      }));
+    });
+    return { totalLines: allLines.length, dateGroupLineIdxs: dateHits.map(h => h.i), windows };
+  });
+  document.getElementById('out').textContent = JSON.stringify(out, null, 2);
+}
+main().catch((e) => { document.getElementById('out').textContent = 'ERR:' + (e && e.stack || e); });
+</script>
+</body></html>

@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Statement Bridge",
+  "version": "0.1.0",
+  "description": "Turn bank statements (CSV/TSV/PDF) into clean transaction exports. Fully offline.",
+  "permissions": ["storage", "unlimitedStorage", "clipboardWrite"],
+  "background": { "service_worker": "src/background.js" },
+  "action": { "default_title": "Statement Bridge" },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"
+  }
+}
