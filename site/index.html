@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- HEAD:START -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Statement Bridge: bank statements to your spreadsheet</title>
@@ -12,15 +13,16 @@
 <link rel="icon" type="image/png" sizes="512x512" href="img/logo-512.png">
 <meta name="theme-color" content="#0d1a17">
 <meta property="og:title" content="Statement Bridge: bank statements to your spreadsheet">
-<meta property="og:description" content="Drop a bank statement, get clean rows in your spreadsheet in 30 seconds. Runs on your device, works with banks everywhere.">
+<meta property="og:description" content="Drop a bank statement, get clean rows in your spreadsheet in 30 seconds. Runs on your device, no account, no server, works with banks everywhere.">
 <meta property="og:image" content="https://statementbridge.urbanalgorithm.com/img/og.png">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://statementbridge.urbanalgorithm.com/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Statement Bridge: bank statements to your spreadsheet">
-<meta name="twitter:description" content="Drop a bank statement, get clean rows in your spreadsheet in 30 seconds. Runs on your device, works with banks everywhere.">
+<meta name="twitter:description" content="Drop a bank statement, get clean rows in your spreadsheet in 30 seconds. Runs on your device, no account, no server, works with banks everywhere.">
 <meta name="twitter:image" content="https://statementbridge.urbanalgorithm.com/img/og.png">
 <script defer src="https://umami-analytics-puce.vercel.app/script.js" data-website-id="bb2d5d39-a77f-4865-8ae4-b71fa36a5dd0"></script>
+<!-- HEAD:END -->
 <style>
   :root{
     --ink-900:#0d1a17;
@@ -66,9 +68,12 @@
   .brand-bar .wrap{max-width:1040px;margin:0 auto;width:100%;display:flex;align-items:center;justify-content:space-between;}
   .brand-left{display:flex;align-items:center;gap:12px;}
   .brand-left img{width:32px;height:32px;border-radius:7px;}
-  .brand-left .name{font-size:16px;font-weight:700;}
+  .brand-left .name{font-size:16px;font-weight:700;text-decoration:none;color:inherit;}
+  .brand-bar nav{display:flex;align-items:center;}
   .brand-bar nav a{color:var(--ink-text-dim);text-decoration:none;font-size:14px;margin-left:24px;}
   .brand-bar nav a:hover,.brand-bar nav a:focus-visible{color:var(--ink-text);}
+  .brand-bar nav a.btn-header-cws{background:var(--brass);color:var(--brass-ink);font-size:13.5px;padding:11px 16px;min-height:40px;white-space:nowrap;margin-left:20px;}
+  .brand-bar nav a.btn-header-cws:hover,.brand-bar nav a.btn-header-cws:focus-visible{background:var(--brass-hover);color:var(--brass-ink);}
 
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
@@ -121,7 +126,7 @@
   .shots-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;}
   .shot-card{background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:12px;overflow:hidden;}
   .shot-card .shot-frame{aspect-ratio:1280/800;background:#faf8f2;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-  .shot-card img{width:100%;height:100%;object-fit:cover;}
+  .shot-card img{width:100%;height:100%;object-fit:contain;}
   .shot-card .shot-missing{color:var(--ink-dim);font-size:13px;text-align:center;padding:16px;}
   .shot-card .shot-caption{padding:12px 16px;font-size:13.5px;color:var(--ink-dim);border-top:1px solid var(--paper-line);}
 
@@ -157,7 +162,8 @@
     .steps-grid,.works-grid{grid-template-columns:1fr;}
     .privacy-list{grid-template-columns:1fr;}
     .countries-grid{grid-template-columns:repeat(2,1fr);}
-    .brand-bar nav{display:none;}
+    .brand-bar nav a:not(.btn-header-cws){display:none;}
+    .brand-bar nav{margin-left:auto;}
     footer .wrap{flex-direction:column;text-align:center;}
     footer nav{justify-content:center;}
   }
@@ -171,19 +177,21 @@
 
 <a class="skip-link" href="#main">Skip to content</a>
 
+<!-- HEADER:START -->
 <header class="brand-bar">
   <div class="wrap">
     <div class="brand-left">
       <img src="img/logo.png" alt="Statement Bridge logo" width="32" height="32">
-      <div class="name">Statement Bridge</div>
+      <a class="name" href="index.html">Statement Bridge</a>
     </div>
     <nav aria-label="Primary">
-      <a href="#how">How it works</a>
-      <a href="#privacy">Privacy</a>
-      <a href="#faq">FAQ</a>
+      <a href="index.html#how">How it works</a>
+      <a href="index.html#faq">FAQ</a>
+      <a class="btn btn-header-cws" data-cws href="#" target="_blank" rel="noopener">Add to Chrome</a>
     </nav>
   </div>
 </header>
+<!-- HEADER:END -->
 
 <main id="main">
   <section class="hero">
@@ -194,13 +202,13 @@
         <div class="bf-bar" aria-hidden="true">
           <span class="bf-dot"></span><span class="bf-dot"></span><span class="bf-dot"></span>
         </div>
-        <img src="img/shot-2@2x.png" alt="Statement Bridge showing 546 transactions ready, with a Copy to Google Sheets button" loading="eager">
+        <img src="img/shot-2@2x.png" alt="Statement Bridge showing 5 transactions ready, with a Copy to Google Sheets button" loading="eager">
         <figcaption>Drop, wait, copy.</figcaption>
       </figure>
 
       <p class="sub">Drop the CSV or PDF your bank gives you. Get clean rows you can paste straight into Sheets. No account, no server, nothing to set up.</p>
       <div class="cta-row">
-        <a class="btn btn-giant" id="cws-btn" href="#" target="_blank" rel="noopener">Add to Chrome, it's free</a>
+        <a class="btn btn-giant" id="cws-btn" data-cws href="#" target="_blank" rel="noopener">Add to Chrome, it's free</a>
       </div>
       <p class="fine">Works with banks everywhere. See the list below.</p>
     </div>
@@ -242,7 +250,7 @@
           <li>Nothing to configure before your first statement</li>
         </ul>
         <div class="link-row">
-          <a href="../extension/workspace.html#how-it-works">Read how the extension works</a>
+          <a href="privacy.html">Read the full privacy policy</a>
         </div>
       </div>
     </div>
@@ -335,12 +343,13 @@
       <div class="cta-band">
         <h2>Get your first statement into your spreadsheet</h2>
         <p class="section-sub">Free to install. Nothing to set up.</p>
-        <a class="btn btn-giant" id="cws-btn-2" href="#" target="_blank" rel="noopener">Add to Chrome, it's free</a>
+        <a class="btn btn-giant" id="cws-btn-2" data-cws href="#" target="_blank" rel="noopener">Add to Chrome, it's free</a>
       </div>
     </div>
   </section>
 </main>
 
+<!-- FOOTER:START -->
 <footer>
   <div class="wrap">
     <div class="footer-brand">
@@ -348,19 +357,19 @@
       <span>Made by <a href="https://urbanalgorithm.com" target="_blank" rel="noopener">Urban Algorithm</a></span>
     </div>
     <nav aria-label="Footer">
+      <a href="index.html">Home</a>
       <a href="privacy.html">Privacy</a>
       <a href="support.html">Support</a>
       <a href="accessibility.html">Accessibility</a>
     </nav>
   </div>
 </footer>
-
 <script>
   // TODO: swap this for the real Chrome Web Store listing URL on listing day.
   var CWS_URL = "https://chromewebstore.google.com/detail/PLACEHOLDER";
-  document.getElementById('cws-btn').href = CWS_URL;
-  document.getElementById('cws-btn-2').href = CWS_URL;
+  document.querySelectorAll('[data-cws]').forEach(function (el) { el.href = CWS_URL; });
 </script>
+<!-- FOOTER:END -->
 
 </body>
 </html>

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- HEAD:START -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Privacy: Statement Bridge</title>
@@ -8,12 +9,24 @@
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="icon" href="img/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="img/logo-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="img/logo-512.png">
 <meta name="theme-color" content="#0d1a17">
+<meta property="og:title" content="Privacy: Statement Bridge">
+<meta property="og:description" content="Statement Bridge reads your bank statements on your device. No account, no server, nothing uploaded.">
+<meta property="og:image" content="https://statementbridge.urbanalgorithm.com/img/og.png">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://statementbridge.urbanalgorithm.com/privacy.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Privacy: Statement Bridge">
+<meta name="twitter:description" content="Statement Bridge reads your bank statements on your device. No account, no server, nothing uploaded.">
+<meta name="twitter:image" content="https://statementbridge.urbanalgorithm.com/img/og.png">
 <script defer src="https://umami-analytics-puce.vercel.app/script.js" data-website-id="bb2d5d39-a77f-4865-8ae4-b71fa36a5dd0"></script>
+<!-- HEAD:END -->
 <style>
   :root{
     --ink-900:#0d1a17; --ink-line:#2c463e; --ink-text:#e7efe9; --ink-text-dim:#9db3ab;
-    --brass:#c6a15b; --brass-ink:#2a2109;
+    --brass:#c6a15b; --brass-hover:#d6b06a; --brass-ink:#2a2109;
     --paper:#f3efe6; --paper-raised:#ffffff; --paper-line:#e3ddcd;
     --ink:#20241f; --ink-dim:#666a5f;
   }
@@ -25,12 +38,27 @@
   .skip-link{position:absolute;left:-9999px;top:0;background:var(--brass);color:var(--brass-ink);padding:12px 20px;font-weight:700;border-radius:0 0 8px 0;z-index:100;text-decoration:none;}
   .skip-link:focus{left:0;}
   .wrap{max-width:720px;margin:0 auto;padding:0 24px;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;font-weight:700;text-decoration:none;cursor:pointer;border:none;}
   header.brand-bar{background:var(--ink-900);color:var(--ink-text);padding:18px 24px;border-bottom:1px solid var(--ink-line);}
-  header.brand-bar .wrap{display:flex;align-items:center;gap:12px;}
+  header.brand-bar .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .brand-left{display:flex;align-items:center;gap:12px;}
   header.brand-bar img{width:32px;height:32px;border-radius:7px;}
-  header.brand-bar .name{font-size:16px;font-weight:700;}
+  .brand-left .name{font-size:16px;font-weight:700;text-decoration:none;color:inherit;}
+  .brand-bar nav{display:flex;align-items:center;}
+  .brand-bar nav a{color:var(--ink-text-dim);text-decoration:none;font-size:14px;margin-left:24px;}
+  .brand-bar nav a:hover,.brand-bar nav a:focus-visible{color:var(--ink-text);}
+  .brand-bar nav a.btn-header-cws{background:var(--brass);color:var(--brass-ink);font-size:13.5px;padding:11px 16px;min-height:40px;white-space:nowrap;margin-left:20px;}
+  .brand-bar nav a.btn-header-cws:hover,.brand-bar nav a.btn-header-cws:focus-visible{background:var(--brass-hover);color:var(--brass-ink);}
   main{padding:48px 0 72px;}
+  .footer-brand{display:flex;align-items:center;gap:10px;}
+  .footer-brand img{width:22px;height:22px;border-radius:5px;}
   footer nav{display:flex;gap:16px;flex-wrap:wrap;}
+  @media (max-width:760px){
+    .brand-bar nav a:not(.btn-header-cws){display:none;}
+    .brand-bar nav{margin-left:auto;}
+    footer .wrap{flex-direction:column;text-align:center;}
+    footer nav{justify-content:center;}
+  }
   @media (prefers-reduced-motion:reduce){
     *{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important;}
   }
@@ -49,12 +77,21 @@
 
 <a class="skip-link" href="#main">Skip to content</a>
 
+<!-- HEADER:START -->
 <header class="brand-bar">
   <div class="wrap">
-    <img src="img/logo.png" alt="Statement Bridge logo" width="32" height="32">
-    <a class="name" href="index.html" style="text-decoration:none;color:inherit;">Statement Bridge</a>
+    <div class="brand-left">
+      <img src="img/logo.png" alt="Statement Bridge logo" width="32" height="32">
+      <a class="name" href="index.html">Statement Bridge</a>
+    </div>
+    <nav aria-label="Primary">
+      <a href="index.html#how">How it works</a>
+      <a href="index.html#faq">FAQ</a>
+      <a class="btn btn-header-cws" data-cws href="#" target="_blank" rel="noopener">Add to Chrome</a>
+    </nav>
   </div>
 </header>
+<!-- HEADER:END -->
 
 <main id="main">
   <div class="wrap">
@@ -76,16 +113,27 @@
   </div>
 </main>
 
+<!-- FOOTER:START -->
 <footer>
   <div class="wrap">
-    <div>Made by <a href="https://urbanalgorithm.com" target="_blank" rel="noopener">Urban Algorithm</a></div>
+    <div class="footer-brand">
+      <img src="img/logo.png" alt="Statement Bridge logo" width="22" height="22">
+      <span>Made by <a href="https://urbanalgorithm.com" target="_blank" rel="noopener">Urban Algorithm</a></span>
+    </div>
     <nav aria-label="Footer">
       <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy</a>
       <a href="support.html">Support</a>
       <a href="accessibility.html">Accessibility</a>
     </nav>
   </div>
 </footer>
+<script>
+  // TODO: swap this for the real Chrome Web Store listing URL on listing day.
+  var CWS_URL = "https://chromewebstore.google.com/detail/PLACEHOLDER";
+  document.querySelectorAll('[data-cws]').forEach(function (el) { el.href = CWS_URL; });
+</script>
+<!-- FOOTER:END -->
 
 </body>
 </html>

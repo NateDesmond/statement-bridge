@@ -2,52 +2,51 @@
 // images, from static local HTML - no extension load needed for these, so
 // plain playwright-core against a local file:// page is enough. Same
 // bundled-Chromium rule as store-shots.mjs (never channel:'chrome').
+//
+// Tight-on-the-product crop (owner requirement 2026-09-18): shot-5 clips to
+// the pasted grid region (.grid-wrap) plus a small margin instead of the
+// whole 1280x800 mock page, so the drop shot shows the drop area filling the
+// frame - see lib/shot-crop.mjs for the shared crop/compose helpers.
 import { chromium } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { shotUnionCrop, composeStoreShot } from './lib/shot-crop.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const siteDir = path.join(__dirname, '..', '..', 'site');
+const siteImgDir = path.join(siteDir, 'img');
 const storeDir = path.join(__dirname, '..', '..', 'store');
 const shotsDir = path.join(__dirname, 'shots');
 fs.mkdirSync(shotsDir, { recursive: true });
 
-async function shotBand(page, filePath, viewport, caption) {
-  await page.setViewportSize(viewport);
-  await page.waitForTimeout(80);
-  if (caption) {
-    await page.evaluate((text) => {
-      const old = document.getElementById('__shot_caption_band');
-      if (old) old.remove();
-      const band = document.createElement('div');
-      band.id = '__shot_caption_band';
-      band.style.cssText = [
-        'position:fixed', 'left:0', 'right:0', 'bottom:0', 'height:84px',
-        'background:#0d1a17', 'border-top:3px solid #c6a15b',
-        'display:flex', 'align-items:center', 'justify-content:center',
-        'padding:0 48px', 'z-index:2147483647',
-        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif',
-        'font-size:22px', 'font-weight:600', 'color:#f3efe6', 'text-align:center',
-      ].join(';');
-      band.textContent = text;
-      document.body.appendChild(band);
-    }, caption);
-  }
-  await page.waitForTimeout(60);
-  await page.screenshot({ path: filePath, fullPage: false });
+function sipsPixelSize(filePath) {
+  const out = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', filePath], { encoding: 'utf8' });
+  return { width: Number(out.match(/pixelWidth:\s*(\d+)/)[1]) };
 }
 
 async function main() {
   const browser = await chromium.launch({ headless: true, executablePath: chromium.executablePath() });
-  const page = await browser.newPage();
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+  const page = await context.newPage();
+  const caption = 'Paste once. Your columns land exactly where you expect.';
 
-  // ---- Shot 5: pasted result in the mock Sheets-style grid ----
+  // ---- Shot 5: pasted result in the mock Sheets-style grid, cropped tight ----
   await page.goto(pathToFileURL(path.join(siteDir, 'mock-sheets.html')).href);
-  await shotBand(page, path.join(shotsDir, 'shot-5.png'), { width: 1280, height: 800 },
-    'Paste once. Your columns land exactly where you expect.');
-  await shotBand(page, path.join(shotsDir, 'shot-5@2x.png'), { width: 2560, height: 1600 },
-    'Paste once. Your columns land exactly where you expect.');
+  await page.waitForTimeout(80);
+  const crop2xPath = path.join(shotsDir, 'shot-5@2x.png');
+  // Union of just the .pasted cells (not .toast, which sits near the
+  // bottom of the whole 800px mock body and would drag the crop down
+  // through a dozen empty rows).
+  await shotUnionCrop(page, '.pasted', crop2xPath);
+  fs.copyFileSync(crop2xPath, path.join(siteImgDir, 'shot-5@2x.png'));
+  const shot1xPath = path.join(siteImgDir, 'shot-5.png');
+  const { width } = sipsPixelSize(crop2xPath);
+  fs.copyFileSync(crop2xPath, shot1xPath);
+  execFileSync('sips', ['--resampleWidth', String(Math.round(width / 2)), shot1xPath]);
+  const cropBuffer = fs.readFileSync(crop2xPath);
+  await composeStoreShot(context, cropBuffer, path.join(storeDir, 'shot-5.png'), caption);
 
   // ---- Promo images: logo + solid Vault colours ----
   const logoPath = path.join(__dirname, '..', '..', 'designs', 'logos', 'logo-final.png');

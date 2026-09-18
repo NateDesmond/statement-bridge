@@ -4,26 +4,40 @@
 // user's browser). Pattern copied from dev/e2e-extension.mjs and
 // dev/simple-shots.mjs. Only test/fixtures are used, never test/private.
 //
-// Writes 1280x800 PNGs to dev/shots/store-N.png, then this script's caller
-// copies them into store/ and site/img/ (plus @2x via a 2560x1600 capture).
+// Tight-on-the-product shots (owner requirement 2026-09-18): capture at
+// 1100x720 @2x, then clip to the actual content card's bounding box (see
+// lib/shot-crop.mjs) instead of the whole viewport, so there's no empty page
+// background or huge dark header band. Writes:
+//   - site/img/shot-N@2x.png (the crop, full 2x resolution)
+//   - site/img/shot-N.png (the same crop downscaled to 1x, via sips)
+//   - store/shot-N.png (1280x800 with a caption band, product scaled to
+//     fill the band width - see composeStoreShot)
 import { chromium } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { assertCleanLog } from './lib/assert-clean-log.mjs';
+import { shotCardCrop, composeStoreShot } from './lib/shot-crop.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(__dirname, '..');
 const fixturesDir = path.join(extensionPath, 'test', 'fixtures');
 const shotsDir = path.join(__dirname, 'shots');
+const siteImgDir = path.join(__dirname, '..', '..', 'site', 'img');
+const storeDir = path.join(__dirname, '..', '..', 'store');
 fs.mkdirSync(shotsDir, { recursive: true });
+
+const VIEWPORT = { width: 1100, height: 720 };
 
 async function launchExtensionContext() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-ext-store-shots-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false, // --headless=new below is what actually goes headless (extensions require it)
     executablePath: chromium.executablePath(), // bundled Chromium only
+    viewport: VIEWPORT,
+    deviceScaleFactor: 2,
     args: [
       '--headless=new',
       `--disable-extensions-except=${extensionPath}`,
@@ -42,49 +56,33 @@ async function launchExtensionContext() {
   return { context, page, pageErrors };
 }
 
-// Injects a caption band for screenshot purposes only (never shipped in the
-// extension itself) - a bottom strip in the Vault palette (ink-900 bg, brass
-// rule, paper text) naming the one idea the shot demonstrates. Chrome Web
-// Store screenshots convention: short caption band, one idea each.
-async function addCaptionBand(page, text) {
-  await page.evaluate((caption) => {
-    const old = document.getElementById('__shot_caption_band');
-    if (old) old.remove();
-    const band = document.createElement('div');
-    band.id = '__shot_caption_band';
-    band.style.cssText = [
-      'position:fixed', 'left:0', 'right:0', 'bottom:0', 'height:84px',
-      'background:#0d1a17', 'border-top:3px solid #c6a15b',
-      'display:flex', 'align-items:center', 'justify-content:center',
-      'padding:0 48px', 'z-index:2147483647',
-      'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif',
-      'font-size:22px', 'font-weight:600', 'color:#f3efe6', 'text-align:center',
-      'letter-spacing:0.1px',
-    ].join(';');
-    band.textContent = caption;
-    document.body.appendChild(band);
-  }, text);
+function sipsPixelSize(filePath) {
+  const out = execFileSync('sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', filePath], { encoding: 'utf8' });
+  const width = Number(out.match(/pixelWidth:\s*(\d+)/)[1]);
+  const height = Number(out.match(/pixelHeight:\s*(\d+)/)[1]);
+  return { width, height };
 }
 
-async function shot(page, viewport, filePath, caption) {
-  await page.setViewportSize(viewport);
-  await page.waitForTimeout(150);
-  if (caption) await addCaptionBand(page, caption);
-  await page.waitForTimeout(80);
-  await page.screenshot({ path: filePath, fullPage: false });
-}
+/** Writes site img (@2x + downscaled 1x) and the composited store/shot-N.png for one card. */
+async function writeShotSet(context, page, selector, name, caption) {
+  const crop2xPath = path.join(shotsDir, `${name}@2x.png`);
+  await shotCardCrop(page, selector, crop2xPath);
+  fs.copyFileSync(crop2xPath, path.join(siteImgDir, `${name}@2x.png`));
 
-/** Writes one shot at 1280x800 (store/site) and its @2x (2560x1600) sibling. */
-async function shotWithRetina(page, basePath, caption) {
-  await shot(page, { width: 1280, height: 800 }, `${basePath}.png`, caption);
-  await shot(page, { width: 2560, height: 1600 }, `${basePath}@2x.png`, caption);
+  const shot1xPath = path.join(siteImgDir, `${name}.png`);
+  const { width, height } = sipsPixelSize(crop2xPath);
+  fs.copyFileSync(crop2xPath, shot1xPath);
+  execFileSync('sips', ['--resampleWidth', String(Math.round(width / 2)), shot1xPath]);
+
+  const cropBuffer = fs.readFileSync(crop2xPath);
+  await composeStoreShot(context, cropBuffer, path.join(storeDir, `${name}.png`), caption);
 }
 
 async function main() {
   // ---- Shot 1: the drop area (empty state) ----
   {
     const { context, page, pageErrors } = await launchExtensionContext();
-    await shotWithRetina(page, path.join(shotsDir, 'shot-1'),
+    await writeShotSet(context, page, '#dropzone-full', 'shot-1',
       'Drop your bank statement. Nothing leaves your computer.');
     const clean = await assertCleanLog(page, 'shot-1 drop area', pageErrors);
     await context.close();
@@ -97,7 +95,15 @@ async function main() {
     await page.$('#file-input').then((el) => el.setInputFiles(path.join(fixturesDir, 'meridian_savings.csv')));
     await page.waitForSelector('.file-row .badge-ok', { timeout: 15000 });
     await page.waitForSelector('#export-panel:not([hidden])', { timeout: 5000 });
-    await shotWithRetina(page, path.join(shotsDir, 'shot-2'),
+    // The result table's body is a "live" preset-editor.js preview: it
+    // renders with an empty tbody first, then fills in after a 100ms
+    // debounce (PREVIEW_DEBOUNCE_MS in preset-editor.js). Wait for the real
+    // rows (5, from meridian_savings.csv) instead of a fixed timeout.
+    await page.waitForFunction(
+      () => document.querySelectorAll('#result-table tbody tr').length >= 5,
+      { timeout: 5000 },
+    );
+    await writeShotSet(context, page, '#export-panel', 'shot-2',
       'Copy your transactions straight into Google Sheets.');
     const clean = await assertCleanLog(page, 'shot-2 result card', pageErrors);
     await context.close();
@@ -109,8 +115,14 @@ async function main() {
     const { context, page, pageErrors } = await launchExtensionContext();
     await page.$('#file-input').then((el) => el.setInputFiles(path.join(fixturesDir, 'northwind_transaction_history_flags.pdf')));
     await page.waitForSelector('.decision-row', { timeout: 20000 });
-    await page.waitForTimeout(700); // let the async page-snippet crop finish rendering
-    await shotWithRetina(page, path.join(shotsDir, 'shot-3'),
+    // The page-snippet crop (loadDecisionSnippet in home.js) starts as a
+    // "Loading..." placeholder and swaps in a <canvas> once the async PDF
+    // crop finishes. Wait for the real canvas instead of a fixed timeout.
+    await page.waitForFunction(
+      () => document.querySelector('.decision-row .decision-snippet canvas'),
+      { timeout: 10000 },
+    );
+    await writeShotSet(context, page, '.decision-row', 'shot-3',
       'A quick look at anything unclear, right next to the page it came from.');
     const clean = await assertCleanLog(page, 'shot-3 decision card', pageErrors);
     await context.close();
@@ -139,7 +151,14 @@ async function main() {
     await page.click('#attention-cards button:has-text("Set up")');
     await page.waitForSelector('#screen-wizard.active', { timeout: 10000 });
     await page.waitForSelector('#confirm-a:not([hidden])', { timeout: 10000 });
-    await shotWithRetina(page, path.join(shotsDir, 'shot-4'),
+    // renderConfirmA() writes the preview table synchronously, but wait for
+    // its rows explicitly anyway (defensive, matches the other async shots)
+    // rather than assuming render order.
+    await page.waitForFunction(
+      () => document.querySelectorAll('#confirm-a-preview tbody tr').length >= 5,
+      { timeout: 5000 },
+    );
+    await writeShotSet(context, page, '#confirm-a', 'shot-4',
       'Confirm the read before you copy anything.');
     const clean = await assertCleanLog(page, 'shot-4 confirm screen', pageErrors);
     await context.close();
@@ -147,7 +166,7 @@ async function main() {
     if (!clean.ok) throw new Error('shot-4: ' + clean.problems.join('; '));
   }
 
-  console.log('done. shots in', shotsDir);
+  console.log('done. shots in', shotsDir, 'site img in', siteImgDir, 'store in', storeDir);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });
