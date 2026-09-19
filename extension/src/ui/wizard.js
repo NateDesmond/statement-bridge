@@ -22,6 +22,7 @@ import {
   detectPdfRowModel, loadPdfPages, detectGroupedSignConvention, matchAmountLine, inferPdfColumns,
 } from '../core/pdf.js';
 import { balanceCheck, countCheck, countCheckGrouped, groupedCountLabel, fileSummary, flagLabel, rowFlagLabel } from '../core/checks.js';
+import { defaultAccountLabel } from '../core/home-state.js';
 import { buildFileRows } from '../core/pipeline.js';
 import { announce } from './nav.js';
 import { renderPdfPage, pdfYToCanvasTop, pdfXToCanvasLeft, canvasLeftToPdfX } from './pdf-render.js';
@@ -306,7 +307,7 @@ export function computeStepValid(step, ctx) {
   return true;
 }
 
-export function createWizard({ storage, onSaved, onOpenReport }) {
+export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
   const state = {
     entry: null,
     step: 0,
@@ -362,14 +363,22 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
   }
 
   const STATEMENT_TYPE_LABELS = { savings: 'savings', current: 'current', credit_card: 'credit card', other: 'other' };
+  /** Item 9: the file-format tag shown beside the name field, kept out of the name itself. */
+  function fmtLabel() { return isPdf() ? 'PDF' : 'CSV'; }
 
-  /** Fix 6c: a ready-to-confirm profile name from Basics, e.g. "DBS savings, PDF" - the user only needs to type one when Basics itself couldn't guess a bank. */
+  /**
+   * Fix 6c / Item 9: a ready-to-confirm profile name from Basics, e.g.
+   * "DBS savings" - the user only needs to type one when Basics itself
+   * couldn't guess a bank. No file-format suffix ("PDF"/"CSV") in the name
+   * itself - it reads as a category label, not a name a person would pick.
+   * The format shows separately as a small tag next to the name field
+   * instead (see #confirm-name-fmt / #w-name-fmt).
+   */
   function suggestedProfileName() {
     const b = state.basics;
     const bank = b.bank || 'Statement';
     const typeLabel = STATEMENT_TYPE_LABELS[b.statementType] || b.statementType || '';
-    const fileLabel = isPdf() ? 'PDF' : 'CSV';
-    return `${bank} ${typeLabel}, ${fileLabel}`;
+    return typeLabel ? `${bank} ${typeLabel}` : bank;
   }
 
   /**
@@ -502,10 +511,11 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
     $('#w-dateformat').value = state.dateFormat;
     $('#w-numberformat').value = state.numberFormat;
     $('#w-signconvention').value = state.signConvention;
-    // Fix 6c: prefill from Basics ("DBS savings, PDF") so the user just
-    // confirms instead of typing a name from scratch for a brand-new profile.
+    // Fix 6c: prefill from Basics ("DBS savings") so the user just confirms
+    // instead of typing a name from scratch for a brand-new profile.
     if (state.updateProfile) $('#w-name').value = state.updateProfile.name || '';
     else $('#w-name').value = suggestedProfileName();
+    if ($('#w-name-fmt')) $('#w-name-fmt').textContent = fmtLabel();
     renderMappingTable();
     renderTransforms();
     renderLivePreview();
@@ -634,16 +644,23 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
       <div class="confirm-total-item in"><span class="num">${escapeHtml(formatMinorDisplay(totals.in, cur))}</span><span class="lbl">Money in</span></div>
       <div class="confirm-total-item out"><span class="num">-${escapeHtml(formatMinorDisplay(totals.out, cur))}</span><span class="lbl">Money out</span></div>`;
 
-    const preview = rows.slice(0, 5);
+    // Item 10: every row is in the DOM (not just the first 5) inside a
+    // scroll box sized to show 5 at a time - same scroll pattern Home's own
+    // result table uses (preset-editor.js's preset-preview-scroll-live) -
+    // plus a caption so confirming "does this look right" is never silently
+    // vouching for rows that were never shown at all.
     $('#confirm-a-preview').innerHTML = `
-      <table class="txn-table map-table">
-        <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
-        <tbody>${preview.map((r) => `<tr>
-          <td>${escapeHtml(r.date ?? r.date_raw ?? '')}</td>
-          <td>${escapeHtml(r.description_raw ?? '')}</td>
-          <td class="num ${r.amount < 0 ? 'amount-out' : 'amount-in'}">${escapeHtml(formatMinorDisplay(r.amount, r.currency))}</td>
-        </tr>`).join('')}</tbody>
-      </table>`;
+      <div class="preset-preview-scroll preset-preview-scroll-live" style="--preview-rows:5;" tabindex="0" role="region" aria-label="Transaction preview, scroll for more rows">
+        <table class="txn-table map-table">
+          <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+          <tbody>${rows.map((r) => `<tr>
+            <td>${escapeHtml(r.date ?? r.date_raw ?? '')}</td>
+            <td>${escapeHtml(r.description_raw ?? '')}</td>
+            <td class="num ${r.amount < 0 ? 'amount-out' : 'amount-in'}">${escapeHtml(formatMinorDisplay(r.amount, r.currency))}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <p class="pdf-anchor-hint">${rows.length > 5 ? `Showing 5 of ${rows.length}. Scroll to see all.` : `All ${rows.length} row${rows.length === 1 ? '' : 's'}.`}</p>`;
     const yesBtn = $('#confirm-yes');
     const offBtn = $('#confirm-off');
     let notice = $('#confirm-a-notice');
@@ -671,6 +688,7 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
   function renderConfirmC() {
     const input = $('#confirm-name');
     if (input) input.value = state.updateProfile ? (state.updateProfile.name || '') : suggestedProfileName();
+    if ($('#confirm-name-fmt')) $('#confirm-name-fmt').textContent = fmtLabel();
     showConfirmScreen('c');
   }
 
@@ -1496,10 +1514,6 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
       if (value === selectedValue) opt.selected = true;
       select.appendChild(opt);
     }
-    const idCap = document.createElement('span');
-    idCap.className = 'field-id-cap';
-    const updateCap = () => { idCap.textContent = m.field ? m.field.replace('extra:', 'extra_') : ''; };
-    updateCap();
     select.addEventListener('change', () => {
       if (select.value === '__keep__') {
         m.field = `extra:${slugify(m.source)}`;
@@ -1512,10 +1526,9 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
         m.field = select.value;
         delete m.customName;
       }
-      updateCap();
       onChanged?.();
     });
-    td3.append(select, idCap);
+    td3.append(select);
     tr.append(td1, td2, td3);
     tbody.appendChild(tr);
   }
@@ -2111,7 +2124,7 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
       catch { /* clipboard denied - the log stays visible via Download in Settings */ }
     });
     $('#w-error-report')?.addEventListener('click', () => onOpenReport?.(state.entry));
-    $('#w-error-back')?.addEventListener('click', () => $('#wizard-back-btn')?.click());
+    $('#w-error-back')?.addEventListener('click', () => onBack?.());
   }
 
   function renderLivePreview() {
@@ -2485,6 +2498,15 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
       // silently redone by Home's own flag-based badge on the same file.
       entry.rows = applyTestResolutions(rows, state.testResolutions);
       entry.profile = profile;
+      // Item 8: pre-save, entry.accountLabel (when set at all) is just a bare
+      // masked account number with no bank name - fine as a rough preview,
+      // but a first-timer coming off Save must see "<Bank> <type> ****1234",
+      // not the number alone with the filename simply gone. Re-derive it now
+      // that the profile (and its bank/statement type) actually exists;
+      // home.js's file-row render fades old -> new text over 300ms whenever
+      // this value visibly changes, so it reads as a rename, not a swap.
+      const maskedOnly = entry.accountLabel && /^\*{4}\d{4}$/.test(entry.accountLabel) ? entry.accountLabel : null;
+      entry.accountLabel = defaultAccountLabel(profile, maskedOnly);
       // A saved mapping always supersedes an earlier "no candidate profile
       // could read this" outcome (item A) or a failed "Use an existing
       // profile" pick (item 13) - this file just got its own real mapping.
@@ -2556,8 +2578,6 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
     const step = state.step;
     const backBtn = $('#wizard-back');
     const nextBtn = $('#wizard-next');
-    const nameEl = $('#wizard-footer-stepname');
-    if (nameEl) nameEl.textContent = STEP_META[step].label;
     if (backBtn) {
       backBtn.hidden = step === 0;
       backBtn.textContent = step > 0 ? `Back: ${STEP_META[step - 1].label}` : '';

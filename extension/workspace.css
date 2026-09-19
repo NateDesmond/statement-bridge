@@ -204,6 +204,10 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
 .dropzone strong{font-size:15px;display:block;margin-bottom:4px;}
 .dropzone p{margin:0 0 14px;font-size:13px;color:var(--ink-dim);}
 
+/* Item 5: the restore prompt is a quiet inline line, never a full-weight
+   card competing with the drop zone below it. */
+.restore-quiet-line{margin:0 0 14px;font-size:13px;color:var(--ink-dim);display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+
 /* Item 3: the empty-state hero - a giant, unmissable drop target, one line
    of copy, one giant "Choose files" button. */
 .dropzone-hero{
@@ -284,10 +288,16 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
 }
 .decision-snippet canvas{display:block;}
 .decision-snippet-text{
-  padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
-  font-size:13px;color:#333;line-height:1.5;
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  padding:8px 10px;font-size:13px;color:#333;line-height:1.4;
+  display:flex;flex-direction:column;gap:3px;overflow:hidden;
   word-break:break-word;text-align:left;
+}
+/* Item 17: quiet label above the raw source line - a CSV decision card's
+   monospace chip is never unlabeled again. */
+.decision-snippet-label{font-family:inherit;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);}
+.decision-snippet-line{
+  font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
 }
 .decision-body{flex:1;min-width:220px;}
 .decision-body .db-txn{font-size:13.5px;font-weight:600;margin-bottom:2px;}
@@ -739,7 +749,14 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .confirm-choice-tile:hover{border-color:var(--brass);background:#faf6ec;}
 .confirm-name-input{
   font:inherit;font-size:16px;padding:12px 14px;border-radius:var(--radius);border:1.5px solid var(--paper-line);
-  width:100%;max-width:340px;text-align:center;margin:16px auto 0;display:block;
+  width:100%;max-width:340px;text-align:center;
+}
+/* Item 9: the file-format tag sits beside the name field instead of being
+   folded into the name itself ("Generic savings, CSV" read like taxonomy). */
+.name-input-row{display:flex;align-items:center;justify-content:center;gap:8px;margin:16px auto 0;}
+.fmt-tag{
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);
+  background:var(--paper);border:1px solid var(--paper-line);border-radius:5px;padding:3px 6px;flex-shrink:0;
 }
 #confirm-focus-host{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;text-align:left;}
 #confirm-focus-host > #csv-header-picker,#confirm-focus-host > #pdf-anchor-picker{width:100%;}
@@ -756,6 +773,11 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .row-resolve-actions .rs-link{color:var(--ink-dim);text-decoration:underline;cursor:pointer;background:none;border:none;font:inherit;padding:0;}
 .signatures-human{list-style:none;margin:0 0 12px;padding:0;font-size:12.5px;}
 .signatures-human li{padding:6px 0;border-bottom:1px solid #f0ede2;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+
+/* Item 15: the Report sheet's plain-language "What will be sent" bullets. */
+.report-summary-list{list-style:none;margin:0 0 10px;padding:0;font-size:13px;color:var(--ink);}
+.report-summary-list li{padding:4px 0;}
+#report-raw-details summary{cursor:pointer;margin-bottom:4px;}
 
 /* Locate-data page navigation (Fix 1) */
 .pdf-page-nav{display:flex;align-items:center;gap:10px;margin:8px 0;}
@@ -882,6 +904,10 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 }
 .file-row .fr-main{flex:1;min-width:0;}
 .file-row .fr-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;}
+/* Item 8: the row label fades in over 300ms the one time it changes from the
+   filename to the saved account label, so it reads as a rename. */
+.file-row .fr-name.fr-name-renamed{animation:fr-name-fade .3s ease;}
+@keyframes fr-name-fade{from{opacity:.1;}to{opacity:1;}}
 .file-row .fr-line{font-size:12px;color:var(--ink-dim);margin-top:2px;}
 /* Fix item 1: the row's status is plain text, not a coloured pill - drop
    .badge's chip chrome here only (Profiles/Settings/Review keep their own
@@ -960,11 +986,16 @@ table.accounts-table .mr-count-zero{color:var(--ink-dim);font-style:italic;}
 .rate-table input{font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:5px;border:1px solid var(--paper-line);width:90px;}
 
 
+/* Item 6: anchored above the "Report a problem" pill (bottom:20px, ~38px
+   tall) so the two fixed bottom elements never collide, and capped to the
+   same content width main/.undo-bar are bounded to (1040px minus main's own
+   side padding) instead of stretching arbitrarily wide - never wide enough,
+   or low enough, to sit on top of a result-table row. */
 .home-toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+  position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--ink-900);color:var(--ink-text);padding:10px 20px;border-radius:var(--radius);
-  font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.25);opacity:0;transition:opacity .15s ease, transform .15s ease;
-  z-index:50;
+  font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.28);opacity:0;transition:opacity .15s ease, transform .15s ease;
+  z-index:50;max-width:984px;width:max-content;
 }
 .home-toast.shown{opacity:1;transform:translateX(-50%) translateY(0);}
 .home-toast a{color:inherit;text-decoration:underline;font-weight:600;margin-left:4px;cursor:pointer;}

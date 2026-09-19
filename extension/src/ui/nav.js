@@ -10,10 +10,11 @@ import { computeStorageSplit, storageMeterText, storageContextNote } from './sto
 const $ = (sel) => document.querySelector(sel);
 
 // Screens reachable only through the gear menu (never shown a "Back" control
-// of their own here) - home has nothing to go back to, and the wizard keeps
-// its own dedicated back button (app.js wires #wizard-back-btn to whichever
-// screen opened it, not always Home).
-const NO_SHELL_BACK = new Set(['home', 'wizard']);
+// of their own here) - home has nothing to go back to. The wizard shows the
+// shared header Back control like every other screen (item 16); app.js
+// registers a back handler that routes it to whichever screen opened the
+// wizard, not always Home.
+const NO_SHELL_BACK = new Set(['home']);
 
 /**
  * Item A2: one shared `#sr-status` (role="status", aria-live="polite") lives

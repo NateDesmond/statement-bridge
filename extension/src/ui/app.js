@@ -116,6 +116,19 @@ const wizard = createWizard({
     nav.renderStorageMeter({ storage, sessionStore });
   },
   onOpenReport: (entry) => openReport(entry?.name),
+  onBack: () => nav.showScreen(wizardReturnScreen),
+});
+
+// Item 16: the wizard's own "Back to files" is now the shared header Back
+// control (like every other screen) instead of a full-width in-page button -
+// consume Back here first so it returns to wherever the wizard was opened
+// from (wizardReturnScreen), not just history.
+registerBackHandler(() => {
+  if (document.getElementById('screen-wizard').classList.contains('active')) {
+    nav.showScreen(wizardReturnScreen);
+    return true;
+  }
+  return false;
 });
 
 const report = createReportScreen({
@@ -131,11 +144,10 @@ async function init() {
   settings.wire();
   wizard.wire();
   report.wire();
-  document.getElementById('wizard-back-btn').addEventListener('click', () => nav.showScreen(wizardReturnScreen));
   // Simple B: the sidebar's own "How it works" lock-indicator link is gone -
   // its gear-menu tile (data-screen="how") is wired generically by nav.js's
-  // wireGearMenu instead. The How screen's own Back button stays.
-  document.getElementById('how-back-btn').addEventListener('click', () => nav.showScreen('home'));
+  // wireGearMenu instead. Item 14: How it works no longer has its own
+  // in-page Back button - the shared header Back control is the only one.
   // Item C: "Show the welcome tour again" - Settings and How it works both
   // reopen the same first-run onboarding tab background.js opens on install.
   const openTour = () => chrome.tabs.create({ url: chrome.runtime.getURL('onboarding/onboarding.html') });

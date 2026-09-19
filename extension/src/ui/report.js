@@ -46,6 +46,27 @@ export function createReportScreen({ getFiles }) {
     });
   }
 
+  // Item 15: a plain-language summary is what shows by default - the exact
+  // JSON "Copy report" will put on the clipboard is still right there,
+  // verifiable, just behind a "Show the exact report" disclosure instead of
+  // being the first thing every user sees.
+  function renderSummaryList(r) {
+    const list = $('#report-summary-list');
+    if (!list) return;
+    const items = [
+      r.whatHappened.trim() ? 'Your message' : 'No message written yet',
+      r.fileName ? `File: ${r.fileName}` : 'No file selected',
+      r.logIncluded ? `Debug log included, ${(r.log || []).length} entries` : 'No debug log included',
+      `Extension version ${r.extensionVersion}`,
+    ];
+    list.innerHTML = '';
+    for (const text of items) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      list.appendChild(li);
+    }
+  }
+
   // The exact JSON that "Copy report" will put on the clipboard, shown
   // before the user ever clicks - the anonymisation is verifiable, not
   // just asserted.
@@ -53,6 +74,7 @@ export function createReportScreen({ getFiles }) {
     const r = currentReport();
     $('#report-preview').textContent = reportToJson(r);
     $('#report-log-summary').textContent = includeLog() ? r.logNote : 'No debug log will be included.';
+    renderSummaryList(r);
   }
 
   async function copyReport() {

@@ -64,6 +64,18 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   let dedupeNotice = null; // { removed: [], accountLabel } for the merged/Undo card
   let restorePending = false;
   let profilesCache = []; // for the preset editor's extra_* column discovery; refreshed on drawer open
+  // Item 12: whether "Use a statement type I already set up" has anywhere
+  // useful to go. loadProfiles() always includes the app's own seeded
+  // built-in bank profiles (Meridian, Northwind, ...) even before a user has
+  // ever saved one themselves - "I already set up" means the user's own, so
+  // built-ins (id starts with "builtin-") don't count. Always 0 for a
+  // first-time user with no saved statement type of their own.
+  let savedProfileCount = 0;
+  async function refreshSavedProfileCount() {
+    const profiles = await loadProfiles(storage).catch(() => []);
+    savedProfileCount = profiles.filter((p) => !p.id?.startsWith('builtin-')).length;
+    renderAttentionCards();
+  }
   let lastExportCompositionKey = null; // dedupes the "export composition" debug log line (see renderExportPanel)
 
   // --- Worker (CSV/XLSX parse off the main thread; item 4) -----------------
@@ -236,6 +248,15 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
 
   async function handleFiles(fileList) {
     const files = [...fileList];
+    // Item 5: "Restore your last statements?" is a dead question the moment
+    // any new file is dropped - the person has already answered it by
+    // acting, so the banner (and the restore-session offer behind it) goes
+    // away instead of sitting next to a session it no longer describes.
+    if (files.length) {
+      restorePending = null;
+      const banner = $('#restore-banner');
+      if (banner) banner.hidden = true;
+    }
     const batchWarnings = checkBatchSize(state.files.length + files.length, 0);
     $('#batch-warning').textContent = batchWarnings.join(' ');
     $('#batch-warning').hidden = !batchWarnings.length;
@@ -831,7 +852,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   async function runOcrOnFile(entry) {
     entry.processing = true;
     entry.progress = 0;
-    entry.progressLabel = 'Reading with text recognition…';
+    // Item 11: shown the instant OCR starts (renderAll below runs before the
+    // first onProgress tick even knows the page count) - a first-timer
+    // dropping a scanned PDF from the setup path sees this immediately
+    // instead of a silent gap that could read as "did this stall?".
+    entry.progressLabel = 'Reading your scan…';
     entry.ocrRunning = true;
     entry.ocrFailed = false;
     entry.ocrCancelled = false;
@@ -854,7 +879,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
           entry.progress = total ? done / total : 0;
           const avgMs = pageTimingsMs.length ? pageTimingsMs.reduce((a, b) => a + b, 0) / pageTimingsMs.length : null;
           const estimate = ocrTimeEstimateLabel(done, total, avgMs);
-          entry.progressLabel = `Read ${done} of ${total} pages with text recognition${estimate ? ` &middot; ${estimate}` : ''}`;
+          entry.progressLabel = `Reading page ${done} of ${total}${estimate ? ` &middot; ${estimate}` : ''}`;
           renderFileRows();
         },
         onPage: (pageResult, pagesSoFar, total) => {
@@ -1495,6 +1520,16 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         // that used to read the old badge text/profile name - nothing here
         // is rendered as visible text.
         const displayName = entry.accountLabel || entry.profile?.name || entry.name;
+        // Item 8: the row's label can change once (filename -> account label)
+        // right after Save - fade it in over 300ms so it reads as a rename,
+        // never a silent swap, and never on every render (only when the text
+        // just changed since the last one).
+        const renamed = entry._prevDisplayName != null && entry._prevDisplayName !== displayName;
+        entry._prevDisplayName = displayName;
+        // The original file name stays visible as a quiet caption whenever
+        // the label is no longer just the filename, so "where did my file
+        // go" never has to be asked.
+        const sourceNameCaption = displayName !== entry.name ? `<div class="fr-caption">${escapeHtml(entry.name)}</div>` : '';
         const statusText = flagged ? 'Needs a quick look' : `Done, ${rowCount} transaction${rowCount === 1 ? '' : 's'}`;
         row.dataset.profileName = entry.profile?.name || '';
         row.dataset.fileType = normalizedFileType(entry);
@@ -1544,7 +1579,8 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         const statusHref = flagged ? ' href="#"' : '';
         row.innerHTML = `
           <div class="fr-main">
-            <div class="fr-name">${escapeHtml(displayName)}</div>
+            <div class="fr-name${renamed ? ' fr-name-renamed' : ''}">${escapeHtml(displayName)}</div>
+            ${sourceNameCaption}
             <div class="fr-line"><${statusTag} class="badge badge-${badge.tone}"${statusHref}>${escapeHtml(statusText)}</${statusTag}>${updateMappingLink}</div>
             ${ocrCaption}
             ${mergedCaption}
@@ -1817,7 +1853,12 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // almost always last in a bank export) stays visible instead of getting
     // clipped off the bottom of the 2-line box.
     const MAX_CHARS = 90;
-    container.textContent = line.length > MAX_CHARS ? `${line.slice(0, MAX_CHARS - 20)} … ${line.slice(-17)}` : (line || 'Source line not available.');
+    const shown = line.length > MAX_CHARS ? `${line.slice(0, MAX_CHARS - 20)} … ${line.slice(-17)}` : (line || 'Source line not available.');
+    // Item 17: labeled, not a bare monospace dump - "From your file:" makes
+    // clear this is the row's own source text, not a debug artifact.
+    container.innerHTML = line
+      ? `<span class="decision-snippet-label">From your file:</span><span class="decision-snippet-line">${escapeHtml(shown)}</span>`
+      : escapeHtml(shown);
   }
 
   function resolveDecisionRow(file, row, nextRow, announcement) {
@@ -1919,7 +1960,9 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         <div class="fc-actions"></div>`;
       const actions = el.querySelector('.fc-actions');
       actions.appendChild(mkBtn('btn-brass', 'Set up', () => onOpenWizard(entry)));
-      appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
+      // Item 12: dead weight on a first run with zero saved profiles - there is nowhere for
+      // it to go with zero saved statement types.
+      if (savedProfileCount > 0) appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
     } else if (card.kind === 'layoutChanged') {
       el.className = 'file-card';
       el.innerHTML = `<div class="fc-name">Layout changed</div>
@@ -1945,13 +1988,14 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         <div class="fc-actions"></div>`;
       const actions = el.querySelector('.fc-actions');
       actions.appendChild(mkBtn('btn-brass', 'Set up again', () => onOpenWizard(entry)));
-      appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
+      if (savedProfileCount > 0) appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
       appendSecondaryLink(actions, 'Report a problem', () => onOpenReport?.(entry));
     } else if (card.kind === 'lowConfidence') {
+      // Item 13: no raw confidence number in front of a non-technical user -
+      // plain words carry the same "this isn't certain" signal.
       el.className = 'file-card';
-      const pct = Math.round(card.confidence * 100);
       el.innerHTML = `<div class="fc-name">Confirm statement type</div>
-        <p class="fc-body">"${card.name}" looks like ${card.profileName} (${pct}% match).</p>
+        <p class="fc-body">This looks like ${card.profileName}, with a small difference. Use it?</p>
         <div class="fc-actions"></div>`;
       const actions = el.querySelector('.fc-actions');
       actions.appendChild(mkBtn('btn-brass', 'Confirm', () => applyMatchToFile(entry, entry.matches[0])));
@@ -2107,6 +2151,22 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     downloadBtn.disabled = readiness.blocked && rows.length === 0;
     $('#export-blocked-note').textContent = readiness.blocked ? readiness.reasons.join('; ') : '';
     $('#export-warn-note').textContent = warnings.length ? warnings.join('; ') : '';
+
+    // Item 4: while any decision row (the "N rows need a quick look" list)
+    // is still unresolved, the headline softens to "Almost ready" and Copy
+    // stays clickable but secondary-weighted - never a flat "ready" claim
+    // next to a card that's simultaneously asking for a decision. The moment
+    // every row is resolved this flips back to the plain ready state.
+    const pendingDecisions = flaggedDecisionRows(state.files).length;
+    const headingEl = $('#export-heading');
+    const pendingNoteEl = $('#export-pending-note');
+    if (headingEl) headingEl.textContent = pendingDecisions ? 'Almost ready' : 'Your transactions are ready.';
+    if (pendingNoteEl) {
+      pendingNoteEl.hidden = !pendingDecisions;
+      if (pendingDecisions) pendingNoteEl.textContent = `Resolve ${pendingDecisions} row${pendingDecisions === 1 ? '' : 's'} below, or copy now and check later.`;
+    }
+    copyBtn.classList.toggle('btn-brass', !pendingDecisions);
+    copyBtn.classList.toggle('btn-ghost', !!pendingDecisions);
 
     renderResultTable();
     renderDrawer();
@@ -2554,6 +2614,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // drawer as the result card's own quiet link, just from outside it.
     $('#tile-export')?.addEventListener('click', () => { closeGearMenu(); drawerOpen = true; renderDrawer(); });
     loadPrefs().then(() => { checkRestore(); renderAll(); });
+    refreshSavedProfileCount();
   }
 
   // persistSession: exposed so Review can autosave a row resolution (confirm/
@@ -2569,6 +2630,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     mergeDuplicates();
     renderAll();
     autosave();
+    refreshSavedProfileCount(); // a first-ever Save just created the first profile - the link can now appear
   }
 
   return { render, wire, renderFileCards: renderFileRows, renderExportPanel, undoDedupe, onMappingSaved, persistSession: autosave, removeFile };
