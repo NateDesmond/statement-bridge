@@ -135,7 +135,7 @@ export function selectMatchCandidate(matches, dateLedLineCount, buildRows) {
  */
 export function fileStatus(entry) {
   if (entry.error) return 'error';
-  if (entry.processing) return 'processing';
+  if (entry.processing || entry.ocrRunning) return 'processing';
   // An image-only PDF starts OCR automatically (no question asked), so this
   // state is normally instantaneous ('processing' takes over within the same
   // tick). ocrFailed/ocrCancelled are the only two ways OCR ends up needing
@@ -462,7 +462,14 @@ export function exportReadiness(files, { missingRatePairs = [], rowCountInRange 
   if (!hasHealthyFile) reasons.push('No file has been mapped yet');
   if (missingRatePairs.length) reasons.push(`Missing exchange rate for ${missingRatePairs.join(', ')}`);
   if (rowCountInRange === 0) reasons.push('No rows in the selected date range');
-  return { blocked: reasons.length > 0, reasons, hasHealthyFile, notIncluded };
+  // A statement still being read must never let a partial count pose as the
+  // final one: hold Copy until every file has finished (partial copy stays
+  // available through its own explicit link on the processing row).
+  const processing = files.filter((f) => ['processing', 'ocrQueued', 'imageOnly'].includes(fileStatus(f))).length;
+  if (processing > 0 && hasHealthyFile) {
+    reasons.push(`Reading ${processing} of ${files.length} statement${files.length === 1 ? '' : 's'}, ${rowCountInRange} rows so far`);
+  }
+  return { blocked: reasons.length > 0, reasons, hasHealthyFile, notIncluded, processing };
 }
 
 /**

@@ -983,3 +983,7 @@ table.accounts-table .mr-count-zero{color:var(--ink-dim);font-style:italic;}
 .reading p{margin:0 0 4px;font-size:13.5px;color:var(--ink);}
 .reading .password-note{margin-top:22px;padding:12px 14px;background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius);font-size:13px;color:var(--ink-dim);}
 .first-run-how-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-size:12.5px;cursor:pointer;padding:0;margin-top:10px;}
+
+/* Confirm-first notice (blank required column) */
+.confirm-notice { margin: 12px 0 0; padding: 10px 14px; border-radius: 6px; background: #fbf3e2; color: #6b4e12; font-size: 14px; }
+.confirm-notice[hidden] { display: none; }

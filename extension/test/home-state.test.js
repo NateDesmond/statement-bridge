@@ -210,7 +210,7 @@ test('attentionCards respects dismissal flags', () => {
 
 test('exportReadiness never blocks on an unmapped/failed file, only on zero rows, missing rate, or no healthy file', () => {
   const healthy = [{ rows: [row()] }];
-  assert.deepEqual(exportReadiness(healthy, { rowCountInRange: 5 }), { blocked: false, reasons: [], hasHealthyFile: true, notIncluded: 0 });
+  assert.deepEqual(exportReadiness(healthy, { rowCountInRange: 5 }), { blocked: false, reasons: [], hasHealthyFile: true, notIncluded: 0, processing: 0 });
 
   // An unmapped file alongside a healthy one does not block; it's just not included.
   const withUnmapped = [{ rows: [row()] }, { matches: [] }];
@@ -531,4 +531,14 @@ test('summarizeExtraction: counts valid/missing-amount/unparseable-date rows, sk
   assert.equal(summary.missingAmountRows, 1);
   assert.equal(summary.unparseableDateRows, 1);
   assert.ok(summary.at);
+});
+
+test('exportReadiness holds Copy while any statement is still being read (returner defect, pass 1)', () => {
+  const files = [
+    { id: 'a', rows: [{ date: '2026-06-01', amount: -100 }, { date: '2026-06-02', amount: -200 }, { date: '2026-06-03', amount: 300 }], rowCountAtMatch: 3, matchedVersion: {} },
+    { id: 'b', processing: true, rows: [] },
+  ];
+  const r = exportReadiness(files, { rowCountInRange: 3 });
+  assert.equal(r.blocked, true);
+  assert.match(r.reasons.join(' '), /Reading 1 of 2 statements, 3 rows so far/);
 });

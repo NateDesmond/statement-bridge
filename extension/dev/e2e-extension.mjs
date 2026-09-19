@@ -20,6 +20,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { assertCleanLog } from './lib/assert-clean-log.mjs';
 
+let checkFailures = 0;
+function check(label, ok, detail) {
+  console.log(`${ok ? 'PASS' : 'FAIL'} - ${label}${detail ? ` (${detail})` : ''}`);
+  if (!ok) checkFailures++;
+}
+
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(__dirname, '..');
 const shotsDir = path.join(__dirname, 'shots');
@@ -411,14 +418,24 @@ async function runConfirmYesGenericBankScenario() {
   console.log('1. drop the fixture, land on Screen A...');
   await dropAndOpenWizard(page, fixture);
   await shotStep('01-confirm-a');
+  const cells = await page.$$eval('#confirm-a-preview tbody tr', (trs) => trs.map((tr) => Array.from(tr.querySelectorAll('td')).map((td) => td.textContent.trim())));
+  check('Screen A shows at least 3 preview rows', cells.length >= 3, `rows=${cells.length}`);
+  check('Screen A preview has a date on every row', cells.length > 0 && cells.every((c) => /\d{4}-\d{2}-\d{2}|\d{1,2}[\/ -]/.test(c[0] || '')), JSON.stringify(cells.map((c) => c[0])));
+  check('Screen A preview has a description on every row', cells.length > 0 && cells.every((c) => (c[1] || '').length > 0), JSON.stringify(cells.map((c) => c[1])));
+  const yesDisabled = await page.$eval('#confirm-yes', (b) => b.disabled);
+  check('Yes is enabled only when the preview is complete', !yesDisabled, `disabled=${yesDisabled}`);
 
   console.log('2. Yes, looks right -> Screen C -> Save and finish...');
   await page.click('#confirm-yes');
   await page.waitForTimeout(200);
   await shotStep('02-confirm-c');
   await page.click('#confirm-save');
-  await page.waitForTimeout(800);
+  await page.waitForFunction(() => /Done, \d+ transactions/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
   await shotStep('03-home-after-save');
+  const bodyText = await page.evaluate(() => document.body.innerText);
+  const done = bodyText.match(/Done, (\d+) transactions/);
+  check('Home shows the saved file as done with a row count', !!done && Number(done[1]) >= 3, done ? done[0] : 'no "Done, N transactions" on Home');
+  check('Home does not show a could-not-read-dates state for the saved file', !/Could not read dates/i.test(bodyText), /Could not read dates/i.test(bodyText) ? 'found "Could not read dates"' : '');
 
   const cleanLog = await assertCleanLog(page, 'confirm-first Yes path (confirmyes)', pageErrors);
   await context.close();
@@ -519,6 +536,45 @@ async function runConfirmRowsBranchScenario() {
  * image-only PDFs"), so by the time the wizard opens Screen A's preview
  * already reflects the OCR'd text.
  */
+
+async function runFirstTimerUnknownPdfScenario() {
+  console.log('\n=== scenario: first-timer, unknown-bank image PDF, primary prompts only (prefix firsttimerpdf) ===');
+  const { context, page, pageErrors } = await launchExtensionContext();
+  const shotStep = shotter(page, 'firsttimerpdf');
+  const fixture = path.join(extensionPath, 'test', 'fixtures', 'summit_grouped_2line_image.pdf');
+  try {
+    console.log('1. drop the unknown image PDF, wait for reading, Set up...');
+    await dropAndOpenWizard(page, fixture);
+    await shotStep('01-after-setup-click');
+    const onConfirmA = await page.isVisible('#confirm-a').catch(() => false);
+    check('unknown image PDF lands on the confirm-first screen, not the bare wizard', onConfirmA, `confirm-a visible=${onConfirmA}`);
+    if (onConfirmA) {
+      const cells = await page.$$eval('#confirm-a-preview tbody tr', (trs) => trs.map((tr) => Array.from(tr.querySelectorAll('td')).map((td) => td.textContent.trim())));
+      check('Screen A has dated rows with descriptions', cells.length >= 3 && cells.every((c) => c[0] && c[1]), JSON.stringify(cells.slice(0, 3)));
+      const yesDisabled = await page.$eval('#confirm-yes', (b) => b.disabled);
+      check('Yes is enabled', !yesDisabled, `disabled=${yesDisabled}`);
+      await page.click('#confirm-yes');
+      await page.waitForTimeout(200);
+      await shotStep('02-confirm-c');
+      const bank = await page.$eval('#confirm-name', (el) => el.value).catch(() => '');
+      check('statement name is prefilled', bank.trim().length > 0, `name="${bank}"`);
+      await page.click('#confirm-save');
+      await page.waitForFunction(() => /Done, \d+ transactions/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
+      await shotStep('03-home-after-save');
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      const done = bodyText.match(/Done, (\d+) transactions/);
+      check('Home shows the saved image PDF as done with a row count', !!done && Number(done[1]) >= 10, done ? done[0] : 'no Done line');
+      check('Copy to Google Sheets is available', await page.$eval('#copy-tsv-btn', (b) => !b.disabled).catch(() => false), '');
+    } else {
+      await shotStep('02-wherever-it-landed');
+    }
+    const cleanLog = await assertCleanLog(page, 'first-timer unknown image PDF (firsttimerpdf)', pageErrors);
+    if (!cleanLog.ok) throw new Error(`firsttimerpdf scenario: ${cleanLog.problems.join('; ')}`);
+  } finally {
+    await context.close();
+  }
+}
+
 async function runConfirmOcrYesScenario() {
   console.log('\n=== scenario: confirm-first Yes path, OCR image-only PDF (prefix confirmocr) ===');
   const { context, page, pageErrors } = await launchExtensionContext();
@@ -651,17 +707,27 @@ async function runManualRangeScenario() {
   // but wrong preview (Description holding the dates, no real Date column) -
   // this is exactly the case "Something's off" -> "Rows are missing or
   // extra" exists for, not the separate zero-rows fallback.
-  await shotBothWidths('range', page, '01-confirm-a-wrong');
-  const wrongPreview = await page.textContent('#confirm-a-preview');
-  if (!/01\/06\/2026/.test(wrongPreview) || !/DATE/.test(wrongPreview.toUpperCase())) {
-    throw new Error(`range scenario: expected the wrong-header preview to show a date under Description, got: ${wrongPreview}`);
+  await shotBothWidths('range', page, '01-after-setup');
+  // The completeness gate must NOT let a mis-detected header reach "Does this
+  // look right?" with blank dates: it routes straight to the grid with an
+  // explanation. Accept either route into the grid.
+  const onConfirmA = await page.isVisible('#confirm-a').catch(() => false);
+  if (onConfirmA) {
+    const wrongPreview = await page.textContent('#confirm-a-preview');
+    const cells = await page.$$eval('#confirm-a-preview tbody tr td:first-child', (tds) => tds.map((td) => td.textContent.trim()));
+    check('Screen A is only shown when dates were detected', cells.every((c) => /\d/.test(c)), JSON.stringify(cells));
+    console.log('2. Something\'s off -> Rows are missing or extra -> the real Locate-data grid...');
+    await page.click('#confirm-off');
+    await page.waitForTimeout(200);
+    await page.click('#confirm-fix-rows');
+    await page.waitForSelector('#confirm-focus:not([hidden]), #wizard-steps:not([hidden])', { timeout: 10000 });
+    void wrongPreview;
+  } else {
+    console.log('2. routed straight to the grid (dates were not detected)...');
+    await page.waitForSelector('#w-rawgrid', { timeout: 10000 });
+    const intro = await page.$eval('#wizard-step-intro', (el) => (el.hidden ? '' : el.textContent)).catch(() => '');
+    check('grid route explains itself', /could not (tell|find)|not sure/i.test(intro), intro);
   }
-
-  console.log('2. Something\'s off -> Rows are missing or extra -> the real Locate-data grid...');
-  await page.click('#confirm-off');
-  await page.waitForTimeout(200);
-  await page.click('#confirm-fix-rows');
-  await page.waitForSelector('#confirm-focus:not([hidden])', { timeout: 10000 });
   await shotBothWidths('range', page, '02-locate-wrong-guess');
 
   console.log('3. click the real header row (row 9) in the grid...');
@@ -677,20 +743,31 @@ async function runManualRangeScenario() {
   const excludedNote = await page.textContent('#w-rawgrid tbody tr:nth-child(12)').catch(() => '');
   console.log('   footer row struck through:', /Note/.test(excludedNote || ''));
 
-  console.log('5. Done -> back to Screen A, confirm the fix produced the real 2 rows...');
-  await page.click('#confirm-focus-done');
-  await page.waitForTimeout(200);
-  await shotStep('05-confirm-a-fixed');
-  const fixedPreview = await page.textContent('#confirm-a-preview');
-  if (!/Coffee/.test(fixedPreview) || !/Salary/.test(fixedPreview) || /Note|Printed/.test(fixedPreview)) {
-    throw new Error(`range scenario: expected the fixed preview to show Coffee/Salary and no footer rows, got: ${fixedPreview}`);
+  if (onConfirmA) {
+    console.log('5. Done -> back to Screen A, confirm the fix produced the real 2 rows...');
+    await page.click('#confirm-focus-done');
+    await page.waitForTimeout(200);
+    await shotStep('05-confirm-a-fixed');
+    const fixedPreview = await page.textContent('#confirm-a-preview');
+    check('fixed preview shows Coffee and Salary and no footer rows', /Coffee/.test(fixedPreview) && /Salary/.test(fixedPreview) && !/Note|Printed/.test(fixedPreview), fixedPreview.slice(0, 120));
+    console.log('6. Yes, looks right -> Save and finish...');
+    await page.click('#confirm-yes');
+    await page.waitForTimeout(200);
+    await shotStep('06-confirm-c');
+    await page.click('#confirm-save');
+  } else {
+    console.log('5. Continue through Map fields and Test to Save on the detailed route...');
+    for (let i = 0; i < 4; i++) {
+      const label = await page.textContent('#wizard-next').catch(() => '');
+      await page.click('#wizard-next');
+      await page.waitForTimeout(300);
+      if (/Save and finish/.test(label)) break;
+    }
+    await shotStep('05-detailed-route-test');
+    const testText = await page.textContent('#wizard-steps').catch(() => '');
+    check('detailed route reaches Save with the real rows', /Coffee/.test(testText) && /Salary/.test(testText), testText.slice(0, 120));
+    if (await page.isVisible('#wizard-next')) await page.click('#wizard-next').catch(() => {});
   }
-
-  console.log('6. Yes, looks right -> Save and finish...');
-  await page.click('#confirm-yes');
-  await page.waitForTimeout(200);
-  await shotStep('06-confirm-c');
-  await page.click('#confirm-save');
   await page.waitForTimeout(800);
   await shotStep('07-home-after-save');
 
@@ -718,6 +795,7 @@ const SCENARIOS = {
   confirmupdate: runConfirmUpdateMappingScenario,
   confirmrows: runConfirmRowsBranchScenario,
   confirmocr: runConfirmOcrYesScenario,
+  firsttimerpdf: runFirstTimerUnknownPdfScenario,
   setup: runConfirmScreensGalleryScenario,
   range: runManualRangeScenario,
 };
@@ -732,4 +810,4 @@ async function main() {
   console.log('\ndone. screenshots in', shotsDir);
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().then(() => { if (checkFailures) { console.error(`${checkFailures} check(s) failed`); process.exit(1); } }).catch((err) => { console.error(err); process.exit(1); });

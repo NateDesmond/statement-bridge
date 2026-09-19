@@ -380,6 +380,14 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
    * file" fields end up reflecting the file's actual content, not just its
    * name.
    */
+  /** Title-cased first word of the file name (letters only), so the Bank field is never empty; "My bank" when the name has no letters. */
+  function bankNameFromFilename(name) {
+    const m = String(name || '').replace(/\.[^.]+$/, '').match(/[A-Za-z]+/);
+    if (!m) return 'My bank';
+    const w = m[0];
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }
+
   function refreshBasics(text) {
     state.basics = state.updateProfile
       ? { bank: state.updateProfile.bank || '', statementType: state.updateProfile.statementType || 'savings', currency: state.updateProfile.defaultCurrency || '', suggested: {} }
@@ -590,9 +598,29 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
    * underneath it changes (a Locate/format fix via Screen B, coming back
    * from the focus screen) - never a snapshot taken once at open().
    */
+  /** Share of rows with a usable value for a field; the confirm screen must never invite a Yes on a mostly-empty column. */
+  function fieldFill(rows, pick) {
+    if (!rows.length) return 0;
+    return rows.filter((r) => pick(r) != null && String(pick(r)).trim() !== '').length / rows.length;
+  }
+
   function renderConfirmA() {
     const rows = tryComputeConfirmRows();
     if (!rows.length) { enterConfirmOrWizard(); return; }
+    const dateFill = fieldFill(rows, (r) => r.date);
+    const amountFill = fieldFill(rows, (r) => (r.amount == null ? null : String(r.amount)));
+    const descFill = fieldFill(rows, (r) => r.description_raw);
+    if (dateFill < 0.5 || amountFill < 0.5) {
+      // Detection could not fill a required column: go straight to the one step that fixes it, never a Yes on blank data.
+      setConfirmMode(false);
+      state.gateIntro = dateFill < 0.5
+        ? 'We could not find the dates with this header row. Click the real header row below, then continue.'
+        : 'We could not tell which column holds the amount. Match the Amount column on the next step.';
+      const intro = $('#wizard-step-intro');
+      if (intro) { intro.hidden = false; intro.textContent = state.gateIntro; }
+      setStep(dateFill < 0.5 ? 1 : 2);
+      return;
+    }
     const summary = fileSummary(rows);
     const count = summary.rowCount;
     const range = summary.dateRange ? ` from ${summary.dateRange.start} to ${summary.dateRange.end}` : '';
@@ -616,6 +644,25 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
           <td class="num ${r.amount < 0 ? 'amount-out' : 'amount-in'}">${escapeHtml(formatMinorDisplay(r.amount, r.currency))}</td>
         </tr>`).join('')}</tbody>
       </table>`;
+    const yesBtn = $('#confirm-yes');
+    const offBtn = $('#confirm-off');
+    let notice = $('#confirm-a-notice');
+    if (!notice) {
+      notice = document.createElement('p');
+      notice.id = 'confirm-a-notice';
+      notice.className = 'confirm-notice';
+      $('#confirm-a-preview').after(notice);
+    }
+    if (descFill < 0.5) {
+      notice.hidden = false;
+      notice.textContent = 'We could not find the description column, so the descriptions are blank. Fix that first.';
+      if (yesBtn) yesBtn.disabled = true;
+      if (offBtn) offBtn.textContent = 'Fix the description column';
+    } else {
+      notice.hidden = true;
+      if (yesBtn) yesBtn.disabled = false;
+      if (offBtn) offBtn.textContent = "Something's off";
+    }
     setConfirmMode(true);
     showConfirmScreen('a');
   }
@@ -837,7 +884,7 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
     const rows = entry.grid.slice(0, 40);
     const hRow = headerRow();
     const confidence = suggestHeaderRowConfidence(entry.grid, hRow);
-    $('#w-headerrow-suggestion').textContent = `row ${hRow + 1}${confidence > 0.9 ? ' (high confidence)' : ''}`;
+    $('#w-headerrow-suggestion').textContent = `row ${hRow + 1}${confidence > 0.9 && !state.gateIntro ? ' (high confidence)' : ''}`;
     const lowHint = $('#w-lowconfidence-hint');
     if (lowHint) lowHint.hidden = !state.lowConfidenceLocate;
 
@@ -2548,7 +2595,7 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
     // Item 1's plain intro ("A few quick questions...") only makes sense on
     // the first step of the fallback detailed wizard - never on later steps.
     const intro = $('#wizard-step-intro');
-    if (intro && !intro.hidden) intro.hidden = step !== 0;
+    if (intro && !intro.hidden) intro.hidden = !(step === 0 || (step === 1 && state.gateIntro) || (step === 2 && state.gateIntro));
     if (step === 2) renderLivePreview();
     if (step === 3) renderTestStep();
     if (step === 4) renderSaveStep();
@@ -2571,7 +2618,13 @@ export function createWizard({ storage, onSaved, onOpenReport }) {
   }
 
   async function goNext() {
-    if (!stepValid(state.step)) return;
+    if (!stepValid(state.step)) {
+      // Never a silent no-op: show the reason, disable Continue, focus the first empty required field.
+      renderFooter();
+      const firstEmpty = Array.from(document.querySelectorAll('#wizard-steps input, #wizard-steps select')).find((el) => !el.hidden && el.offsetParent && el.hasAttribute('required') && !String(el.value || '').trim());
+      (firstEmpty || $('#wizard-footer-reason'))?.focus?.();
+      return;
+    }
     if (state.step === STEP_META.length - 1) {
       await save();
       return;

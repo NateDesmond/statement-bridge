@@ -1692,9 +1692,18 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     return startISO === endISO ? formatShortDate(startISO) : `${formatShortDate(startISO)} to ${formatShortDate(endISO)}`;
   }
 
+  let lastCardKeys = '';
   function renderAttentionCards() {
     const container = $('#attention-cards');
     container.innerHTML = '';
+    // A stale toast must never sit over a newly mounted card: when the set of
+    // cards changes, hide any toast that is still showing.
+    const cardKeys = attentionCards(state.files).map((c) => `${c.kind || c.type || ''}:${c.name || c.fileId || ''}`).join('|');
+    if (cardKeys !== lastCardKeys) {
+      lastCardKeys = cardKeys;
+      const t = $('#home-toast');
+      if (t && !t.hidden) { t.hidden = true; t.classList.remove('shown'); clearTimeout(t._timer); }
+    }
     // Item 5: a row-level warning is no longer its own per-file card (a
     // single "Review N rows" button that jumped to Review) - every flagged
     // row across every file becomes one decision-row in the shared "N rows

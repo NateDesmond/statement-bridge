@@ -450,7 +450,9 @@ const CURRENCY_ZERO_DECIMALS = new Set(['JPY', 'KRW', 'IDR', 'VND']);
 // 33,889.56" reads exactly like a transaction unless excluded by its own
 // wording - real statements' account-summary section reliably uses these
 // same handful of phrases.
-const NON_TRANSACTION_LINE_RE = /^page\s+\d+\s+of\s+\d+$/i;
+// Page footers as OCR tends to read them: 'Page 1 of 3', 'Page 1/3', with or without trailing noise.
+const MONTH_ABBR_RE = /^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)$/i;
+const NON_TRANSACTION_LINE_RE = /^\s*page\s*[\dIlO]+\s*(?:of|\/|0f)\s*[\dIlO]+\b/i;
 // "Ref: SB700001"-style reference lines are common banking vocabulary (not
 // tied to any one bank) and never a transaction amount on their own; a
 // reference number OCR'd with just enough digits to slip under
@@ -476,7 +478,7 @@ const TWO_YEARS_RE = /\b(19|20)\d{2}\b.*\b(19|20)\d{2}\b/;
 export const MONTH_YEAR_BANNER_RE = /^[A-Za-z]{3,}\s+(?:19|20)\d{2}$/;
 const BARE_YEAR_RE = /^(?:19|20)\d{2}$/;
 
-function looksLikeNonTransactionLine(text) {
+export function looksLikeNonTransactionLine(text) {
   const t = text.trim();
   if (NON_TRANSACTION_LINE_RE.test(t) || NON_TRANSACTION_PHRASES_RE.test(text) || TWO_YEARS_RE.test(text)) return true;
   if (MONTH_YEAR_BANNER_RE.test(t) || BARE_YEAR_RE.test(t)) return true;
@@ -585,6 +587,9 @@ export function matchAmountLine(text, customRe) {
   // Item 3: a currency code can sit before OR after the number - whichever
   // slot matched (never both on the same line, the regex only allows one).
   const curToken = curRaw || curRawTrail;
+  // A month abbreviation is never a currency: "16 Sep 2026" at the end of a
+  // balance strip must not read as "2026 SEP".
+  if (curToken && MONTH_ABBR_RE.test(curToken)) return null;
   const currency = curToken
     ? (/[A-Za-z0-9]{3}/.test(curToken) ? normalizeOcrCurrencyToken(curToken) : curToken)
     : null;

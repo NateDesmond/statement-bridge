@@ -1,6 +1,6 @@
 // Balance/count checks and per-file summaries over normalized rows.
 
-import { lineText } from './pdf.js';
+import { lineText, matchAmountLine, looksLikeNonTransactionLine } from './pdf.js';
 
 /**
  * Human wording for every row flag normalize.js can set, shared by every
@@ -135,7 +135,12 @@ export function countCheckLabel(extracted, sourceLines, diff, matches, explainNo
 // the line. Matches core/pdf.js's matchAmountEnd's tolerance (currency
 // optional, sign optional) so a dropped "+"/"-" glyph or an unreadable
 // currency code still counts as a transaction-shaped line, not a miss.
-const AMOUNT_LINE_LOOSE_RE = /(?:[A-Za-z0-9]{2,4}\s*)?[+-]?\s*[\d,]+\.\d{2}\s*$/;
+// One source of truth with the extractor: a line "carries an amount" exactly
+// when core/pdf.js's matchAmountLine says so (currency before or after the
+// number, CR/DR markers, no decimals, parentheses). A private stricter regex
+// here once required the line to END with the number, so a "178.78 SGD CR"
+// layout counted zero amount lines and every extracted row was tagged unmatched.
+const looksLikeAmountLine = (text) => !looksLikeNonTransactionLine(text) && !!matchAmountLine(text);
 
 // Same default date-group line pattern core/pdf.js's extractGroupedRows uses
 // (not exported there, copied - see this function's gating note below).
@@ -178,7 +183,7 @@ export function countCheckGrouped(sourceText, rows, pdfConfig = {}) {
     if (!l || ignoreRes.some((re) => re.test(l))) continue;
     if (dateRe.test(l)) { dateOpened = true; continue; }
     if (!dateOpened) continue;
-    if (AMOUNT_LINE_LOOSE_RE.test(l)) amountLines++;
+    if (looksLikeAmountLine(l)) amountLines++;
   }
   const diff = extracted - amountLines;
   const matches = diff === 0;
@@ -225,7 +230,7 @@ export function diffGroupedExtraction(rows, pagesLines, pdfConfig = {}) {
       if (!text || ignoreRes.some((re) => re.test(text))) continue;
       if (dateRe.test(text)) { dateOpened = true; continue; }
       if (!dateOpened) continue;
-      if (!AMOUNT_LINE_LOOSE_RE.test(text)) continue;
+      if (!looksLikeAmountLine(text)) continue;
       if (rowIdx < ordered.length) {
         unmatchedRowIds.delete(ordered[rowIdx].row_id);
         rowIdx++;

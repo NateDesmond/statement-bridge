@@ -11,7 +11,7 @@
 // Writes test/fixtures/summit_grouped_2line.pdf (real text) and
 // test/fixtures/summit_grouped_2line.truth.json (ground truth: date/amount/
 // description for every transaction, signed amount in dollars).
-// Run: node test/fixtures/gen/gen-uob-grouped-2line.mjs
+// Run: node test/fixtures/gen/gen-summit-grouped-2line.mjs
 import fs from 'node:fs';
 import { buildTextStream, buildMultiPagePdf } from './pdflib.mjs';
 import { makeLayout, makeRng, isoToDMonYYYY } from './layout.mjs';
@@ -44,7 +44,7 @@ const truth = [];
 const layout = makeLayout({ top: 760, bottom: 60 });
 
 const header = [
-  { x: 50, y: 760, text: 'United Overseas Bank Limited', size: 12 },
+  { x: 50, y: 760, text: 'Summit Bank Limited', size: 12 },
   { x: 50, y: 744, text: 'Summit Preferred Platinum Card' },
   { x: 50, y: 730, text: 'Card Member: LIM WEI JIE' },
   { x: 50, y: 716, text: 'Statement Date: 14 Sep 2026    Payment Due Date: 04 Oct 2026' },
