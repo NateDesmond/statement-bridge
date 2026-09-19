@@ -197,19 +197,16 @@ async function main() {
     await page.waitForTimeout(400);
 
     // Coordinator round 2, item 1: the grouped count check must not count a
-    // preamble balance line as a transaction on this exact fixture. Assert on
-    // the tone class + the two numbers (core/checks.js's groupedCountLabel),
-    // never a literal sentence - the wording itself is free to change (it
-    // already has, to "N rows read, N amount lines found").
+    // preamble balance line as a transaction on this exact fixture. 2026-09-19
+    // rule: the count check is a silent cross-check - it renders NO line at
+    // all once rows and amount lines match, so the regression check is that
+    // absence itself (a real off-by-one would still show a line, per the
+    // "one line when it does not" half of the same rule).
     const countCheckInfo = await page.$$eval('#review-summary .rs-item', (items) => {
       const el = items.find((i) => /amount line/.test(i.textContent));
       return el ? { text: el.textContent.trim(), classes: [...el.classList] } : null;
     });
-    const countCheckMatch = countCheckInfo?.text.match(/(\d+)\s+rows?\s+\w+,\s+(\d+)\s+amount lines?\s+found/i) || null;
-    check('count check reports its two numbers (rows, amount lines)', !!countCheckMatch, countCheckInfo?.text);
-    check('count check reports 5 rows (not 6 - no preamble balance line counted)', countCheckMatch?.[1] === '5', countCheckInfo?.text);
-    check('count check reports 5 amount lines found', countCheckMatch?.[2] === '5', countCheckInfo?.text);
-    check('count check is not rendered as a failure', !!countCheckInfo && !countCheckInfo.classes.includes('fail'), JSON.stringify(countCheckInfo?.classes));
+    check('count check is silent once rows and amount lines match (5=5, no preamble counted)', countCheckInfo === null, JSON.stringify(countCheckInfo));
 
     // Item 2: date cells must not wrap onto two lines. The <td> itself can
     // still be tall (it spans the row's own height, set by the description
@@ -291,9 +288,11 @@ async function main() {
 
     await page.screenshot({ path: path.join(shotsDir, 'rev2-03-row-outlined.png'), fullPage: true });
 
-    // --- Balance check neutral wording -----------------------------------
-    const balanceItemText = await page.$$eval('#review-summary .rs-item', (items) => items.map((i) => i.textContent.trim())).then((arr) => arr.find((t) => t.includes('balance check')) || '');
-    check('balance check reads "No balance column" (not n/a) when there is no balance data', balanceItemText.includes('No balance column') || balanceItemText.includes('Passes') || balanceItemText.includes('Fails'), balanceItemText);
+    // --- Balance is a silent cross-check (2026-09-19 rule) ----------------
+    // No balance data on this fixture -> no balance line at all, not even a
+    // neutral "No balance column" one.
+    const balanceItemText = await page.$$eval('#review-summary .rs-item', (items) => items.map((i) => i.textContent.trim())).then((arr) => arr.find((t) => /alance/i.test(t)) || '');
+    check('no balance line is shown when there is no balance data', balanceItemText === '', balanceItemText);
 
     // --- Edit flow: Save commits + marks edited, Cancel discards ----------
     console.log('5. Edit -> Save on the first row...');
@@ -612,17 +611,16 @@ async function runAllDoneWithCleanStatement() {
       const cleanFixture = path.join(extensionPath, 'test', 'fixtures', 'meridian_savings.csv');
       await openInReview(page, [flagsFixture, cleanFixture]);
 
-      // Item 2 (copy consistency): the CSV count check reads "N rows read, N
-      // date lines found" now, the same tone/phrasing as a PDF's "N rows
-      // read, N amount lines found" - not the old "N rows extracted / N
-      // date-led lines".
+      // 2026-09-19 rule: the count check is a silent cross-check - a clean
+      // CSV (rows match date lines) shows no count-check line at all, same
+      // as a clean PDF.
       await page.selectOption('#review-summary select.map-select', { label: 'meridian_savings.csv' });
       await page.waitForTimeout(200);
-      const csvCountText = await page.$$eval('#review-summary .rs-item', (items) => {
+      const csvCountEl = await page.$$eval('#review-summary .rs-item', (items) => {
         const el = items.find((i) => /date lines? found/.test(i.textContent));
-        return el ? el.textContent.trim() : '';
+        return el ? el.textContent.trim() : null;
       });
-      check('CSV count check reads "N rows read, N date lines found" (same phrasing as a PDF\'s)', /^\d+ rows read, \d+ date lines? found$/.test(csvCountText), csvCountText);
+      check('CSV count check is silent when clean (no line shown)', csvCountEl === null, csvCountEl);
       await page.selectOption('#review-summary select.map-select', { label: path.basename(flagsFixture) });
       await page.waitForTimeout(200);
 

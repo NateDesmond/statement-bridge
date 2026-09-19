@@ -16,7 +16,7 @@ import { loadProfiles, matchProfile, learnSignatures, pdfAnchorCandidates, updat
 import { resolvePreset, filterByRange, coverageWarnings, formatShortDate } from '../core/daterange.js';
 import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, suggestFilename, LAYOUT_PRESETS } from '../core/export.js';
 import { checkFileSize, checkBatchSize } from '../core/limits.js';
-import { fileSummary, countCheckGrouped, groupedCountLabel, rowFlagLabel } from '../core/checks.js';
+import { fileSummary, countCheckGrouped, groupedCountLabel, rowFlagLabel, balanceCheck } from '../core/checks.js';
 import { mergeAcrossFiles, fingerprint, isExactDuplicateFile, sha256Hex, findDuplicateByHash } from '../core/dedupe.js';
 import { detectCurrency, convertToTarget, formatBothDirections } from '../core/currency.js';
 import { saveSession, sessionsNearingDeletion } from '../core/sessions.js';
@@ -2224,6 +2224,22 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     if (pendingNoteEl) {
       pendingNoteEl.hidden = !pendingDecisions;
       if (pendingDecisions) pendingNoteEl.textContent = `Resolve ${pendingDecisions} row${pendingDecisions === 1 ? '' : 's'} below, or copy now and check later.`;
+    }
+    // Item 6 (2026-09-19): every check that COULD run passed - a quiet
+    // reassurance line, not a badge. Balances are only mentioned when a
+    // balance actually existed and reconciled (they're a silent cross-check,
+    // never a goal on their own).
+    const allClearNoteEl = $('#export-allclear-note');
+    if (allClearNoteEl) {
+      const gapFile = sourceFiles().find((f) => f.groupedCheckLabel && f.groupedCheckLabel.tone !== 'ok');
+      const bc = balanceCheck(rows);
+      const allClear = !pendingDecisions && !gapFile && bc.reconciles !== false;
+      allClearNoteEl.hidden = !allClear;
+      if (allClear) {
+        allClearNoteEl.textContent = bc.reconciles === true
+          ? 'Every transaction on the page is accounted for, and the balances add up.'
+          : 'Every transaction on the page is accounted for.';
+      }
     }
     copyBtn.classList.toggle('btn-brass', !pendingDecisions);
     copyBtn.classList.toggle('btn-ghost', !!pendingDecisions);

@@ -2280,11 +2280,13 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       : { tone: cc.matches ? 'ok' : 'fail', text: cc.matches ? `matches ${cc.sourceLines} date-led lines in source` : `vs ${cc.sourceLines} date-led lines in source (diff ${cc.diff})` };
     const countLabel = countResult.text;
     const countRowClass = countResult.tone === 'ok' ? 'pass' : countResult.tone === 'neutral' ? 'neutral' : 'fail';
-    // Fix 3: no balance column is a neutral "not applicable", never a red fail.
-    const balanceClass = bc.reconciles == null ? 'neutral' : bc.reconciles ? 'pass' : 'fail';
-    const balanceLabel = bc.reconciles == null
-      ? 'No balance column in this statement, balance check skipped'
-      : bc.reconciles ? 'Balance reconciles' : `Balance does not reconcile${bc.firstFailingRow ? ` (first mismatch: ${bc.firstFailingRow.row_id})` : ''}`;
+    // Balances are a silent cross-check, not a goal (2026-09-19 rule): no
+    // line when there's no balance column, and none either when it
+    // reconciles clean - only a mismatch earns a line, and a calm one.
+    const balanceRowNum = bc.reconciles === false && bc.firstFailingRow ? rows.findIndex((r) => r.row_id === bc.firstFailingRow.row_id) + 1 : 0;
+    const balanceHtml = bc.reconciles === false
+      ? `<div class="rs-item neutral">Balances stop adding up at${balanceRowNum > 0 ? ` <button type="button" class="rs-link balance-mismatch-link" data-row-id="${escapeHtml(bc.firstFailingRow.row_id)}">row ${balanceRowNum}</button>` : ' a row we could not pin down'}</div>`
+      : '';
 
     const showAll = !!state._testShowAll;
     const flaggedOnly = !!state._testFlaggedOnly;
@@ -2351,12 +2353,14 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     // actually something to put in them.
     const hasBalance = nonSkippedRows.some((r) => r.balance != null);
     const hasFlagged = flaggedRows.length > 0;
+    // Item 4: silent when the count check matches, one line when it doesn't.
+    const countHtml = countResult.tone === 'ok' ? '' : `<div class="rs-item ${countRowClass}">${isGrouped ? countLabel : `<span class="num">${cc.extractedCount}</span>${countLabel}`}</div>`;
     host.innerHTML = `
       <div class="review-summary">
         <div class="rs-item"><span class="num">${summary.rowCount}</span>rows parsed</div>
-        <div class="rs-item ${countRowClass}">${isGrouped ? countLabel : `<span class="num">${cc.extractedCount}</span>${countLabel}`}</div>
-        <div class="rs-item ${balanceClass}">${balanceLabel}</div>
+        ${countHtml}
       </div>
+      ${balanceHtml}
       ${warnings.length ? `<div class="confirm-note" style="color:var(--warn);">${warnings.join('<br>')}</div>` : ''}
       <p class="pdf-anchor-hint">${currencyLines}</p>
       <p class="pdf-anchor-hint">Flags: ${flagChips}</p>
@@ -2412,6 +2416,12 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
         target?.scrollIntoView({ block: 'center' });
         target?.classList.add('selected');
       });
+    });
+    host.querySelector('.balance-mismatch-link')?.addEventListener('click', () => {
+      const rowId = host.querySelector('.balance-mismatch-link').dataset.rowId;
+      const target = host.querySelector(`tr[data-row-id="${rowId}"]`);
+      target?.scrollIntoView({ block: 'center' });
+      target?.classList.add('selected');
     });
     $('#w-test-confirm-all')?.addEventListener('click', (e) => {
       e.preventDefault();

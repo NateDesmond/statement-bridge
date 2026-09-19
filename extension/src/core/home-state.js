@@ -208,9 +208,14 @@ export function maskAccountNumber(text) {
  * @param {{accountLabel?:string, bank?:string, statementType?:string, name:string}} profile
  * @param {string|null} masked - maskAccountNumber's output, or null
  */
+/** Statement type ids are internal; labels always use the plain words. */
+export function statementTypeLabel(id) {
+  return { savings: 'savings', current: 'current', credit_card: 'credit card', other: '' }[id] ?? String(id || '').replace(/_/g, ' ');
+}
+
 export function defaultAccountLabel(profile, masked) {
   if (profile.accountLabel) return profile.accountLabel;
-  const base = [profile.bank, profile.statementType].filter(Boolean).join(' ') || profile.name;
+  const base = [profile.bank, statementTypeLabel(profile.statementType)].filter(Boolean).join(' ') || profile.name;
   return masked ? `${base} ${masked}` : base;
 }
 

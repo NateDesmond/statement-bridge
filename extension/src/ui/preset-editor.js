@@ -4,7 +4,7 @@
 // header row pickers, and a live 2-sample-row preview. Used by the Settings
 // screen and the Home "Change" drawer.
 
-import { fieldValue, formatDateOut, DATE_FORMATS, LAYOUT_PRESETS } from '../core/export.js';
+import { fieldValue, formatDateOut, DATE_FORMATS, LAYOUT_PRESETS, visibleColumns as exportVisibleColumns } from '../core/export.js';
 import { groupPlainNumber } from '../core/amount.js';
 
 // Fields whose export value is a plain number and reads better grouped
@@ -552,9 +552,11 @@ function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows =
   // value contains the delimiter (e.g. a description with a comma).
   const live = Array.isArray(previewRows);
   const pPreset = previewPreset;
-  const columns = activeColumns(pPreset);
   const allPreviewRows = live ? previewRows : (sampleRows.length ? sampleRows.slice(0, 2) : PLACEHOLDER_ROWS);
   const shownRows = live ? allPreviewRows.slice(0, PREVIEW_ROW_LIMIT) : allPreviewRows;
+  // 2026-09-19 rule: a Balance column never shows here unless at least one
+  // of these rows actually carries one - same rule buildCsv/buildTsv apply.
+  const columns = exportVisibleColumns(pPreset.columns, allPreviewRows);
 
   const previewCaption = document.createElement('p');
   previewCaption.className = 'pdf-anchor-hint preset-preview-caption';

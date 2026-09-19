@@ -213,12 +213,17 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
     const cur = Object.keys(totalsByCur)[0];
     const totals = cur ? totalsByCur[cur] : { in: 0, out: 0 };
 
-    let mismatchNote = '';
-    if (balance.reconciles === false && balance.firstFailingRow) {
-      const rowNum = file.rows.findIndex((r) => r.row_id === balance.firstFailingRow.row_id) + 1;
-      if (rowNum > 0) {
-        mismatchNote = ` <button type="button" class="balance-mismatch-link" data-row-id="${escapeHtml(balance.firstFailingRow.row_id)}" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer;">first mismatch at row ${rowNum}</button>`;
-      }
+    // Balances are a silent cross-check, not a goal (2026-09-19 rule): no
+    // line at all when there's no balance column, and none either when it
+    // reconciles clean - only a mismatch earns a line, and a calm one, not a
+    // red fail.
+    let balanceHtml = '';
+    if (balance.reconciles === false) {
+      const rowNum = balance.firstFailingRow ? file.rows.findIndex((r) => r.row_id === balance.firstFailingRow.row_id) + 1 : 0;
+      const link = rowNum > 0
+        ? ` <button type="button" class="balance-mismatch-link" data-row-id="${escapeHtml(balance.firstFailingRow.row_id)}" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer;">row ${rowNum}</button>`
+        : '';
+      balanceHtml = `<div class="rs-item neutral">Balances stop adding up at${link || ' a row we could not pin down'}</div>`;
     }
 
     // Count check, explained: extractedCount includes skipped summary lines
@@ -241,7 +246,10 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
       const missedHtml = missed.length
         ? `<div class="pdf-anchor-hint">${missed.length} amount line${missed.length === 1 ? '' : 's'} produced no row: ${missed.map((m) => `page ${m.page} line ${m.lineNumber}`).join(', ')}</div>`
         : '';
-      countsHtml = `<div class="rs-item ${cls}">${result.text}${updateLink}</div>${missedHtml}`;
+      // Item 4 (2026-09-19): the count check is a silent cross-check too -
+      // no line at all when it matches, only ever a line for a real gap.
+      const countLine = result.tone === 'ok' ? '' : `<div class="rs-item ${cls}">${result.text}${updateLink}</div>`;
+      countsHtml = `${countLine}${missedHtml}`;
       log('review', 'grouped count check rendered', { sourceFile: file.name, extracted: groupedCounts.extracted, amountLines: groupedCounts.amountLines, matches: groupedCounts.matches, tone: result.tone });
     } else if (counts) {
       // Same wording/tone rules as the grouped-PDF path just above
@@ -254,7 +262,8 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
         : null;
       const result = countCheckLabel(counts.extractedCount, counts.sourceLines, counts.diff, counts.matches, explainNote);
       const cls = result.tone === 'ok' ? 'pass' : result.tone === 'neutral' ? 'neutral' : 'fail';
-      countsHtml = `<div class="rs-item ${cls}">${result.text}</div>`;
+      // Item 4: silent when it matches, one line when it doesn't.
+      countsHtml = result.tone === 'ok' ? '' : `<div class="rs-item ${cls}">${result.text}</div>`;
       log('review', 'count check rendered', { sourceFile: file.name, extractedCount: counts.extractedCount, sourceLines: counts.sourceLines, matches: counts.matches, skippedCount, flaggedRemainder });
     }
 
@@ -305,17 +314,12 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
       removeBtn.onclick = () => { onRemoveFile(file); render(); };
       host.appendChild(removeBtn);
     }
-    // Item 5: balance check's "n/a" reads as a neutral, non-alarming "No
-    // balance column" (grey, not red/green) when there's simply nothing to
-    // check; money in/out get thousands separators.
-    const balanceCls = balance.reconciles === false ? 'fail' : balance.reconciles === true ? 'pass' : 'neutral';
-    const balanceLabel = balance.reconciles === false ? 'Fails' : balance.reconciles === true ? 'Passes' : 'No balance column';
     host.insertAdjacentHTML('beforeend', `
       <div class="rs-item"><span class="num">${summary.rowCount}</span>rows</div>
       <div class="rs-item"><span class="num">${summary.dateRange ? `${summary.dateRange.start} to ${summary.dateRange.end}` : 'n/a'}</span>date range</div>
       <div class="rs-item pass"><span class="num">+${formatMinorDisplay(totals.in, cur)} ${cur || ''}</span>money in</div>
       <div class="rs-item"><span class="num">-${formatMinorDisplay(totals.out, cur)} ${cur || ''}</span>money out</div>
-      <div class="rs-item ${balanceCls}"><span class="num">${balanceLabel}</span>balance check${mismatchNote}</div>
+      ${balanceHtml}
       ${countsHtml}
       ${outHint}
       ${ocrNote}

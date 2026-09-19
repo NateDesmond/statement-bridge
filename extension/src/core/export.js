@@ -85,6 +85,17 @@ export function fieldValue(row, field, preset) {
   return row[field] ?? '';
 }
 
+// Product rule (2026-09-19): a balance is a silent cross-check, never a
+// goal - a layout (or the default preset) can list a `balance` column, but
+// it only actually appears in an export/preview when the rows on hand carry
+// one. Shared by buildDelimited and every UI preview so the rule can't drift
+// between what Copy produces and what the on-screen table shows.
+export function visibleColumns(columns, rows) {
+  const enabled = columns.filter((c) => c.enabled !== false);
+  if (rows.some((r) => r.balance != null)) return enabled;
+  return enabled.filter((c) => c.field !== 'balance');
+}
+
 function escapeCsvCell(value, delimiter) {
   const s = String(value ?? '');
   if (s.includes(delimiter) || s.includes('"') || s.includes('\n') || s.includes('\r')) {
@@ -100,7 +111,9 @@ function buildDelimited(rows, preset, delimiter, { includeSourceColumns = false 
   // Item 1: export must carry the exact same columns, in the exact same
   // order, that the preset editor's enabled list and live preview show -
   // a column unchecked there (enabled === false) never reaches the file.
-  const columns = preset.columns.filter((c) => c.enabled !== false);
+  // A `balance` column is additionally dropped when none of these rows
+  // actually carry a balance (visibleColumns, 2026-09-19 rule).
+  const columns = visibleColumns(preset.columns, rows);
   if (includeSourceColumns && rows.length) {
     for (const key of Object.keys(rows[0].original || {})) {
       columns.push({ field: `original.${key}`, name: key });

@@ -103,9 +103,11 @@ test('D2: Mode B converted amounts reach buildTsv\'s Amount/Currency columns, wi
   const exportRows = rowsForExportModeB(rows, 'SGD', { USD_SGD: 1.35, JPY_SGD: 0.0091 });
   const tsv = buildTsv(exportRows, DEFAULT_PRESET_MODE_B);
   const lines = tsv.split('\r\n');
-  assert.equal(lines[0].split('\t').join(','), 'Date,Account,Description,Amount,Currency,Original amount,Original currency,FX rate,Balance');
-  assert.equal(lines[1], ['2026-07-01', '', 'Conference Fee', '-135.00', 'SGD', '-100.00', 'USD', '1.35', ''].join('\t'));
-  assert.equal(lines[2], ['2026-07-05', '', 'Hotel Tokyo', '-136.50', 'SGD', '-15000', 'JPY', '0.0091', ''].join('\t'));
+  // 2026-09-19: balance is a silent cross-check, not a goal - with no row
+  // carrying one, the Balance column is dropped silently, here and in Mode A.
+  assert.equal(lines[0].split('\t').join(','), 'Date,Account,Description,Amount,Currency,Original amount,Original currency,FX rate');
+  assert.equal(lines[1], ['2026-07-01', '', 'Conference Fee', '-135.00', 'SGD', '-100.00', 'USD', '1.35'].join('\t'));
+  assert.equal(lines[2], ['2026-07-05', '', 'Hotel Tokyo', '-136.50', 'SGD', '-15000', 'JPY', '0.0091'].join('\t'));
 });
 
 test('isDefaultPresetColumns: true for the untouched default, false once columns are customised', () => {
