@@ -598,7 +598,10 @@ const OCR_PATH = 'main-thread orchestration + Tesseract\'s own worker for recogn
  * across a small pool of Tesseract workers (see getWorkerPool) so a
  * multi-page document recognises pages in parallel instead of one at a time.
  * @param {ArrayBuffer} bytes
- * @param {{onProgress?:(page:number,total:number)=>void, onPage?:(page:{pageNum:number,items:object[],avgConfidence:number,ms:number}, pagesSoFar:object[], total:number)=>void, signal?:AbortSignal, scale?:number, fileName?:string}} [opts]
+ * @param {{onStart?:(total:number)=>void, onProgress?:(page:number,total:number)=>void, onPage?:(page:{pageNum:number,items:object[],avgConfidence:number,ms:number}, pagesSoFar:object[], total:number)=>void, signal?:AbortSignal, scale?:number, fileName?:string}} [opts]
+ *   `onStart` fires the instant the page count is known (right after pdf.js opens the document, before any page
+ *   is actually recognised) - item 9: the page count doesn't need to wait for a first page to finish, so the
+ *   status line can read "Reading page 1 of N" from the very first render instead of a bare "Reading your scan...".
  *   `onPage` fires as soon as EACH page finishes (not necessarily in page-number order, since pages now run in
  *   parallel across workers) with every page done so far sorted by pageNum - the caller (home.js) uses it to show
  *   partial results while later pages are still recognising.
@@ -613,7 +616,7 @@ export async function ocrDocument(bytes, opts = {}) {
   // where the real wall-clock win comes from instead (~2.5x on a real
   // 3-page scanned statement: 13.6s -> 5.5s, same 31/31 recall) - see
   // HARDENING.md Track 3's report for the full before/after numbers.
-  const { onProgress, onPage, signal, scale = 2.5, fileName } = opts;
+  const { onStart, onProgress, onPage, signal, scale = 2.5, fileName } = opts;
   // Item 7: every [ocr] log line names the file it's about - with the queue
   // serializing OCR jobs one at a time, a "page done" line with no file name
   // used to be ambiguous about which of two recently-dropped files it
@@ -621,6 +624,7 @@ export async function ocrDocument(bytes, opts = {}) {
   log('ocr', 'starting document OCR', { path: OCR_PATH, file: fileName });
   return withPdfjs(async (pdfjsLib, standardFontDataUrl) => {
     const doc = await pdfjsLib.getDocument({ data: bytes.slice(0), standardFontDataUrl }).promise;
+    onStart?.(doc.numPages);
     const pool = await getWorkerPool();
     const pages = [];
     let doneCount = 0;

@@ -40,16 +40,36 @@ export function restoreRow(row) {
 // this file has no DOM/UI concept of "warning" to import from there).
 const CONFIRM_KEEP_FLAGS = new Set(['ocr', 'manually_added']);
 
+// Pass 3 item 2: a row whose date or amount never actually parsed. "Looks
+// right" is a false affordance here - the value is still unusable, not just
+// unconfirmed - so confirmRow must never clear these, and the UI (home.js's
+// decision row, review.js's action buttons, wizard.js's Test step) must
+// never offer "Looks right" while one is set. "Fix" (correct the value) or
+// "Exclude" (drop the row) are the only real ways out.
+const HARD_FLAGS = new Set(['unparseable_date', 'missing_amount']);
+export function hasUnresolvableFlag(row) { return (row.flags || []).some((f) => HARD_FLAGS.has(f)); }
+
 /**
  * "Looks right": a human has checked this row against the source and it's
  * fine as extracted. Clears every warning flag (keeping provenance-only ones
- * like 'ocr') and marks the row user-confirmed, so it drops out of the
- * warnings count/Home badge without discarding what it originally flagged.
+ * like 'ocr', and HARD_FLAGS - a value that never parsed stays flagged no
+ * matter what calls confirmRow) and marks the row user-confirmed, so it
+ * drops out of the warnings count/Home badge without discarding what it
+ * originally flagged.
  * @param {object} row
  */
 export function confirmRow(row) {
-  const flags = (row.flags || []).filter((f) => CONFIRM_KEEP_FLAGS.has(f));
-  return { ...row, flags, confirmed: true };
+  const flags = (row.flags || []).filter((f) => {
+    if (CONFIRM_KEEP_FLAGS.has(f)) return true;
+    // A hard flag only survives confirmRow while the value it complains
+    // about is STILL missing - editRow (resolveEdit's own first step, run
+    // before this) may already have filled row.date/row.amount, in which
+    // case the flag is stale and clears like any other.
+    if (f === 'unparseable_date') return row.date == null;
+    if (f === 'missing_amount') return row.amount == null;
+    return false;
+  });
+  return { ...row, flags, confirmed: !flags.some((f) => HARD_FLAGS.has(f)) };
 }
 
 /**

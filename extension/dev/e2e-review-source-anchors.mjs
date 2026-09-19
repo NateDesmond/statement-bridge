@@ -170,12 +170,16 @@ async function runFlagsFixtureCompletion() {
     if (chipDisabled) {
       console.log('   (info) fixture had no warnings at all - completion panel should already show)');
     } else {
-      // Resolve every warning row by clicking "Looks right" until none remain.
+      // Resolve every warning row by clicking "Looks right" until none
+      // remain - falling back to "Exclude" for a row whose date/amount
+      // never actually parsed (Pass 3 item 2: those never offer "Looks
+      // right" at all, only Edit/Exclude - this fixture has one).
       for (let i = 0; i < 50; i++) {
-        const btn = await page.$('#review-table tbody tr:first-child button:has-text("Looks right")');
-        if (!btn) break;
-        await btn.click();
-        await page.waitForTimeout(120);
+        const looksRight = await page.$('#review-table tbody tr:first-child button:has-text("Looks right")');
+        if (looksRight) { await looksRight.click(); await page.waitForTimeout(120); continue; }
+        const exclude = await page.$('#review-table tbody tr:first-child button:has-text("Exclude")');
+        if (exclude) { await exclude.click(); await page.waitForTimeout(120); continue; }
+        break;
       }
     }
     await page.waitForTimeout(300);

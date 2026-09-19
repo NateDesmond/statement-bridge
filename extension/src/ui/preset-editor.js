@@ -342,7 +342,7 @@ let instanceCounter = 0;
  * renderer - the export preview is already exactly "every active column,
  * formatted the way export.js would write it, 5 rows visible and scrolling".
  */
-export function renderPresetEditor({ container, preset, sampleRows = [], profiles = [], fileGroups, previewRows, previewPreset, onChange, tableOnly = false, showPreview = true }) {
+export function renderPresetEditor({ container, preset, sampleRows = [], profiles = [], fileGroups, previewRows, previewPreset, onChange, tableOnly = false, showPreview = true, flaggedRowIds = null }) {
   // The container is fully re-rendered on every edit (a controlled
   // component, like review.js) - remember whether Customise was left open so
   // toggling a pill or reordering columns doesn't collapse it back closed
@@ -366,7 +366,7 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
   // pickers, the header-row toggle) - straight to the live preview table at
   // the end of this function.
   if (tableOnly) {
-    renderPreviewOnly({ container, previewRows, previewPreset: previewPreset || preset, sampleRows, tableOnly: true });
+    renderPreviewOnly({ container, previewRows, previewPreset: previewPreset || preset, sampleRows, tableOnly: true, flaggedRowIds });
     return;
   }
 
@@ -544,7 +544,7 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
  * the full editor's own preview share one implementation - see
  * renderPresetEditor's tableOnly doc comment.
  */
-function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows = [], tableOnly = false }) {
+function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows = [], tableOnly = false, flaggedRowIds = null }) {
   // Preview: item 1 - what Copy for Sheets would produce right now, in
   // export order, through the exact per-field value function export.js uses
   // (fieldValue), rendered straight from the row objects - never by
@@ -597,7 +597,13 @@ function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows =
       return classes.length ? ` class="${classes.join(' ')}"` : '';
     };
     const theadHtml = `<thead><tr>${columns.map((c) => `<th scope="col" data-field="${escapeHtml(c.field)}">${escapeHtml(c.name)}</th>`).join('')}</tr></thead>`;
-    const tbodyHtml = (rowsToRender) => `<tbody>${rowsToRender.map((row) => `<tr>${columns.map((c) => `<td data-field="${escapeHtml(c.field)}"${cellClass(c, row)}>${escapeHtml(cellFor(row, c))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    // Item 5: a row also shown above in the "N rows need a quick look" card
+    // gets a small dot on its first cell here instead of the card repeating
+    // its date/description/amount a second time - one visual anchor, not a
+    // second copy of the same three values.
+    const rowMark = (row) => (flaggedRowIds && row.row_id != null && flaggedRowIds.has(row.row_id))
+      ? ' title="Shown above, needs a quick look"><span class="flag-dot" aria-hidden="true"></span>' : '>';
+    const tbodyHtml = (rowsToRender) => `<tbody>${rowsToRender.map((row, i) => `<tr>${columns.map((c, ci) => `<td data-field="${escapeHtml(c.field)}"${cellClass(c, row)}${ci === 0 ? rowMark(row) : '>'}${escapeHtml(cellFor(row, c))}</td>`).join('')}</tr>`).join('')}</tbody>`;
     // Item 2: the header (and, for the small static Sample preview, the body
     // too) renders immediately - only a live preview's (up to 200-row) body
     // is debounced, since that's the part whose cost scales with row count.

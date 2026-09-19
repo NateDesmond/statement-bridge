@@ -146,7 +146,13 @@ const scenes = {
       await page.click('#home-preset-editor .columns-customise > summary');
       await page.waitForTimeout(150);
     }
-    const chip = await page.$('#home-preset-editor .columns-customise button:has-text("Balance")');
+    // Item 14: the pill is a <span role="button"> (draggable, dbl-click to
+    // rename), never a real <button> - a button:has-text() selector here
+    // always matched nothing, so this click silently never fired. Verified
+    // separately that the pill itself toggles correctly (.column-pill ->
+    // .column-pill.enabled, live preview gains the column) once actually
+    // clicked; this was a script bug, not a product one.
+    const chip = await page.$('#home-preset-editor .columns-customise .column-pill:has-text("Balance")');
     if (chip) await chip.click();
     await page.waitForTimeout(150);
     await shot(page, '07-export-customised');

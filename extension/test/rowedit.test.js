@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   editCell, excludeRow, restoreRow, addMissingRow, treatAsTransaction, confirmRow, confirmAllLowConfidence, editRow, applyAmountAlt,
   resolveRow, resolveConfirm, resolveExclude, resolveUseAlt, resolveEdit, undoRow, nextUnresolvedAfter, prevUnresolvedBefore,
+  hasUnresolvableFlag,
 } from '../src/ui/rowedit.js';
 
 const baseRow = { row_id: 'f:0', description_raw: 'Amazon.com USD 22.40', amount: -3071, excluded: false, edited: false };
@@ -66,6 +67,27 @@ test('confirmRow clears warning flags, keeps provenance-only ones, and marks con
   assert.deepEqual(confirmed.flags, ['ocr']);
   assert.equal(confirmed.confirmed, true);
   assert.deepEqual(row.flags, ['low_confidence_ocr', 'sign_unclear', 'ocr'], 'original row untouched');
+});
+
+test('Pass 3 item 2: confirmRow never clears unparseable_date/missing_amount while the value is still unreadable ("Looks right" must not be a false affordance)', () => {
+  const row = { row_id: 'f:2', date: null, date_raw: '15.09.2026', amount: null, flags: ['unparseable_date', 'missing_amount'] };
+  const confirmed = confirmRow(row);
+  assert.deepEqual(confirmed.flags, ['unparseable_date', 'missing_amount']);
+  assert.equal(confirmed.confirmed, false);
+  assert.equal(hasUnresolvableFlag(row), true);
+});
+
+test('Pass 3 item 2: confirmRow DOES clear a hard flag once the underlying value has actually been fixed (resolveEdit -> editRow then confirmRow)', () => {
+  const row = { row_id: 'f:3', date: null, date_raw: '15.09.2026', amount: null, flags: ['unparseable_date', 'missing_amount'] };
+  const fixed = resolveEdit(row, { date: '2026-09-15', amount: -4523 });
+  assert.deepEqual(fixed.flags, []);
+  assert.equal(fixed.confirmed, true);
+  assert.equal(hasUnresolvableFlag(fixed), false);
+});
+
+test('hasUnresolvableFlag is false for a row with only confidence/direction/duplicate flags', () => {
+  assert.equal(hasUnresolvableFlag({ flags: ['possible_duplicate', 'sign_unclear'] }), false);
+  assert.equal(hasUnresolvableFlag({ flags: [] }), false);
 });
 
 test('confirmAllLowConfidence only touches rows flagged low_confidence_ocr', () => {

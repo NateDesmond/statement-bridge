@@ -575,6 +575,68 @@ async function runFirstTimerUnknownPdfScenario() {
   }
 }
 
+/**
+ * Pass 3 fix items 1-3 gated scenario: a first-timer dropping an unknown
+ * German bank CSV (semicolon-delimited, dotted dates "15.09.2026", German
+ * number format "-45,23") and following ONLY the primary prompts the app
+ * itself offers, all the way to Copy - the same walk PASS-3-first-timer.md
+ * did by hand, now with real assertions instead of eyeballed screenshots.
+ * Real dead end that report found: dotted dates never parsed, Map fields
+ * offered no way out, and "Looks right" cleared the flag without fixing
+ * anything. All three are fixed now (see FIX-PASS-3-LOG.md items 1-3); this
+ * scenario is the regression guard.
+ */
+async function runFirstTimerGermanCsvScenario() {
+  console.log('\n=== scenario: first-timer, unknown German-bank CSV, primary prompts only (prefix firsttimerde) ===');
+  const { context, page, pageErrors } = await launchExtensionContext();
+  const shotStep = shotter(page, 'firsttimerde');
+  const fixture = path.join(extensionPath, 'test', 'fixtures', 'waldkonto_unbekannt.csv');
+  try {
+    console.log('1. drop the unknown German CSV, wait for Set up...');
+    await dropAndOpenWizard(page, fixture);
+    await shotStep('01-after-setup-click');
+    const onConfirmA = await page.isVisible('#confirm-a').catch(() => false);
+    check('unknown German CSV lands on the confirm-first screen, not the full 5-step wizard on an error banner', onConfirmA, `confirm-a visible=${onConfirmA}`);
+    if (onConfirmA) {
+      const heading = await page.textContent('#confirm-a-heading').catch(() => '');
+      console.log('   heading:', heading);
+      const cells = await page.$$eval('#confirm-a-preview tbody tr td:first-child', (tds) => tds.map((td) => td.textContent.trim()));
+      // Item 10 (pass 3): confirm-a's preview now shows dates in Home's own
+      // display format ("15 Sep 2026"), not raw ISO - accept either shape,
+      // the point of this assertion is "a real parsed date, not blank/raw".
+      check('every previewed row has a real (non-empty) date, not blank/unparsed', cells.length >= 3 && cells.every((c) => /^\d{4}-\d{2}-\d{2}$/.test(c) || /^\d{1,2} [A-Za-z]{3} \d{4}$/.test(c)), JSON.stringify(cells));
+      const yesDisabled = await page.$eval('#confirm-yes', (b) => b.disabled);
+      check('Yes is enabled (dotted German dates parsed)', !yesDisabled, `disabled=${yesDisabled}`);
+      await page.click('#confirm-yes');
+      await page.waitForTimeout(200);
+      await shotStep('02-confirm-c');
+      await page.click('#confirm-save');
+      await page.waitForFunction(() => /Done, \d+ transactions/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
+      await shotStep('03-home-after-save');
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      const done = bodyText.match(/Done, (\d+) transactions/);
+      check('Home shows the saved CSV as Done with a row count (real dates, no "could not read dates" dead end)', !!done && Number(done[1]) === 6, done ? done[0] : 'no Done line');
+      check('no "Could not read dates" failure banner', !/Could not read dates/i.test(bodyText), bodyText.slice(0, 400));
+      const copyEnabled = await page.$eval('#copy-tsv-btn', (b) => !b.disabled).catch(() => false);
+      check('Copy to Google Sheets is available', copyEnabled, '');
+      if (copyEnabled) {
+        await page.click('#copy-tsv-btn');
+        await page.waitForFunction(() => /Copied \d+ rows? to the clipboard/i.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
+        const afterCopy = await page.evaluate(() => document.body.innerText);
+        const copied = afterCopy.match(/Copied (\d+) rows? to the clipboard/i);
+        check('Copy produced the toast with the real row count (6)', !!copied && Number(copied[1]) === 6, copied ? copied[0] : 'no copy toast');
+        await shotStep('04-after-copy');
+      }
+    } else {
+      await shotStep('02-wherever-it-landed');
+    }
+    const cleanLog = await assertCleanLog(page, 'first-timer German CSV (firsttimerde)', pageErrors);
+    if (!cleanLog.ok) throw new Error(`firsttimerde scenario: ${cleanLog.problems.join('; ')}`);
+  } finally {
+    await context.close();
+  }
+}
+
 async function runConfirmOcrYesScenario() {
   console.log('\n=== scenario: confirm-first Yes path, OCR image-only PDF (prefix confirmocr) ===');
   const { context, page, pageErrors } = await launchExtensionContext();
@@ -796,6 +858,7 @@ const SCENARIOS = {
   confirmrows: runConfirmRowsBranchScenario,
   confirmocr: runConfirmOcrYesScenario,
   firsttimerpdf: runFirstTimerUnknownPdfScenario,
+  firsttimerde: runFirstTimerGermanCsvScenario,
   setup: runConfirmScreensGalleryScenario,
   range: runManualRangeScenario,
 };

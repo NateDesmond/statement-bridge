@@ -128,6 +128,10 @@ button,select,input{font-family:inherit;}
   box-shadow:0 2px 8px rgba(0,0,0,.08);
 }
 .report-fab:hover{color:var(--ink);border-color:var(--brass);}
+/* Pass 3 item 4: hidden while its own sheet (or any other side sheet) is
+   open - no reason to float a button over the panel it just opened, and it
+   can otherwise sit above that panel's own bottom-right content. */
+#screen-report.open ~ .report-fab{display:none;}
 
 .content-col{min-width:0;}
 .topbar-actions{display:flex;gap:10px;align-items:center;}
@@ -161,7 +165,11 @@ button,select,input{font-family:inherit;}
 /* Item 15: main scrolls vertically only - horizontal overflow (a wide preset
    preview table) is the table's own problem to solve (its scroll wrapper
    below), never the page's. */
-main{min-width:0;overflow-x:hidden;padding:24px 28px 64px;max-width:1040px;margin:0 auto;}
+/* Pass 3 item 4: bottom padding clears the fixed report-fab's own footprint
+   (20px offset + ~38px button height, plus a little breathing room) so a
+   tall screen's last row of action links (e.g. the accounts table's Check/
+   Set up again/Remove) never sits under it. */
+main{min-width:0;overflow-x:hidden;padding:24px 28px 84px;max-width:1040px;margin:0 auto;}
 .screen{display:none;}
 .screen.active{display:block;}
 
@@ -180,6 +188,15 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
    bottom margin happens to be - one rule instead of tuning every block. */
 .drawer-body > h2.section-title{margin-top:24px;}
 .drawer-body > h2.section-title:first-child{margin-top:0;}
+/* Item 13: three visually bounded cards (When/What to copy/Currency)
+   instead of six flat all-caps labels - the same 24px rhythm rule as
+   above, scoped to labels nested inside a card instead of directly under
+   the drawer. */
+.drawer-card{margin-bottom:16px;}
+.drawer-card:last-child{margin-bottom:0;}
+.drawer-card-title{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 14px;}
+.drawer-card > h2.section-title{margin-top:20px;}
+.drawer-card > h2.section-title:first-of-type{margin-top:0;}
 
 .badge{
   display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
@@ -207,6 +224,14 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
 /* Item 5: the restore prompt is a quiet inline line, never a full-weight
    card competing with the drop zone below it. */
 .restore-quiet-line{margin:0 0 14px;font-size:13px;color:var(--ink-dim);display:flex;flex-wrap:wrap;align-items:center;gap:10px;}
+
+/* Pass 3 item 8: Home's empty state otherwise sits top-anchored, leaving
+   60-70% of a tall viewport as flat dead space below it - centre it in
+   whatever room is actually available (viewport minus the header/progress
+   strip/main's own padding: 67+86+24+84 = 261) instead. align-items is left
+   at its flex default (stretch) so the hero/explainer keep their existing
+   width and internal text-align:center, only the vertical position moves. */
+#empty-state{min-height:calc(100vh - 261px);display:flex;flex-direction:column;justify-content:center;}
 
 /* Item 3: the empty-state hero - a giant, unmissable drop target, one line
    of copy, one giant "Choose files" button. */
@@ -730,10 +755,35 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 #screen-wizard #wizard-steps{flex:1;min-height:0;overflow:auto;padding-bottom:24px;}
 
 /* --------- Confirm-first setup (Section 2): Screens A/B/focus/C --------- */
-#screen-wizard #wizard-confirm{flex:1;min-height:0;overflow:auto;padding-bottom:24px;}
+#screen-wizard #wizard-confirm{flex:1;min-height:0;overflow:auto;padding-bottom:24px;display:flex;flex-direction:column;}
 #screen-wizard #wizard-confirm[hidden]{display:none;}
+/* Pass 3 item 8: Setup C ("Name this statement") is a single short card on
+   an otherwise blank step. #screen-wizard.active's height:100% is only as
+   tall as `main` naturally grows to (main itself has no explicit height),
+   so there was never any spare space to centre into - min-height here
+   forces real room (viewport minus header 67 + progress strip 86 = 153),
+   which then cascades UP through the auto-height #screen-wizard/main
+   instead of relying on percentage heights flowing down. Auto margins
+   (not justify-content:center, which clips the top of anything taller
+   than the box under overflow:auto) then centre #confirm-c only when it's
+   shorter than that space; confirm-a/b/focus get the same breathing room
+   but keep their default flex-start (no margin set on them). */
+#screen-wizard #wizard-confirm{min-height:calc(100vh - 153px);}
+#confirm-c{margin-top:auto;margin-bottom:auto;}
 .confirm-step{max-width:640px;margin:0 auto;text-align:center;}
+/* Pass 3 item 10: .confirm-step's own text-align:center (for the heading/
+   totals/buttons above) was cascading into the preview table too, centring
+   Date/Description text that every other table in the app (Home, Check a
+   statement, Map fields) shows left-aligned - .num (Amount) already
+   overrides to right, this restores the same left default for the rest. */
+#confirm-a-preview table{text-align:left;}
 .confirm-step h2.confirm-heading{font-size:19px;text-transform:none;letter-spacing:0;color:var(--ink);line-height:1.4;font-weight:700;}
+/* Pass 3 item 6: a real page heading for screens that otherwise open
+   straight into an intro sentence with no title at all (Settings, How it
+   works) - same weight/size as the wizard's own confirm-heading, so a
+   screen never reads as unfinished next to Statement types/Home/Check a
+   statement, which all lead with a bold title. */
+.page-title{font-size:19px;color:var(--ink);line-height:1.4;font-weight:700;margin:0 0 12px;}
 .confirm-totals{display:flex;justify-content:center;gap:36px;margin:14px 0 20px;}
 .confirm-total-item{text-align:center;}
 .confirm-total-item .num{display:block;font-size:19px;font-weight:700;}
@@ -745,8 +795,12 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .confirm-choice-tile{
   appearance:none;background:var(--paper-raised);border:1.5px solid var(--paper-line);border-radius:var(--radius);
   padding:20px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-align:center;color:var(--ink);
+  display:flex;flex-direction:column;gap:6px;align-items:center;
 }
 .confirm-choice-tile:hover{border-color:var(--brass);background:#faf6ec;}
+/* Item 10: the one-line example under each tile's label - quieter/smaller,
+   never bold, so the label itself stays the primary thing read. */
+.confirm-choice-tile .cct-example{font-size:12px;font-weight:400;color:var(--ink-dim);line-height:1.4;}
 .confirm-name-input{
   font:inherit;font-size:16px;padding:12px 14px;border-radius:var(--radius);border:1.5px solid var(--paper-line);
   width:100%;max-width:340px;text-align:center;

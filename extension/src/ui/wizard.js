@@ -23,10 +23,11 @@ import {
 } from '../core/pdf.js';
 import { balanceCheck, countCheck, countCheckGrouped, groupedCountLabel, fileSummary, flagLabel, rowFlagLabel } from '../core/checks.js';
 import { defaultAccountLabel } from '../core/home-state.js';
+import { formatShortDate } from '../core/daterange.js';
 import { buildFileRows } from '../core/pipeline.js';
 import { announce } from './nav.js';
 import { renderPdfPage, pdfYToCanvasTop, pdfXToCanvasLeft, canvasLeftToPdfX } from './pdf-render.js';
-import { confirmRow, confirmAllLowConfidence, editRow, excludeRow, applyAmountAlt } from './rowedit.js';
+import { confirmRow, confirmAllLowConfidence, editRow, excludeRow, applyAmountAlt, hasUnresolvableFlag } from './rowedit.js';
 import { humanizeExtraField } from './preset-editor.js';
 import { log, error as logError, asText as debugLogText } from '../core/debuglog.js';
 
@@ -277,15 +278,22 @@ export function computeStepReason(step, ctx) {
     return `${joinEnglish(missing)} ${missing.length > 1 ? 'are' : 'is'} required`;
   }
   if (step === 2) {
-    if (ctx.isPdf && ctx.pdfRowModel === 'grouped') return '';
-    const fs = ctx.isPdf ? (ctx.pdfColumnFields || []) : (ctx.mappingFields || []);
-    const hasDate = fs.includes('date');
-    const hasAmount = fs.includes('amount') || (fs.includes('debit') && fs.includes('credit'));
-    const missing = [];
-    if (!hasDate) missing.push('a Date column');
-    if (!hasAmount) missing.push('an Amount column (or Money out and Money in columns)');
-    if (!missing.length) return '';
-    return `Map ${joinEnglish(missing)} to continue`;
+    if (!(ctx.isPdf && ctx.pdfRowModel === 'grouped')) {
+      const fs = ctx.isPdf ? (ctx.pdfColumnFields || []) : (ctx.mappingFields || []);
+      const hasDate = fs.includes('date');
+      const hasAmount = fs.includes('amount') || (fs.includes('debit') && fs.includes('credit'));
+      const missing = [];
+      if (!hasDate) missing.push('a Date column');
+      if (!hasAmount) missing.push('an Amount column (or Money out and Money in columns)');
+      if (missing.length) return `Map ${joinEnglish(missing)} to continue`;
+    }
+    // Item 1: fields are all mapped, but the selected date/number format
+    // fails on too many real sampled values - naming which one, and how
+    // many, since the red line above the picker may read as a passive
+    // readout rather than something Continue is actually blocked on.
+    if (ctx.dateFormatOk === false) return `This date format does not match your file: ${ctx.dateFailedCount} of ${ctx.dateSampleTotal} dates could not be read`;
+    if (ctx.numberFormatOk === false) return `This number format does not match your file: ${ctx.numberFailedCount} of ${ctx.numberSampleTotal} amounts could not be read`;
+    return '';
   }
   if (step === 1) {
     return ctx.isPdf ? 'Click the first and last transaction rows on the page to continue' : 'Pick the row your columns are named on to continue';
@@ -300,9 +308,13 @@ export function computeStepValid(step, ctx) {
     return ctx.pdfRowModel === 'grouped' ? (ctx.groupedRowCount || 0) > 0 : !!(ctx.tableStart && ctx.tableEnd);
   }
   if (step === 2) {
-    if (ctx.isPdf && ctx.pdfRowModel === 'grouped') return true; // fixed date/description/amount fields, always present
+    // Item 1: whatever else is true, a format that fails on >10% of the
+    // sampled dates/amounts blocks Continue - a first-timer must never be
+    // able to walk a broken date/number format into a save.
+    const formatOk = ctx.dateFormatOk !== false && ctx.numberFormatOk !== false;
+    if (ctx.isPdf && ctx.pdfRowModel === 'grouped') return formatOk; // fixed date/description/amount fields, always present
     const fs = ctx.isPdf ? (ctx.pdfColumnFields || []) : (ctx.mappingFields || []);
-    return fs.includes('date') && (fs.includes('amount') || (fs.includes('debit') && fs.includes('credit')));
+    return fs.includes('date') && (fs.includes('amount') || (fs.includes('debit') && fs.includes('credit'))) && formatOk;
   }
   return true;
 }
@@ -461,6 +473,16 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     state.updateProfile = (opts.forceUpdateMapping || match?.formatChanged) ? (match?.profile || null) : null;
     $('#screen-wizard').classList.add('active');
     document.querySelectorAll('.screen').forEach((s) => { if (s.id !== 'screen-wizard') s.classList.remove('active'); });
+    // Item 16: neutral "Getting this ready..." until enterConfirmOrWizard()
+    // (at the end of this function) decides which real screen to show -
+    // the PDF/OCR loading below can take seconds, and the wizard's default
+    // un-hidden state is the full stepper on Basics, which would otherwise
+    // flash before the real confirm-first screen paints.
+    $('#wizard-loading').hidden = false;
+    for (const sel of ['#wizard-stepper', '#wizard-step-heading', '#wizard-step-intro', '#wizard-steps', '#wizard-footer-reason', '#wizard-footer', '#wizard-confirm']) {
+      const el = $(sel);
+      if (el) el.hidden = true;
+    }
 
     // PDF entries have no entry.text/entry.grid at open() time (that only
     // exists once the PDF is actually loaded, in renderAnchorPicker below),
@@ -549,6 +571,10 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
 
   /** Toggle between the confirm screens and the full guided stepper (they are siblings under #screen-wizard, never both visible). */
   function setConfirmMode(on) {
+    // Item 16: whichever real screen this call is about to show, the
+    // neutral loading state's job is done.
+    const loading = $('#wizard-loading');
+    if (loading) loading.hidden = true;
     for (const sel of ['#wizard-stepper', '#wizard-step-heading', '#wizard-step-intro', '#wizard-steps', '#wizard-footer-reason', '#wizard-footer']) {
       const el = $(sel);
       if (el) el.hidden = on;
@@ -621,6 +647,18 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     const amountFill = fieldFill(rows, (r) => (r.amount == null ? null : String(r.amount)));
     const descFill = fieldFill(rows, (r) => r.description_raw);
     if (dateFill < 0.5 || amountFill < 0.5) {
+      // Item 3: a date column WAS found and mapped (real raw text is there),
+      // it's only the date FORMAT that's wrong - a different problem than
+      // "we can't find the dates at all", and a much smaller one to fix.
+      // Stay on confirm-first and open just the date-format picker (already
+      // rendered with its own samples/mismatch line by renderMappingTable),
+      // instead of dropping a first-timer into the full 5-step wizard on an
+      // error banner for a one-field fix.
+      const rawDateFill = fieldFill(rows, (r) => r.date_raw);
+      if (dateFill < 0.5 && amountFill >= 0.5 && rawDateFill >= 0.5) {
+        openConfirmFocus('dates', 'We need one detail: which date format does this file use?');
+        return;
+      }
       // Detection could not fill a required column: go straight to the one step that fixes it, never a Yes on blank data.
       setConfirmMode(false);
       state.gateIntro = dateFill < 0.5
@@ -654,7 +692,7 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
         <table class="txn-table map-table">
           <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
           <tbody>${rows.map((r) => `<tr>
-            <td>${escapeHtml(r.date ?? r.date_raw ?? '')}</td>
+            <td>${escapeHtml(r.date ? formatShortDate(r.date) : (r.date_raw ?? ''))}</td>
             <td>${escapeHtml(r.description_raw ?? '')}</td>
             <td class="num ${r.amount < 0 ? 'amount-out' : 'amount-in'}">${escapeHtml(formatMinorDisplay(r.amount, r.currency))}</td>
           </tr>`).join('')}</tbody>
@@ -707,10 +745,10 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
    * closeConfirmFocus() puts them back exactly where the full wizard expects
    * them to be.
    */
-  function openConfirmFocus(kind) {
+  function openConfirmFocus(kind, heading) {
     renderMappingTable(); // fresh captions/samples/live-preview before pulling nodes out
     const host = $('#confirm-focus-host');
-    host.innerHTML = '';
+    host.innerHTML = heading ? `<h2 class="section-title confirm-heading" tabindex="-1">${escapeHtml(heading)}</h2>` : '';
     state._confirmFocusKind = kind;
     if (kind === 'locate') {
       host.appendChild($('#csv-header-picker'));
@@ -1592,21 +1630,45 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       }
     }
     const warnEl = $(opts.warnEl);
+    const failed = withRaw.filter((v) => parseFn(v) == null).length;
+    const total = withRaw.length;
+    const showWarning = total > 0 && failed / total > 0.1;
     if (warnEl) {
-      const failed = withRaw.filter((v) => parseFn(v) == null).length;
-      const showWarning = withRaw.length > 0 && failed / withRaw.length > 0.1;
       warnEl.hidden = !showWarning;
       if (showWarning) {
         const detectedLabel = opts.detected ? opts.optionLabel(opts.detected) : '';
-        warnEl.innerHTML = `This format does not match your file: ${failed} of ${withRaw.length} ${opts.noun}${failed === 1 ? '' : 's'} could not be read.`
-          + (opts.detected && opts.detected !== opts.current ? ` <a href="#" class="rs-link w-use-detected" data-select="${opts.selectEl}" data-value="${escapeHtml(opts.detected)}">Use detected: ${escapeHtml(detectedLabel)}</a>` : '');
+        // Item 1: for dates specifically, also offer a one-click "Try
+        // day.month.year" that jumps straight to DD/MM/YYYY (the format
+        // whose separator class already accepts dots - see core/date.js) -
+        // distinct from "Use detected" for the case where nothing was
+        // confidently detected, or the detected value IS the (still wrong)
+        // current one.
+        const dayMonthLink = opts.isDate && opts.current !== 'DD/MM/YYYY'
+          ? ' <a href="#" class="rs-link w-try-daymonthyear" data-select="' + opts.selectEl + '">Try day.month.year</a>' : '';
+        warnEl.innerHTML = `This format does not match your file: ${failed} of ${total} ${opts.noun}${failed === 1 ? '' : 's'} could not be read.`
+          + (opts.detected && opts.detected !== opts.current ? ` <a href="#" class="rs-link w-use-detected" data-select="${opts.selectEl}" data-value="${escapeHtml(opts.detected)}">Use detected: ${escapeHtml(detectedLabel)}</a>` : '')
+          + dayMonthLink;
         warnEl.querySelector('.w-use-detected')?.addEventListener('click', (e) => {
           e.preventDefault();
           const sel = $(opts.selectEl);
           if (sel) { sel.value = opts.detected; sel.dispatchEvent(new Event('change')); }
         });
+        warnEl.querySelector('.w-try-daymonthyear')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          const sel = $(opts.selectEl);
+          if (sel) { sel.value = 'DD/MM/YYYY'; sel.dispatchEvent(new Event('change')); }
+        });
       }
     }
+    // Item 1's hard gate (Continue disabled) uses a stricter bar than the
+    // advisory red line above (10%, unchanged): a majority (>50%) of the
+    // sampled values failing is an unambiguous "wrong format" (the German-
+    // dates first-timer case was 6/6); a handful of individually-corrupt
+    // rows in an otherwise-fine file (e.g. one bad OCR read out of 5) stays
+    // just a flagged row for the Test step's own Looks-right/Fix/Exclude
+    // to handle, not a reason to block Map fields entirely.
+    const blockOk = !(total > 0 && failed / total > 0.5);
+    return { failed, total, ok: blockOk };
   }
 
   /**
@@ -1672,16 +1734,22 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     const dateFormatLabels = { 'DD/MM/YYYY': 'DD/MM/YYYY', 'MM/DD/YYYY': 'MM/DD/YYYY', 'YYYY-MM-DD': 'YYYY-MM-DD', 'DD MMM YYYY': 'DD MMM YYYY', 'DD MMM': 'DD MMM' };
     const currentDateFormat = $('#w-dateformat')?.value || state.dateFormat;
     const currentNumberFormat = $('#w-numberformat')?.value || state.numberFormat;
-    renderFormatDiagnostic(
+    const dateInfo = renderFormatDiagnostic(
       dateAllSamples || dateSamples, (raw) => parseDate(raw, currentDateFormat, { year: state.pdf?.yearHint }), (v) => v,
       { exampleEl: '#w-dateformat-example', warnEl: '#w-dateformat-warn', capEl: '#w-dateformat-cap', selectEl: '#w-dateformat',
-        current: currentDateFormat, detected: state.detected.dateFormat, optionLabel: (v) => dateFormatLabels[v] || v, noun: 'date' },
+        current: currentDateFormat, detected: state.detected.dateFormat, optionLabel: (v) => dateFormatLabels[v] || v, noun: 'date', isDate: true },
     );
-    renderFormatDiagnostic(
+    const numberInfo = renderFormatDiagnostic(
       numberAllSamples || numberSamples, (raw) => parseAmount(raw, { numberFormat: currentNumberFormat }).minor, (v) => formatMinorDisplay(v, $('#w-currency')?.value),
       { exampleEl: '#w-numberformat-example', warnEl: '#w-numberformat-warn', capEl: '#w-numberformat-cap', selectEl: '#w-numberformat',
         current: currentNumberFormat, detected: state.detected.numberFormat, optionLabel: (v) => v, noun: 'value' },
     );
+    // Item 1: feeds computeStepValid/computeStepReason (via stepValidCtx) so
+    // Map fields' Continue is disabled - with the reason shown - the moment
+    // more than 10% of the sampled dates or amounts fail to parse under the
+    // currently selected format. A first-timer must never be able to walk a
+    // broken date/number format into a save.
+    state.mapFieldsGate = { date: dateInfo, number: numberInfo };
   }
 
   function renderMappingTable() {
@@ -2268,8 +2336,9 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       const useAltBtn = r.low_confidence_hint && r.amount_alt != null
         ? `<button type="button" class="rs-link row-use-alt-btn">Use ${escapeHtml(formatMinorDisplay(r.amount_alt, r.currency))}</button>`
         : '';
+      const confirmBtn = hasUnresolvableFlag(r) ? '' : '<button type="button" class="rs-link row-confirm-btn">Looks right</button>';
       return `<div class="row-resolve-actions" data-row-id="${r.row_id}">
-        <button type="button" class="rs-link row-confirm-btn">Looks right</button>
+        ${confirmBtn}
         <button type="button" class="rs-link row-fix-btn">Fix</button>
         ${useAltBtn}
         <button type="button" class="rs-link row-exclude-btn">Exclude</button>
@@ -2549,6 +2618,14 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       tableEnd: state.pdf?.tableEnd,
       pdfColumnFields: state.pdf?.columns?.map((c) => c.field) || [],
       mappingFields: state.mapping.map((m) => m.field),
+      // Item 1: undefined (not computed yet, e.g. before Map fields has ever
+      // rendered) reads as "ok" - only an explicit false blocks Continue.
+      dateFormatOk: state.mapFieldsGate ? state.mapFieldsGate.date.ok : undefined,
+      dateFailedCount: state.mapFieldsGate?.date.failed,
+      dateSampleTotal: state.mapFieldsGate?.date.total,
+      numberFormatOk: state.mapFieldsGate ? state.mapFieldsGate.number.ok : undefined,
+      numberFailedCount: state.mapFieldsGate?.number.failed,
+      numberSampleTotal: state.mapFieldsGate?.number.total,
     };
   }
 

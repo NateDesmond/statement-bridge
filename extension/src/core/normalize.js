@@ -317,6 +317,10 @@ export function normalizeRecords(records, version, meta = {}) {
       row_id: `${meta.sourceFile || 'file'}:${idx}`,
       date,
       date_raw: dateRaw || null,
+      // Item 2: the raw amount text, kept alongside date_raw so a "Fix" form
+      // can prefill a row whose amount never parsed with what the file
+      // actually printed, not a blank box.
+      amount_raw: amountResult.ok ? null : (amountRawText || null),
       post_date,
       description_raw,
       merchant: null,

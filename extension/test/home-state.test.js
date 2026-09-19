@@ -238,6 +238,31 @@ test('sinceLastExportRange starts the day after the earliest marker and flags ov
   assert.deepEqual(result.overlapAccounts, ['uob']); // uob's marker is after the suggested start
 });
 
+test('Pass 3 item 15: sinceLastExportRange only flags an overlap account that ALSO has a live row in the suggested range', () => {
+  // uob's marker (2026-08-20) is after the suggested start (2026-08-16), but
+  // it has zero currently-loaded rows in [2026-08-16, 2026-08-20] - all its
+  // rows are either before the range or after its own marker - so it must
+  // not be named as an account being re-exported.
+  const rowsByAccount = {
+    dbs: ['2026-08-01', '2026-08-16'], // has a row inside the range
+    uob: ['2026-07-01', '2026-08-25'], // nothing inside [2026-08-16, 2026-08-20]
+  };
+  const result = sinceLastExportRange({ dbs: '2026-08-15', uob: '2026-08-20' }, '2026-09-01', rowsByAccount);
+  assert.equal(result.startISO, '2026-08-16');
+  assert.deepEqual(result.overlapAccounts, []);
+});
+
+test('Pass 3 item 15: sinceLastExportRange DOES flag an account with a live row on/before its own marker, inside the range', () => {
+  const rowsByAccount = { dbs: ['2026-08-01'], uob: ['2026-08-18'] }; // uob's row is <= its marker (08-20) and >= start (08-16)
+  const result = sinceLastExportRange({ dbs: '2026-08-15', uob: '2026-08-20' }, '2026-09-01', rowsByAccount);
+  assert.deepEqual(result.overlapAccounts, ['uob']);
+});
+
+test('Pass 3 item 15: with no rowsByAccount argument, falls back to the old marker-only behavior (backward compatible)', () => {
+  const result = sinceLastExportRange({ dbs: '2026-08-15', uob: '2026-08-20' }, '2026-09-01');
+  assert.deepEqual(result.overlapAccounts, ['uob']);
+});
+
 // C1 (2026-09-17): a file whose mapping produced no usable dates (a stale
 // profile applied to a renamed-header file, say) must never read as healthy,
 // and must never let its rows reach export silently.

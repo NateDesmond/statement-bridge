@@ -4,7 +4,13 @@
    column, so that's undone below. */
 body.ob-body{min-width:0;}
 
-.ob-page{max-width:560px;margin:0 auto;padding:48px 24px 32px;}
+/* Pass 3 item 8: the shorter onboarding steps (1 has more; 2/3 are quite
+   short) otherwise sit top-anchored with dead space filling the rest of a
+   tall viewport - centre the whole page vertically when it fits, same
+   fix as Home's empty state and Setup C. */
+body.ob-body{display:flex;flex-direction:column;justify-content:center;min-height:100vh;}
+
+.ob-page{max-width:560px;margin:0 auto;padding:48px 24px 32px;width:100%;box-sizing:border-box;}
 
 .ob-lockup{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
 .ob-lockup img{border-radius:7px;}

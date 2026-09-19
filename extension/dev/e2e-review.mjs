@@ -315,7 +315,10 @@ async function main() {
     console.log('6. zoom in, check canvas grows...');
     const widthBefore = await page.$eval('#source-pdf-scroll canvas', (c) => c.getBoundingClientRect().width);
     await page.click('#pdf-zoom-in');
-    await page.waitForTimeout(400);
+    await page.waitForFunction((before) => {
+      const c = document.querySelector('#source-pdf-scroll canvas');
+      return c && c.getBoundingClientRect().width > before + 1;
+    }, widthBefore, { timeout: 8000 }).catch(() => {});
     const widthAfter = await page.$eval('#source-pdf-scroll canvas', (c) => c.getBoundingClientRect().width);
     check('zoom-in makes the rendered page wider', widthAfter > widthBefore, `${widthBefore} -> ${widthAfter}`);
 
@@ -491,12 +494,19 @@ async function seedProfileForFixture(page, fixturePath, bank) {
 }
 
 /** Resolves every currently-selected warning row with "Looks right" until none remain (or the row disappears behind a completion state). */
+// Pass 3 item 2: a row whose date or amount never actually parsed no longer
+// offers "Looks right" at all (a real fix, src/ui/rowedit.js's
+// hasUnresolvableFlag) - only "Edit"/"Exclude" resolve it. Fall back to
+// Exclude when Looks-right isn't there, so this helper still reaches the
+// all-done state on a fixture that has one of those rows, same as a real
+// user would via either action.
 async function resolveAllVisibleWarnings(page, maxSteps = 60) {
   for (let i = 0; i < maxSteps; i++) {
-    const btn = await page.$('#review-table tr.selected button:has-text("Looks right")');
-    if (!btn) break;
-    await btn.click();
-    await page.waitForTimeout(150);
+    const looksRight = await page.$('#review-table tr.selected button:has-text("Looks right")');
+    if (looksRight) { await looksRight.click(); await page.waitForTimeout(150); continue; }
+    const exclude = await page.$('#review-table tr.selected button:has-text("Exclude")');
+    if (exclude) { await exclude.click(); await page.waitForTimeout(150); continue; }
+    break;
   }
 }
 

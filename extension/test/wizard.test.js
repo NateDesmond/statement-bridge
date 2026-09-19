@@ -169,6 +169,30 @@ test('computeStepValid step 2 (Map fields): PDF zone assignment mirrors CSV mapp
   assert.equal(computeStepValid(2, { isPdf: true, pdfRowModel: 'grouped' }), true);
 });
 
+test('Pass 3 item 1: computeStepValid step 2 also gates on the date/number format actually matching the file', () => {
+  const base = { isPdf: false, mappingFields: ['date', 'description_raw', 'amount'] };
+  assert.equal(computeStepValid(2, base), true, 'no gate info yet (undefined) reads as ok');
+  assert.equal(computeStepValid(2, { ...base, dateFormatOk: false, dateFailedCount: 6, dateSampleTotal: 6 }), false);
+  assert.equal(computeStepValid(2, { ...base, numberFormatOk: false }), false);
+  assert.equal(computeStepValid(2, { ...base, dateFormatOk: true, numberFormatOk: true }), true);
+  // Grouped PDFs skip the field-mapping check but not the format gate.
+  assert.equal(computeStepValid(2, { isPdf: true, pdfRowModel: 'grouped', dateFormatOk: false }), false);
+  assert.equal(computeStepValid(2, { isPdf: true, pdfRowModel: 'grouped' }), true);
+});
+
+test('Pass 3 item 1: computeStepReason names the format mismatch once fields are mapped', () => {
+  const base = { isPdf: false, mappingFields: ['date', 'amount'] };
+  assert.equal(
+    computeStepReason(2, { ...base, dateFormatOk: false, dateFailedCount: 6, dateSampleTotal: 6 }),
+    'This date format does not match your file: 6 of 6 dates could not be read',
+  );
+  assert.equal(
+    computeStepReason(2, { ...base, numberFormatOk: false, numberFailedCount: 2, numberSampleTotal: 10 }),
+    'This number format does not match your file: 2 of 10 amounts could not be read',
+  );
+  assert.equal(computeStepReason(2, { ...base, dateFormatOk: true, numberFormatOk: true }), '');
+});
+
 test('computeStepValid step 3+ (Test, Save) has nothing left to validate', () => {
   assert.equal(computeStepValid(3, {}), true);
   assert.equal(computeStepValid(4, {}), true);

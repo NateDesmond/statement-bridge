@@ -22,7 +22,7 @@ import { detectCurrency, convertToTarget, formatBothDirections } from '../core/c
 import { saveSession, sessionsNearingDeletion } from '../core/sessions.js';
 import { renderPresetEditor as renderPresetEditorInto, newPreset, applyLayoutPreset, matchLayoutKey, resolveWorkingPreset } from './preset-editor.js';
 import { renderRowSnippet } from './pdf-render.js';
-import { resolveConfirm, resolveEdit } from './rowedit.js';
+import { resolveConfirm, resolveEdit, resolveExclude, hasUnresolvableFlag } from './rowedit.js';
 import { parseAmount, decimalsFor } from '../core/amount.js';
 import { log, error as logError, asText as debugLogText } from '../core/debuglog.js';
 import {
@@ -54,6 +54,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   let rateMode = 'flat'; // 'flat' one rate for all months, 'perMonth' D4
   let dateField = 'date';
   let customRange = null; // { startISO, endISO } when rangePreset === 'custom'
+  let sinceExportNoteTimer = null; // item 18: the "N of M rows are newer..." note's own 4s auto-hide
   // Item 7: the six built-in layouts, each already shaped as a full preset
   // (dateFormat/signConvention/headerRow included) - "Start from" in Settings
   // indexes into this same list. No user-named saved presets any more.
@@ -875,6 +876,16 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       const { pages, text } = await ocrDocument(entry.bytes, {
         signal: entry.ocrCancel.signal,
         fileName: entry.name, // item 7: every [ocr] log line names the file, not just the wrapping home.ocr ones
+        // Item 9: the page count is known the instant pdf.js opens the
+        // document - no need to wait for a first page to finish before
+        // showing it, so a first-timer never sits looking at a bare
+        // "Reading your scan..." with zero information for however long
+        // page 1 takes.
+        onStart: (total) => {
+          entry.pagesTotal = total;
+          entry.progressLabel = `Reading page 1 of ${total}`;
+          renderFileRows();
+        },
         onProgress: (done, total) => {
           entry.progress = total ? done / total : 0;
           const avgMs = pageTimingsMs.length ? pageTimingsMs.reduce((a, b) => a + b, 0) / pageTimingsMs.length : null;
@@ -1807,13 +1818,25 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
 
     const choices = document.createElement('div');
     choices.className = 'decision-choices';
-    const goodBtn = document.createElement('button');
-    goodBtn.type = 'button'; goodBtn.className = 'btn btn-choice good'; goodBtn.textContent = 'Looks right';
-    goodBtn.onclick = () => resolveDecisionRow(file, row, resolveConfirm(row), 'Marked as looks right.');
     const fixBtn = document.createElement('button');
     fixBtn.type = 'button'; fixBtn.className = 'btn btn-choice fix'; fixBtn.textContent = 'Fix';
     fixBtn.onclick = () => openDecisionFix(body, file, row);
-    choices.append(goodBtn, fixBtn);
+    // Pass 3 item 2: a row whose date or amount never parsed is never
+    // offered "Looks right" - that value is still unusable, so the only
+    // real actions are "Fix" (below, prefilled with the raw source text)
+    // and "Exclude". Every other flag (confidence/direction/duplicate) is
+    // just asking a human to confirm a value that already parsed fine.
+    if (hasUnresolvableFlag(row)) {
+      const excludeBtn = document.createElement('button');
+      excludeBtn.type = 'button'; excludeBtn.className = 'btn btn-choice'; excludeBtn.textContent = 'Exclude';
+      excludeBtn.onclick = () => resolveDecisionRow(file, row, resolveExclude(row), 'Row excluded.');
+      choices.append(fixBtn, excludeBtn);
+    } else {
+      const goodBtn = document.createElement('button');
+      goodBtn.type = 'button'; goodBtn.className = 'btn btn-choice good'; goodBtn.textContent = 'Looks right';
+      goodBtn.onclick = () => resolveDecisionRow(file, row, resolveConfirm(row), 'Marked as looks right.');
+      choices.append(goodBtn, fixBtn);
+    }
 
     el.append(snippet, body, choices);
     return el;
@@ -1875,18 +1898,29 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   function openDecisionFix(body, file, row) {
     const original = body.innerHTML;
     const amountStr = row.amount != null ? (row.amount / (10 ** decimalsFor(row.currency))).toFixed(decimalsFor(row.currency)) : '';
+    // Item 2: a date that never parsed has no ISO value a native
+    // type="date" input can hold - fall back to a plain text input
+    // prefilled with the row's own raw text (date_raw) so a first-timer
+    // edits what they actually see on their statement, not a blank box.
+    const dateInput = row.date
+      ? `<input type="date" class="decision-fix-date" value="${row.date}" aria-label="Date">`
+      : `<input type="text" class="decision-fix-date" value="${escapeHtml(row.date_raw || '')}" aria-label="Date" placeholder="e.g. 2026-06-01">`;
+    const amountInput = amountStr || !row.amount_raw
+      ? `<input type="text" class="decision-fix-amount" value="${amountStr}" aria-label="Amount">`
+      : `<input type="text" class="decision-fix-amount" value="${escapeHtml(row.amount_raw)}" aria-label="Amount">`;
     body.innerHTML = `
       <div class="decision-fix-form">
-        <input type="date" class="decision-fix-date" value="${row.date || ''}" aria-label="Date">
+        ${dateInput}
         <input type="text" class="decision-fix-desc" value="${escapeHtml(row.description_raw || '')}" aria-label="Description">
-        <input type="text" class="decision-fix-amount" value="${amountStr}" aria-label="Amount">
+        ${amountInput}
         <button type="button" class="btn btn-brass btn-sm decision-fix-save">Save</button>
         <button type="button" class="btn btn-ghost btn-sm decision-fix-cancel">Cancel</button>
       </div>`;
     body.querySelector('.decision-fix-cancel').onclick = () => { body.innerHTML = original; };
     body.querySelector('.decision-fix-save').onclick = () => {
+      const dateVal = body.querySelector('.decision-fix-date').value.trim();
       const fields = {
-        date: body.querySelector('.decision-fix-date').value || row.date,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(dateVal) ? dateVal : row.date,
         description_raw: body.querySelector('.decision-fix-desc').value,
       };
       const parsed = parseAmount(body.querySelector('.decision-fix-amount').value, { currency: row.currency });
@@ -1969,14 +2003,20 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         <p class="fc-body">"${card.name}" no longer matches ${card.profileName}'s saved layout.</p>
         <div class="fc-actions"></div>`;
       const actions = el.querySelector('.fc-actions');
-      actions.appendChild(mkBtn('btn-brass', 'Set up again', () => onOpenWizard(entry)));
+      // Item 19: stable data-test attributes for this card's own actions -
+      // "Set up again"/"Use anyway" text also appears elsewhere (the
+      // accounts table row for the same file, once the Change drawer is
+      // open), so a selector keyed on text alone can match more than one
+      // real element; these give the layout-changed card's own buttons an
+      // unambiguous target.
+      actions.appendChild(mkBtn('btn-brass', 'Set up again', () => onOpenWizard(entry), 'layout-changed-setup-again'));
       // Item 13: when this "Layout changed" reading came from a wrong pick
       // in the existing-profile picker (checks failed), the way out is back
       // into that picker, not a blind "use it anyway" over failing checks.
       if (entry.pickedProfileFailed) {
-        appendSecondaryLink(actions, 'Pick a different statement type', () => openProfilePicker(entry));
+        appendSecondaryLink(actions, 'Pick a different statement type', () => openProfilePicker(entry), 'layout-changed-pick-different');
       } else {
-        appendSecondaryLink(actions, 'Use anyway', () => applyMatchToFile(entry, entry.matches[0]));
+        appendSecondaryLink(actions, 'Use anyway', () => applyMatchToFile(entry, entry.matches[0]), 'layout-changed-use-anyway');
       }
     } else if (card.kind === 'matchFailed') {
       // Item A: every ranked candidate profile was tried automatically and
@@ -2084,16 +2124,24 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     return el;
   }
 
-  function appendSecondaryLink(actions, label, onClick) {
+  // Item 19: an optional `dataTest` lets a caller give its action a stable
+  // selector independent of its label text - several card kinds share the
+  // same visible label ("Set up again" appears on unreadableDates,
+  // layoutChanged AND the accounts table row for the same file when the
+  // drawer is open), so an automation/test selector keyed on text alone can
+  // match more than one real, correctly-rendered element at once.
+  function appendSecondaryLink(actions, label, onClick, dataTest) {
     const link = document.createElement('a');
     link.className = 'rs-link fc-secondary'; link.href = '#'; link.textContent = label;
+    if (dataTest) link.setAttribute('data-test', dataTest);
     link.onclick = (e) => { e.preventDefault(); onClick(); };
     actions.appendChild(link);
   }
 
-  function mkBtn(cls, label, onClick) {
+  function mkBtn(cls, label, onClick, dataTest) {
     const btn = document.createElement('button');
     btn.className = `btn ${cls} btn-sm`; btn.type = 'button'; btn.textContent = label;
+    if (dataTest) btn.setAttribute('data-test', dataTest);
     btn.onclick = onClick;
     return btn;
   }
@@ -2127,7 +2175,19 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // what's exported" sheet's own header below, never duplicated here.
     const headlineRange = dateRangeOfRows(rows);
     const headlineRangeLabel = headlineRange ? formatRangeLabel(headlineRange.startISO, headlineRange.endISO) : null;
-    $('#export-summary').textContent = resultHeadlineLabel(rows.length, includedSources.length, headlineRangeLabel);
+    // Item 17: the headline and the drawer's "Copying: <preset> (...)" line
+    // (rangeSummaryLabel above) used to show two unlabeled date ranges that
+    // could diverge and read as a contradiction - the full data span vs the
+    // active filter's narrower window. Label them explicitly: "Covers X"
+    // when the filter isn't actually narrowing anything (or is "All"), or
+    // "Copying X" (matching the filter's own range) when it is.
+    const fullSpanRows = allRows().filter((r) => !r.excluded && !r.skipped);
+    const fullSpan = dateRangeOfRows(fullSpanRows);
+    const sameSpan = !!(fullSpan && headlineRange && fullSpan.startISO === headlineRange.startISO && fullSpan.endISO === headlineRange.endISO);
+    const coverageLabel = headlineRangeLabel
+      ? (state.rangePreset === 'all' || sameSpan ? `Covers ${headlineRangeLabel}` : `Copying ${headlineRangeLabel}`)
+      : null;
+    $('#export-summary').textContent = resultHeadlineLabel(rows.length, includedSources.length, coverageLabel);
     const settingsSummary = `${sourcesText}Columns: ${columnsSummaryLabel()} · ${rangeSummaryLabel()} · ${accountsSummaryLabel(rows.length, byAccount.size)}${notIncludedText} · ${currencyText}`;
     const drawerTitle = $('#change-drawer-title');
     if (drawerTitle) drawerTitle.innerHTML = `Export settings<br><span class="drawer-settings-summary">${settingsSummary}</span>`;
@@ -2179,20 +2239,35 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   function renderResultTable() {
     const container = $('#result-table');
     if (!container) return;
+    // Item 5: rows already shown in the "N rows need a quick look" decision
+    // card get a small dot here instead of the card repeating their date/
+    // description/amount a second time.
+    const flaggedRowIds = new Set(flaggedDecisionRows(state.files).map(({ row }) => row.row_id));
     renderPresetEditorInto({
       container,
       preset: activePreset,
       previewRows: rowsForExport(),
       previewPreset: exportPreset(),
       tableOnly: true,
+      flaggedRowIds,
     });
+  }
+
+  /** Item 17: the active preset's own display name (from RANGE_OPTIONS below), for pairing with its concrete dates - "Last full month" next to "(1 to 31 Aug)", not just a bare date range with no name attached. */
+  function rangePresetLabel() {
+    return RANGE_OPTIONS.find(([id]) => id === state.rangePreset)?.[1] || 'Custom range';
   }
 
   function rangeSummaryLabel() {
     const range = currentRange();
     if (state.rangePreset === 'all') return 'All dates';
     if (!range.startISO && !range.endISO) return 'All dates';
-    return formatRangeLabel(range.startISO || '0001-01-01', range.endISO || new Date().toISOString().slice(0, 10));
+    const dates = formatRangeLabel(range.startISO || '0001-01-01', range.endISO || new Date().toISOString().slice(0, 10));
+    // Item 17: "Copying: <preset name> (<dates>)" - so this line reads as
+    // the active FILTER's own window, distinct from the headline's data
+    // span above it, instead of two unlabeled date ranges that can look
+    // like a contradiction.
+    return `Copying: ${rangePresetLabel()} (${dates})`;
   }
 
   // --- Change drawer -----------------------------------------------------
@@ -2214,13 +2289,40 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       chip.className = `chip${state.rangePreset === value ? ' active' : ''}`;
       chip.type = 'button'; chip.textContent = label;
       chip.onclick = async () => {
+        // Item 18: the count before this click, under whatever range was
+        // active a moment ago - compared against the new "Since last
+        // export" count below, so a real change (47 -> 37) gets a quiet
+        // acknowledgement instead of the click looking like it did nothing.
+        const beforeCount = rowsInRange().length;
         state.rangePreset = value;
         if (value === 'sinceLastExport') {
           const markers = (await storage.get(LAST_EXPORTED_KEY)) || {};
-          const { startISO, endISO, overlapAccounts } = sinceLastExportRange(markers, new Date().toISOString().slice(0, 10));
+          // Item 15: the live row set, per account - sinceLastExportRange
+          // only flags an account as "already exported" (overlapAccounts)
+          // when it ALSO has a currently-loaded row in the suggested range,
+          // not just because its marker happens to be recent.
+          const rowsByAccount = {};
+          for (const { label, files } of accountGroupsForTable()) {
+            rowsByAccount[label] = files.flatMap((f) => (f.rows || [])
+              .filter((r) => !r.excluded && !r.skipped)
+              .map((r) => r.date)).filter(Boolean);
+          }
+          const { startISO, endISO, overlapAccounts } = sinceLastExportRange(markers, new Date().toISOString().slice(0, 10), rowsByAccount);
           customRange = { startISO, endISO };
           $('#since-export-overlap').textContent = overlapAccounts.length
             ? `Re-exporting rows already exported for: ${overlapAccounts.join(', ')}` : '';
+          const afterCount = rowsInRange().length;
+          const noteEl = $('#since-export-note');
+          if (noteEl) {
+            if (afterCount !== beforeCount) {
+              noteEl.textContent = `${afterCount} of ${beforeCount} rows are newer than your last copy`;
+              noteEl.hidden = false;
+              clearTimeout(sinceExportNoteTimer);
+              sinceExportNoteTimer = setTimeout(() => { noteEl.hidden = true; }, 4000);
+            } else {
+              noteEl.hidden = true;
+            }
+          }
         } else {
           $('#since-export-overlap').textContent = '';
         }

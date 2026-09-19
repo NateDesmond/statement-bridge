@@ -616,8 +616,13 @@ export function summarizeExtraction(rows) {
  * a marker is missing or newer data arrived before the marker's date).
  * @param {Record<string,string>} lastExportedByAccount - account label -> ISO date of the last exported row
  * @param {string} todayISO
+ * @param {Record<string,string[]>} [rowsByAccount] - account label -> ISO dates of that account's currently
+ *   loaded (non-excluded, non-skipped) rows. Item 15: an account only belongs in overlapAccounts if it ALSO has
+ *   at least one such row on or before its own marker and inside the suggested range - the marker alone doesn't
+ *   say whether that account contributes any row to THIS export, only whether it was exported before. Optional
+ *   for callers with no live row set yet; omitting it falls back to the old marker-only check.
  */
-export function sinceLastExportRange(lastExportedByAccount, todayISO) {
+export function sinceLastExportRange(lastExportedByAccount, todayISO, rowsByAccount) {
   const markers = Object.values(lastExportedByAccount || {}).filter(Boolean).sort();
   if (!markers.length) return { startISO: null, endISO: todayISO, overlapAccounts: [] };
   // Start the day after the earliest account's marker; accounts exported more
@@ -627,7 +632,12 @@ export function sinceLastExportRange(lastExportedByAccount, todayISO) {
   startDate.setUTCDate(startDate.getUTCDate() + 1);
   const startISO = startDate.toISOString().slice(0, 10);
   const overlapAccounts = Object.entries(lastExportedByAccount || {})
-    .filter(([, marker]) => marker && marker >= startISO)
+    .filter(([account, marker]) => {
+      if (!marker || marker < startISO) return false;
+      if (!rowsByAccount) return true; // no live row set supplied - old marker-only behavior
+      const dates = rowsByAccount[account] || [];
+      return dates.some((d) => d && d >= startISO && d <= marker);
+    })
     .map(([account]) => account);
   return { startISO, endISO: todayISO, overlapAccounts };
 }

@@ -124,59 +124,76 @@
           <div class="drawer-body" id="change-drawer" hidden>
             <h2 class="section-title" id="change-drawer-title">Export settings</h2>
 
-            <h2 class="section-title">Date range</h2>
-            <div class="chip-row" id="range-chip-row"></div>
-            <div class="range-custom-inputs" id="range-custom-inputs" hidden>
-              <label class="pg-label" for="range-custom-start">From</label>
-              <input type="date" id="range-custom-start">
-              <label class="pg-label" for="range-custom-end">To</label>
-              <input type="date" id="range-custom-end">
-            </div>
-            <p class="pdf-anchor-hint" id="since-export-overlap" style="color:var(--warn);"></p>
-            <div class="picker-row">
-              <div class="picker-group">
-                <label class="pg-label" for="date-field-select">Filter using</label>
-                <select id="date-field-select"><option value="date">Transaction date</option><option value="post_date">Posted date</option></select>
+            <!-- Item 13: three visually bounded cards (When / What to copy /
+                 Currency) instead of six flat all-caps labels in a row - the
+                 IDs/structure JS already targets are untouched, only the
+                 grouping/wrapping around them changed. -->
+            <div class="panel drawer-card">
+              <h3 class="drawer-card-title">When</h3>
+              <h2 class="section-title">Date range</h2>
+              <div class="chip-row" id="range-chip-row"></div>
+              <div class="range-custom-inputs" id="range-custom-inputs" hidden>
+                <label class="pg-label" for="range-custom-start">From</label>
+                <input type="date" id="range-custom-start">
+                <label class="pg-label" for="range-custom-end">To</label>
+                <input type="date" id="range-custom-end">
+              </div>
+              <p class="pdf-anchor-hint" id="since-export-overlap" style="color:var(--warn);"></p>
+              <!-- Item 18: a quiet 4-second acknowledgement that the click
+                   actually changed the row count (e.g. 47 -> 37), so a
+                   legitimately surprising drop never reads as "did that do
+                   anything?" -->
+              <p class="pdf-anchor-hint" id="since-export-note" hidden></p>
+              <div class="picker-row">
+                <div class="picker-group">
+                  <label class="pg-label" for="date-field-select">Filter using</label>
+                  <select id="date-field-select"><option value="date">Transaction date</option><option value="post_date">Posted date</option></select>
+                </div>
               </div>
             </div>
 
-            <!-- Item 8 (REBUILD-HOME, 2026-09-18): one table, Coverage by
-                 account and Sources merged - nothing about accounts anywhere
-                 else in the sheet. -->
-            <h2 class="section-title">Your accounts</h2>
-            <table class="accounts-table">
-              <thead><tr><th>Account</th><th>Statements</th><th>Rows in range</th><th>Include</th><th>Actions</th></tr></thead>
-              <tbody id="accounts-table-body"></tbody>
-            </table>
-
-            <h2 class="section-title">Currency</h2>
-            <div class="currency-row" role="radiogroup" aria-label="Currency">
-              <label class="currency-option" id="currency-mode-a">
-                <input type="radio" name="currency-mode" value="A">
-                Keep each account's currency
-              </label>
-              <label class="currency-option" id="currency-mode-b">
-                <input type="radio" name="currency-mode" value="B">
-                Convert everything to
-                <input type="text" class="target-currency-input" id="target-currency-input" maxlength="3" aria-label="Target currency">
-              </label>
-            </div>
-            <div id="rate-table-wrap" hidden>
-              <div class="chip-row" id="rate-mode-row">
-                <button type="button" class="chip" id="rate-mode-flat">One rate for all</button>
-                <button type="button" class="chip" id="rate-mode-permonth">Rate per month</button>
-              </div>
-              <table class="rate-table">
-                <thead><tr><th>Currency pair</th><th>Rate, foreign to target</th><th>Both directions</th></tr></thead>
-                <tbody id="rate-table-body"></tbody>
+            <div class="panel drawer-card">
+              <h3 class="drawer-card-title">What to copy</h3>
+              <!-- Item 8 (REBUILD-HOME, 2026-09-18): one table, Coverage by
+                   account and Sources merged - nothing about accounts anywhere
+                   else in the sheet. -->
+              <h2 class="section-title">Your accounts</h2>
+              <table class="accounts-table">
+                <thead><tr><th>Account</th><th>Statements</th><th>Rows in range</th><th>Include</th><th>Actions</th></tr></thead>
+                <tbody id="accounts-table-body"></tbody>
               </table>
+
+              <h2 class="section-title">Columns</h2>
+              <div id="home-preset-editor"></div>
+              <div class="toggle-line" style="margin-top:8px;">
+                <input type="checkbox" id="source-cols-home">
+                <label for="source-cols-home">Include original source columns</label>
+              </div>
             </div>
 
-            <h2 class="section-title">Columns</h2>
-            <div id="home-preset-editor"></div>
-            <div class="toggle-line" style="margin-top:8px;">
-              <input type="checkbox" id="source-cols-home">
-              <label for="source-cols-home">Include original source columns</label>
+            <div class="panel drawer-card">
+              <h3 class="drawer-card-title">Currency</h3>
+              <div class="currency-row" role="radiogroup" aria-label="Currency">
+                <label class="currency-option" id="currency-mode-a">
+                  <input type="radio" name="currency-mode" value="A">
+                  Keep each account's currency
+                </label>
+                <label class="currency-option" id="currency-mode-b">
+                  <input type="radio" name="currency-mode" value="B">
+                  Convert everything to
+                  <input type="text" class="target-currency-input" id="target-currency-input" maxlength="3" aria-label="Target currency">
+                </label>
+              </div>
+              <div id="rate-table-wrap" hidden>
+                <div class="chip-row" id="rate-mode-row">
+                  <button type="button" class="chip" id="rate-mode-flat">One rate for all</button>
+                  <button type="button" class="chip" id="rate-mode-permonth">Rate per month</button>
+                </div>
+                <table class="rate-table">
+                  <thead><tr><th>Currency pair</th><th>Rate, foreign to target</th><th>Both directions</th></tr></thead>
+                  <tbody id="rate-table-body"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -262,6 +279,12 @@
                 <span>Extracted transactions</span>
                 <span id="extracted-count"></span>
               </div>
+              <!-- Item 7: the source pane shows a date exactly as printed
+                   (e.g. 01/06/2026); this table always normalises to
+                   year-month-day - without this line the same row looking
+                   different in two places next to each other reads as a
+                   bug, not a feature. -->
+              <p class="pdf-anchor-hint" id="extracted-date-caption">Dates shown as year-month-day; the page shows them as printed.</p>
               <div class="grid-scroll">
                 <table class="txn-table" id="review-table">
                   <thead id="review-thead"></thead>
@@ -315,6 +338,7 @@
 
       <!-- ============ SETTINGS ============ -->
       <section class="screen" id="screen-settings">
+        <h1 class="page-title">Settings</h1>
         <p class="pdf-anchor-hint" data-test="settings-intro">Change what gets exported, what's kept on this device, and a few things you won't need often.</p>
         <div class="settings-grid">
           <div>
@@ -395,6 +419,7 @@
 
       <!-- ============ HOW IT WORKS (from the sidebar lock, or Home first-run) ============ -->
       <section class="screen" id="screen-how">
+        <h1 class="page-title">How it works</h1>
         <div class="reading">
           <p class="how-lede" data-test="how-lede">Drop your statements. Statement Bridge reads them on your computer and gives you a table you can copy into Google Sheets.</p>
 
@@ -489,6 +514,15 @@
       <!-- ============ MAPPING WIZARD (opened from Home or Profiles) ============ -->
       <!-- Section A (wizard agent) -->
       <section class="screen" id="screen-wizard">
+        <!-- Pass 3 item 16: a neutral loading state, shown the instant the
+             wizard opens (open()'s PDF/OCR loading is async and can take
+             seconds) and hidden again once enterConfirmOrWizard() has
+             decided which of the states below to show - without this, the
+             default un-hidden state below (the full stepper on Basics) paints
+             first and flashes before the real confirm/wizard screen does. -->
+        <div id="wizard-loading" class="confirm-step">
+          <p class="pdf-anchor-hint">Getting this ready&hellip;</p>
+        </div>
         <!-- Confirm-first setup: the default entry for a new or changed statement.
              Screens A (confirm)/B (what's wrong)/focus (fix one thing)/C (name it).
              The full step-by-step wizard below stays reachable via B's "Something
@@ -506,11 +540,26 @@
 
           <div id="confirm-b" class="confirm-step" hidden>
             <h2 class="section-title confirm-heading" tabindex="-1">What's wrong?</h2>
+            <!-- Item 10: a one-line example under each label, so the tile
+                 reads as a specific, finished choice rather than a bare
+                 placeholder-feeling word. -->
             <div class="confirm-choice-grid">
-              <button class="confirm-choice-tile" type="button" id="confirm-fix-dates" data-test="confirm-fix-dates">Dates are wrong</button>
-              <button class="confirm-choice-tile" type="button" id="confirm-fix-amounts" data-test="confirm-fix-amounts">Amounts or +/- are wrong</button>
-              <button class="confirm-choice-tile" type="button" id="confirm-fix-rows" data-test="confirm-fix-rows">Rows are missing or extra</button>
-              <button class="confirm-choice-tile" type="button" id="confirm-fix-other" data-test="confirm-fix-other">Something else</button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-dates" data-test="confirm-fix-dates">
+                <span class="cct-label">Dates are wrong</span>
+                <span class="cct-example">e.g. shows 1 Jun when your statement says 6 Jan</span>
+              </button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-amounts" data-test="confirm-fix-amounts">
+                <span class="cct-label">Amounts or +/- are wrong</span>
+                <span class="cct-example">e.g. a payment shows as money in instead of money out</span>
+              </button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-rows" data-test="confirm-fix-rows">
+                <span class="cct-label">Rows are missing or extra</span>
+                <span class="cct-example">e.g. a transaction is missing, or a footer line snuck in</span>
+              </button>
+              <button class="confirm-choice-tile" type="button" id="confirm-fix-other" data-test="confirm-fix-other">
+                <span class="cct-label">Something else</span>
+                <span class="cct-example">Open the full setup and fix it by hand</span>
+              </button>
             </div>
           </div>
 

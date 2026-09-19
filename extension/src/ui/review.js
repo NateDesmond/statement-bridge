@@ -6,6 +6,7 @@ import { balanceCheck, countCheck, countCheckLabel, countCheckGrouped, groupedCo
 import {
   restoreRow, addMissingRow, treatAsTransaction, confirmAllLowConfidence, editRow,
   resolveConfirm, resolveExclude, resolveUseAlt, resolveEdit, undoRow, nextUnresolvedAfter, prevUnresolvedBefore,
+  hasUnresolvableFlag,
 } from './rowedit.js';
 import { renderPdfPage, pdfYToCanvasTop, pdfYToCanvasPixel, getPdfPageInfo } from './pdf-render.js';
 import { groupItemsIntoLines, lineText } from '../core/pdf.js';
@@ -18,7 +19,14 @@ const $ = (sel) => document.querySelector(sel);
 // themselves make a row look like it "needs a look" (that's
 // 'low_confidence_ocr'/a real misread, or an actual warning flag).
 const INFO_ONLY_FLAGS = new Set(['ocr', 'pending']);
-const hasWarningFlag = (row) => (row.flags || []).some((f) => !INFO_ONLY_FLAGS.has(f));
+// Pass 3 item 2 follow-up: an excluded row never "needs a look" again,
+// regardless of what flags it still carries - confirmRow (rowedit.js) now
+// deliberately keeps unparseable_date/missing_amount on a row until the
+// value is actually fixed, so "Exclude" (never intended to fix the value,
+// just drop the row) must be the thing that clears it from every warning
+// count/all-done check here, same as home-state.js's warningRowCount/
+// flaggedDecisionRows already do.
+const hasWarningFlag = (row) => !row.excluded && (row.flags || []).some((f) => !INFO_ONLY_FLAGS.has(f));
 // Row tags hide 'ocr' (already said once in the summary bar) but 'pending'
 // is per-transaction context worth seeing on the row itself.
 const HIDDEN_ROW_TAGS = new Set(['ocr']);
@@ -890,7 +898,7 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
 
   function actionButtons(row) {
     const parts = [];
-    if (hasWarningFlag(row)) parts.push('<button type="button" class="primary" data-act="confirm">Looks right</button>');
+    if (hasWarningFlag(row) && !hasUnresolvableFlag(row)) parts.push('<button type="button" class="primary" data-act="confirm">Looks right</button>');
     parts.push('<button type="button" data-act="edit">Edit</button>');
     // Item 1: a row with a suggested alt amount (normalize.js's OCR
     // no-decimal safety net) gets a one-click "Use $X" action next to Edit.
