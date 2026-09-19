@@ -45,14 +45,14 @@ export function parseDate(raw, dateFormat, opts = {}) {
   }
 
   if (dateFormat === 'DD/MM/YYYY') {
-    const m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+    const m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
     if (!m) return null;
     const year = m[3].length === 2 ? 2000 + (+m[3]) : +m[3];
     return toISO(year, +m[2], +m[1]);
   }
 
   if (dateFormat === 'MM/DD/YYYY') {
-    const m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+    const m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
     if (!m) return null;
     const year = m[3].length === 2 ? 2000 + (+m[3]) : +m[3];
     return toISO(year, +m[1], +m[2]);

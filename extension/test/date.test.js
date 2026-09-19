@@ -55,3 +55,8 @@ test('inferYearFromPeriod: crosses boundary, month near end uses end year', () =
   assert.equal(inferYearFromPeriod(1, 5, period), 2026);
   assert.equal(inferYearFromPeriod(12, 20, period), 2025);
 });
+
+test('dotted European dates (01.06.2026) parse under the day-first format (pass 3, German CSV dead end)', () => {
+  assert.equal(parseDate('01.06.2026', 'DD/MM/YYYY'), '2026-06-01');
+  assert.equal(parseDate('31.12.2025', 'DD/MM/YYYY'), '2025-12-31');
+});

@@ -144,7 +144,7 @@ export function scoreHeader(header, field) {
 }
 
 function isDateLike(value) {
-  return /^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}$/.test(String(value ?? '').trim())
+  return /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/.test(String(value ?? '').trim())
     || /^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}$/.test(String(value ?? '').trim());
 }
 
@@ -438,11 +438,11 @@ export function suggestDateFormat(values) {
   if (samples.some((v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v).trim()))) return 'YYYY-MM-DD';
   if (samples.some((v) => /^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}$/.test(String(v).trim()))) return 'DD MMM YYYY';
   if (samples.some((v) => /^\d{1,2}\s+[A-Za-z]{3,}$/.test(String(v).trim()))) return 'DD MMM';
-  const slashSamples = samples.filter((v) => /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(String(v).trim()));
+  const slashSamples = samples.filter((v) => /^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/.test(String(v).trim()));
   if (slashSamples.length === 0) return null;
   let overFirst = false, overSecond = false;
   for (const v of slashSamples) {
-    const m = String(v).trim().match(/^(\d{1,2})[-/](\d{1,2})[-/]\d{2,4}$/);
+    const m = String(v).trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.]\d{2,4}$/);
     if (+m[1] > 12) overFirst = true;
     if (+m[2] > 12) overSecond = true;
   }

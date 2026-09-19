@@ -97,7 +97,7 @@ export function balanceCheck(rows, opts = {}) {
 // optional (2026-09-16: uob_card_sample.pdf's columns-rowModel date column
 // prints "DD MMM" with no year at all - countCheck was reporting a false
 // mismatch on every such file, requiring a year that was never there).
-const DEFAULT_DATE_LINE_RE = /^\s*"?\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\b|^\s*"?\d{1,2}\s+[A-Za-z]{3,9}\b(?:\s+\d{4}\b)?/;
+const DEFAULT_DATE_LINE_RE = /^\s*"?\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b|^\s*"?\d{1,2}\s+[A-Za-z]{3,9}\b(?:\s+\d{4}\b)?/;
 
 export function countCheck(sourceText, extractedCount, dateLineRe = DEFAULT_DATE_LINE_RE) {
   const lines = sourceText.split(/\r\n|\r|\n/);

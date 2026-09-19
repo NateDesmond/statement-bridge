@@ -1071,7 +1071,7 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
   // page - Locate-data itself still shows one rendered page at a time (Prev/
   // Next below), since that is all a screen can usefully show at once.
 
-  const PDF_DATE_LINE_RE = /^\s*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b|^\s*\d{4}-\d{2}-\d{2}\b|^\s*\d{1,2}\s+[A-Za-z]{3,9}\b/;
+  const PDF_DATE_LINE_RE = /^\s*\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b|^\s*\d{4}-\d{2}-\d{2}\b|^\s*\d{1,2}\s+[A-Za-z]{3,9}\b/;
 
   /** Load every page's positioned text items once: OCR's cached per-page items for an OCR'd file, or a real loadPdfPages() pass otherwise. */
   async function loadAllPdfPageItems(entry) {
