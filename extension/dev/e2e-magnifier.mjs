@@ -23,11 +23,11 @@ function check(label, ok, detail) {
   if (!ok) failures++;
 }
 
-async function newContext() {
+async function newContext(width = 1440) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-e2e-magnifier-'));
   return chromium.launchPersistentContext(tmpDir, {
     headless: false, // MV3 service worker needs a real (bundled Chromium) window context
-    viewport: { width: 1440, height: 900 },
+    viewport: { width, height: 900 },
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
@@ -37,12 +37,13 @@ async function newContext() {
 
 async function openWorkspace(context) {
   let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
   const extId = new URL(sw.url()).host;
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+  page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.log(`[console.${m.type()}]`, m.text().slice(0, 300)); });
   await page.goto(`chrome-extension://${extId}/workspace.html`);
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   return page;
 }
 
@@ -67,7 +68,12 @@ async function dropAndMapOnHome(page, fixturePath) {
     return row && !/Cancel/.test(row.textContent || '');
   }, { timeout: 120000 }).catch(() => {});
 
+  // Text recognition on this image-only fixture can take a few minutes on a
+  // busy machine; wait for the Set up button itself rather than assuming the
+  // OCR wait above was long enough (when it wasn't, the whole confirm-first
+  // flow was silently skipped and the "needs a quick look" wait timed out).
   const setupBtn = page.locator('.new-bank-card button:has-text("Set up")');
+  await setupBtn.first().waitFor({ state: 'visible', timeout: 240000 }).catch(() => {});
   if (await setupBtn.count()) {
     await setupBtn.click();
     await page.waitForSelector('#confirm-a:not([hidden])', { timeout: 20000 });
@@ -76,36 +82,115 @@ async function dropAndMapOnHome(page, fixturePath) {
     await page.waitForSelector('#confirm-c:not([hidden])', { timeout: 20000 });
     await page.click('#confirm-save');
   }
-  await page.waitForFunction(() => /\d+\s*rows? need a quick look/i.test(document.body.textContent || ''), { timeout: 20000 });
+  await page.waitForFunction(() => /\d+\s*rows? needs? a quick look/i.test(document.body.textContent || ''), { timeout: 30000 })
+    .catch(async (err) => { console.log('[home text]', (await page.evaluate(() => document.body.innerText)).slice(0, 800)); throw err; });
   await page.waitForTimeout(600);
 }
 
-async function run() {
-  console.log('\n=== scenario: snippet magnifier (item 7) ===');
-  const context = await newContext();
+const snippetSel = '.decision-row .decision-snippet[tabindex]';
+
+/**
+ * Item A: measured (never eyeballed) geometry of the first card's snippet
+ * canvas, including the x-height of the text it actually rendered - read off
+ * the bitmap itself, not inferred: for the darkest text line in the crop, the
+ * rows whose ink coverage is at least half that line's peak are its lowercase
+ * core (ascenders and descenders are the sparse rows above and below).
+ */
+async function snippetMetrics(page) {
+  return page.$eval(`${snippetSel} canvas`, (el) => {
+    const r = el.getBoundingClientRect();
+    const ctx = el.getContext('2d');
+    const { data } = ctx.getImageData(0, 0, el.width, el.height);
+    const ink = [];
+    for (let y = 0; y < el.height; y++) {
+      let n = 0;
+      for (let x = 0; x < el.width; x++) {
+        const i = (y * el.width + x) * 4;
+        if (data[i] < 110 && data[i + 1] < 110 && data[i + 2] < 110) n++;
+      }
+      ink.push(n);
+    }
+    // Split into text lines (runs of rows with any ink), take the one with
+    // the most ink, and count its rows at >= 50% of its own peak.
+    let best = { rows: 0 }, cur = [];
+    const flush = () => {
+      if (!cur.length) return;
+      const peak = Math.max(...cur.map((p) => p.n));
+      const rows = cur.filter((p) => p.n >= peak * 0.5).length;
+      const total = cur.reduce((s, p) => s + p.n, 0);
+      if (total > (best.total || 0)) best = { rows, total };
+      cur = [];
+    };
+    ink.forEach((n, y) => { if (n > 0) cur.push({ y, n }); else flush(); });
+    flush();
+    const bitmapToCss = r.width / el.width;
+    return {
+      xHeightCss: best.rows * bitmapToCss,
+      cssW: r.width, cssH: r.height, left: r.left, top: r.top, right: r.right, bottom: r.bottom,
+      bitmapW: el.width, bitmapH: el.height,
+      cssScale: Number(el.dataset.cssScale),
+      sourceH: Number(el.dataset.sourceH),
+      lineCssPx: Number(el.dataset.lineCssPx),
+    };
+  });
+}
+
+async function run(width) {
+  console.log(`\n=== scenario: decision-card snippet + magnifier at ${width}px ===`);
+  const context = await newContext(width);
   try {
     const page = await openWorkspace(context);
     const fixture = path.join(extensionPath, 'test', 'fixtures', 'northwind_transaction_history_flags.pdf');
     await dropAndMapOnHome(page, fixture);
 
-    const snippetSel = '.decision-row .decision-snippet[tabindex]';
-    await page.waitForSelector(snippetSel, { timeout: 15000 });
+    await page.waitForSelector(`${snippetSel} canvas`, { timeout: 15000 })
+      .catch(async (err) => { console.log('[decision-row html]', (await page.$eval('.decision-row', (el) => el.outerHTML)).slice(0, 700)); throw err; });
     const snippetCount = await page.$$eval(snippetSel, (els) => els.length);
     check('at least one decision-row snippet is magnifiable (has tabindex)', snippetCount > 0, `count=${snippetCount}`);
 
-    // Hover: the panel appears with a canvas roughly the target ~560 CSS px width.
-    await page.hover(snippetSel);
-    await page.waitForSelector('.snippet-magnifier canvas', { timeout: 10000 });
-    const panelBox = await page.$eval('.snippet-magnifier', (el) => el.getBoundingClientRect());
-    const canvasWidth = await page.$eval('.snippet-magnifier canvas', (el) => el.getBoundingClientRect().width);
-    check('magnifier panel is visible on hover', panelBox.width > 0 && panelBox.height > 0, `w=${panelBox.width} h=${panelBox.height}`);
-    // Width is normally the binding constraint (renderRowMagnifier caps at
-    // ~560 CSS px and only shrinks further for an unusually tall block), but
-    // allow generous headroom below that so this doesn't flake on a
-    // short/narrow block that's height-bound instead.
-    check('magnifier canvas is roughly the ~560px target width', canvasWidth > 150 && canvasWidth <= 570, `canvasWidth=${canvasWidth}`);
+    // --- Item A requirement 1: the snippet is readable, measured ------------
+    const snip = await snippetMetrics(page);
+    console.log('  snippet metrics:', JSON.stringify(snip));
+    // source_h (the row's line height in PDF units) x the realized CSS scale
+    // is the line height the text actually renders at; >= 22 CSS px puts a
+    // lowercase x-height around 11 px.
+    check('snippet text has a lowercase x-height of at least 11 CSS px', snip.xHeightCss >= 11, `xHeightCss=${snip.xHeightCss.toFixed(2)}`);
+    // The scale target itself: the row's own line height (source_h) x the
+    // realized scale. It only drops below 22 if even the gutter-squeezed crop
+    // is wider than the card, which the workspace's max-width column means
+    // does not happen at either width here.
+    const lineTarget = 22;
+    check(`snippet renders a line of the row at >= ${lineTarget} CSS px`, snip.lineCssPx >= lineTarget, `lineCssPx=${snip.lineCssPx.toFixed(2)} (source_h=${snip.sourceH} x scale=${snip.cssScale.toFixed(3)})`);
+    check('snippet canvas is at most 96 CSS px tall', snip.cssH <= 96, `cssH=${snip.cssH}`);
+    const cardW = await page.$eval('.decision-row', (el) => el.clientWidth);
+    check('snippet canvas fits the card width', snip.cssW <= cardW, `cssW=${snip.cssW} cardW=${cardW}`);
+    check('snippet bitmap is oversampled (crisp) vs its CSS size', snip.bitmapW >= snip.cssW * 1.9, `bitmapW=${snip.bitmapW} cssW=${snip.cssW}`);
 
-    await page.screenshot({ path: path.join(shotsDir, 'item7-magnifier-hover.png'), fullPage: true });
+    const card = await page.$('.decision-row');
+    await card.screenshot({ path: path.join(shotsDir, `snippet2-${width}.png`) });
+
+    // --- Item A requirement 2/3: the magnifier ------------------------------
+    await page.hover(snippetSel);
+    await page.waitForSelector('.snippet-magnifier canvas', { timeout: 15000 });
+    await page.waitForTimeout(200);
+    const panelBox = await page.$eval('.snippet-magnifier', (el) => el.getBoundingClientRect());
+    const mag = await page.$eval('.snippet-magnifier canvas', (el) => {
+      const r = el.getBoundingClientRect();
+      return { cssW: r.width, cssH: r.height, bitmapW: el.width, bitmapH: el.height, cssScale: Number(el.dataset.cssScale) };
+    });
+    console.log('  magnifier metrics:', JSON.stringify({ panelBox, mag }));
+    // Whole row at 2x when the viewport allows, otherwise the panel scrolls.
+    const wantPanelW = Math.min(mag.cssW + 18, width - 32);
+    check('magnifier panel shows the whole 2x row or fills the viewport', Math.abs(panelBox.width - wantPanelW) < 1.5, `panelW=${panelBox.width} want=${wantPanelW}`);
+    check('magnifier renders at exactly 2x the snippet scale', Math.abs(mag.cssScale / snip.cssScale - 2) < 0.01, `mag=${mag.cssScale.toFixed(3)} snippet=${snip.cssScale.toFixed(3)}`);
+    check('magnifier canvas is exactly 2x the snippet canvas (same region)', Math.abs(mag.cssW / snip.cssW - 2) < 0.02 && Math.abs(mag.cssH / snip.cssH - 2) < 0.02, `mag=${mag.cssW}x${mag.cssH} snippet=${snip.cssW}x${snip.cssH}`);
+    check('magnifier panel is fully inside the viewport', panelBox.left >= 0 && panelBox.top >= 0 && panelBox.right <= width + 0.5 && panelBox.bottom <= 900.5, JSON.stringify(panelBox));
+
+    // No overlap with the snippet it magnifies.
+    const overlapsSnippet = panelBox.left < snip.right && panelBox.right > snip.left && panelBox.top < snip.bottom && panelBox.bottom > snip.top;
+    check('magnifier panel does not overlap the snippet', !overlapsSnippet, JSON.stringify({ panelBox, snip }));
+
+    if (width === 1440) await page.screenshot({ path: path.join(shotsDir, 'snippet2-magnifier-1440.png') });
 
     // The panel must not overlap the card's own text/buttons.
     const cardBox = await page.$eval('.decision-row .decision-body', (el) => el.getBoundingClientRect());
@@ -137,7 +222,8 @@ async function run() {
   }
 }
 
-run()
+run(1440)
+  .then(() => run(1280))
   .then(() => {
     console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll checks passed');
     process.exit(failures ? 1 : 0);

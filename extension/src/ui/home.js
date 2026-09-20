@@ -1931,6 +1931,13 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
    */
   async function loadDecisionSnippet(file, row, container) {
     try {
+      // Item A: the crop is scaled by the ROW's line height, so it needs to
+      // know how much width it has to live in - which means waiting one
+      // frame for the card to be in the DOM and laid out (renderDecisionRow
+      // builds the card before it is appended).
+      // (rAF never fires in a background tab, so a timer races it - the crop
+      // still renders, just against the fallback width.)
+      await new Promise((r) => { requestAnimationFrame(r); setTimeout(r, 50); });
       // Item 5a (root cause): source_y2 - the block's LAST line (e.g. the
       // amount line, when the description spans lines above it) - was being
       // dropped here, so the snippet crop only ever spanned one line around
@@ -1940,7 +1947,8 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       const anchor = rowPageAnchor(row);
       if (file.type === 'pdf' && anchor && file.bytes) {
         const items = file.ocr ? file.ocrPages?.[anchor.page - 1]?.items : null;
-        const canvas = await renderRowSnippet(file.bytes, anchor, items ? { items } : {});
+        const maxWidthPx = Math.max(240, Math.floor(container.clientWidth || 640));
+        const canvas = await renderRowSnippet(file.bytes, anchor, { ...(items ? { items } : {}), maxWidthPx });
         if (canvas) { container.innerHTML = ''; container.appendChild(canvas); return true; }
       }
     } catch (err) {
@@ -1982,28 +1990,29 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   }
 
   /**
-   * Positions the (already-in-DOM, so offsetWidth/Height are real) panel
-   * beside the whole decision CARD (never just the snippet thumbnail inside
-   * it) - the card's own body text and Looks right/Fix buttons sit directly
-   * to the snippet's right in the same row, so anchoring off the snippet's
-   * own edge alone put the panel right on top of them (found live: the
-   * panel's left edge landed inside the card body's own bounding box).
-   * Flips to the left of the whole card when there isn't room on the right,
-   * and is clamped vertically to the viewport.
+   * Item A: the snippet now spans the card's full width, so the panel goes
+   * BELOW it (flipping above when the viewport has no room below) rather than
+   * beside it - directly under the thing it magnifies, never on top of it,
+   * and clamped so it is never clipped by the viewport edge.
    */
   function positionMagnifier(panel, snippet) {
-    const card = snippet.closest('.decision-row') || snippet;
-    const cardRect = card.getBoundingClientRect();
-    const r = snippet.getBoundingClientRect();
+    // Anchored to the whole card, not just the snippet: below the card the
+    // panel covers neither the crop it is magnifying nor the card's own
+    // Looks right/Fix buttons (which now sit under the full-width snippet).
+    const r = (snippet.closest('.decision-row') || snippet).getBoundingClientRect();
     const gap = 10;
-    const panelW = panel.offsetWidth || 560;
+    const panelW = panel.offsetWidth || 640;
     const panelH = panel.offsetHeight || 200;
-    const left = (window.innerWidth - cardRect.right >= panelW + gap)
-      ? cardRect.right + gap
-      : Math.max(gap, cardRect.left - panelW - gap);
-    const top = Math.min(Math.max(gap, r.top), Math.max(gap, window.innerHeight - panelH - gap));
+    const spaceBelow = window.innerHeight - r.bottom - 2 * gap;
+    const spaceAbove = r.top - 2 * gap;
+    const below = panelH <= spaceBelow || spaceBelow >= spaceAbove;
+    // The panel scrolls inside itself rather than ever being clipped by the
+    // viewport or pushed back over the snippet it is magnifying.
+    panel.style.maxHeight = `${Math.max(80, Math.floor(below ? spaceBelow : spaceAbove))}px`;
+    const top = below ? r.bottom + gap : Math.max(gap, r.top - gap - Math.min(panel.offsetHeight, spaceAbove));
+    const left = Math.max(gap, Math.min(r.left, window.innerWidth - panelW - gap));
     panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
+    panel.style.top = `${Math.max(gap, top)}px`;
   }
 
   function wireSnippetMagnifier(snippet, file, row) {
@@ -2021,7 +2030,14 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       try {
         const anchor = rowPageAnchor(row);
         const items = file.ocr ? file.ocrPages?.[anchor.page - 1]?.items : null;
-        const canvas = await renderRowMagnifier(file.bytes, anchor, items ? { items } : {});
+        // Exactly 2x the on-card crop's own realized scale (it stamps it on
+        // the canvas), so the magnifier is a true doubling of what is on the
+        // card rather than a separately-guessed size.
+        const cssScale = Number(snippet.querySelector('canvas')?.dataset.cssScale) * 2;
+        const canvas = await renderRowMagnifier(file.bytes, anchor, {
+          ...(items ? { items } : {}),
+          ...(Number.isFinite(cssScale) && cssScale > 0 ? { cssScale } : {}),
+        });
         if (openMagnifier?.el !== panel) return; // closed, or superseded by another trigger, while awaiting
         if (!canvas) { closeMagnifier(); return; }
         panel.innerHTML = '';

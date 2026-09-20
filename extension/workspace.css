@@ -306,10 +306,14 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
    transaction renders taller here instead of being squeezed into one fixed
    box or split into two pieces. max-width caps how wide a single very long
    line ever gets (CARD_MAX_W in pdf-render.js). */
+/* Item A (NO-TEMPLATES, 2026-09-20): the crop is scaled by the row's own line
+   height (>= 22 CSS px a line) instead of being squeezed into a 360px box, so
+   it needs the card's full width - it sits on its own row above the card's
+   text and buttons, which wrap underneath. */
 .decision-snippet{
-  flex:0 0 auto;max-width:360px;background:#e8e4d8;
+  flex:1 1 100%;max-width:100%;background:#e8e4d8;
   border:1px solid var(--paper-line);border-radius:6px;
-  overflow:hidden;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;display:flex;align-items:center;justify-content:flex-start;
 }
 .decision-snippet canvas{display:block;}
 .decision-snippet[tabindex]{cursor:zoom-in;}
@@ -322,9 +326,12 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
   position:fixed;z-index:90;background:var(--paper-raised);
   border:1px solid var(--paper-line);border-radius:var(--radius);
   box-shadow:0 10px 30px rgba(0,0,0,.35);padding:8px;
-  max-width:600px;font-size:12.5px;color:var(--ink-dim);
+  box-sizing:border-box;width:max-content;max-width:calc(100vw - 32px);
+  overflow:auto;font-size:12.5px;color:var(--ink-dim);
 }
-.snippet-magnifier canvas{display:block;max-width:100%;}
+/* No max-width here on purpose: the canvas is rendered at exactly 2x the
+   on-card crop's scale, so CSS must not shrink it - the panel scrolls. */
+.snippet-magnifier canvas{display:block;}
 .decision-snippet-text{
   padding:8px 10px;font-size:13px;color:#333;line-height:1.4;
   display:flex;flex-direction:column;gap:3px;overflow:hidden;

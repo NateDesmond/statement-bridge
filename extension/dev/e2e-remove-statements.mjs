@@ -40,23 +40,26 @@ async function launchExtensionContext() {
     ],
   });
   let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
   const extensionId = new URL(sw.url()).host;
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/workspace.html`, { waitUntil: 'load' });
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   return { context, page, pageErrors };
 }
 
-async function dropAndSettle(page, fileName, { timeout = 60000 } = {}) {
+async function dropFile(page, fileName) {
   const filePath = path.join(fixturesDir, fileName);
   const input = await page.$('#file-input');
   const before = await page.$$eval('.file-row', (rows) => rows.length);
   await input.setInputFiles(filePath);
   await page.waitForFunction((n) => document.querySelectorAll('.file-row').length > n, before, { timeout: 15000 });
+}
+
+async function waitForBadge(page, fileName, { timeout = 60000 } = {}) {
   await page.waitForFunction(
     (name) => {
       const row = [...document.querySelectorAll('.file-row')].find((r) => r.getAttribute('aria-label') === name);
@@ -70,6 +73,37 @@ async function dropAndSettle(page, fileName, { timeout = 60000 } = {}) {
   );
 }
 
+async function dropAndSettle(page, fileName, opts) {
+  await dropFile(page, fileName);
+  await waitForBadge(page, fileName, opts);
+}
+
+/**
+ * No statement type ships built in any more (src/core/builtin-profiles.js
+ * returns []), so a first drop of any fixture shows the "New bank statement"
+ * card. Walk the real confirm-first flow (Set up -> "Does this look right?"
+ * Yes -> Save) to save the type, exactly as dev/e2e-extension.mjs's union2
+ * scenario does; every later drop of the same layout then auto-matches.
+ */
+async function dropAndSetUp(page, fileName) {
+  await dropFile(page, fileName);
+  const setupBtn = page.locator('#attention-cards .new-bank-card button:has-text("Set up")').first();
+  await setupBtn.waitFor({ state: 'visible', timeout: 60000 });
+  await setupBtn.click();
+  await page.waitForSelector('#screen-wizard.active', { timeout: 10000 });
+  // Some layouts open on the date-format focus screen first (the wizard
+  // can't tell month-first from day-first on its own); accept its default.
+  if (await page.isVisible('#confirm-focus').catch(() => false)) {
+    await page.click('#confirm-focus-done');
+  }
+  await page.waitForSelector('#confirm-a:not([hidden])', { timeout: 30000 });
+  await page.waitForFunction(() => document.getElementById('confirm-a-heading')?.textContent?.trim().length > 0, { timeout: 30000 });
+  await page.click('#confirm-yes');
+  await page.waitForSelector('#confirm-c:not([hidden])', { timeout: 20000 });
+  await page.click('#confirm-save');
+  await waitForBadge(page, fileName);
+}
+
 async function readyToCopyText(page) {
   return page.$eval('#export-summary', (el) => el.textContent.trim()).catch(() => null);
 }
@@ -77,10 +111,10 @@ async function readyToCopyText(page) {
 async function main() {
   const { context, page, pageErrors } = await launchExtensionContext();
   try {
-    console.log('1. drop three fixtures (meridian_savings, riverside_savings, summit_savings)...');
-    await dropAndSettle(page, 'meridian_savings.csv');
-    await dropAndSettle(page, 'riverside_savings.csv');
-    await dropAndSettle(page, 'summit_savings.csv');
+    console.log('1. drop three fixtures (meridian_savings, riverside_savings, summit_savings), each through Set up -> Yes -> Save...');
+    await dropAndSetUp(page, 'meridian_savings.csv');
+    await dropAndSetUp(page, 'riverside_savings.csv');
+    await dropAndSetUp(page, 'summit_savings.csv');
     const before = await readyToCopyText(page);
     console.log('   Ready to copy summary before removal:', before);
     await page.screenshot({ path: path.join(shotsDir, 'remove-01-three-dropped.png'), fullPage: false });

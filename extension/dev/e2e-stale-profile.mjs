@@ -153,7 +153,7 @@ async function launchExtensionContext() {
     ],
   });
   let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
   const extensionId = new URL(sw.url()).host;
   const page = await context.newPage();
   const pageErrors = [];
@@ -164,7 +164,7 @@ async function launchExtensionContext() {
     navigator.clipboard.writeText = (text) => { window.__clipboardWrites.push(text); return real(text); };
   });
   await page.goto(`chrome-extension://${extensionId}/workspace.html`, { waitUntil: 'load' });
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   return { context, page, pageErrors };
 }
 

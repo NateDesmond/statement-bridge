@@ -43,7 +43,7 @@ async function launchExtensionContext() {
     ],
   });
   let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
   const extensionId = new URL(sw.url()).host;
   const page = await context.newPage();
   const pageErrors = [];
@@ -59,7 +59,7 @@ async function launchExtensionContext() {
   });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/workspace.html`, { waitUntil: 'load' });
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   return { context, page, pageErrors };
 }
 
@@ -133,7 +133,7 @@ async function runTextPdfScenario() {
   page.removeAllListeners('pageerror');
   page.on('pageerror', (e) => { pageErrors2.push(e); console.log('[pageerror]', e.message); });
   await page.reload({ waitUntil: 'load' });
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   await page.$('#file-input').then((el) => el.setInputFiles(TEXT_FIXTURE));
   await page.waitForSelector('.fr-pw-input', { timeout: 30000 });
   const hintText = await page.textContent('.fr-caption').catch(() => null);

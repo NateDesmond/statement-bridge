@@ -749,6 +749,7 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
     // Not read by any layout/paint - just so tooling (e2e checks, debugging)
     // can see exactly which PDF-space anchor this box came from.
     box.dataset.y = String(anchor.y);
+    box.dataset.rowId = row.row_id;
     if (anchor.y2 != null) box.dataset.y2 = String(anchor.y2);
     wrap.appendChild(box);
     box.scrollIntoView({ block: 'center', inline: 'center' });

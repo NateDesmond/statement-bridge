@@ -75,7 +75,7 @@ async function main() {
 
   try {
     let [sw] = context.serviceWorkers();
-    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
     const extId = new URL(sw.url()).host;
     console.log('extension id:', extId);
 
@@ -83,7 +83,7 @@ async function main() {
     const pageErrors = [];
     page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
     await page.goto(`chrome-extension://${extId}/workspace.html`);
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
     await seedSampleProfiles(page, ['Northwind Bank', 'Meridian Bank']);
 
     const fixture = path.join(extensionPath, 'test', 'fixtures', 'northwind_transaction_history_image.pdf');
@@ -91,7 +91,7 @@ async function main() {
     await input.setInputFiles(fixture);
 
     console.log('1. waiting for auto-OCR + match...');
-    await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, button:has-text("Read it with on-device text recognition")', { timeout: 30000 });
+    await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, button:has-text("Read it with on-device text recognition")', { timeout: 240000 });
     const ocrBtn = await page.$('button:has-text("Read it with on-device text recognition")');
     if (ocrBtn) {
       await ocrBtn.click();
@@ -336,7 +336,7 @@ async function main() {
 
     console.log('7. reload -> resolutions persisted...');
     await page.reload();
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
     const restoreBtn = await page.$('#restore-yes');
     if (restoreBtn) { await restoreBtn.click(); await page.waitForTimeout(300); }
     await openReviewFromHome(page);
@@ -390,13 +390,13 @@ async function launchWorkspace(viewport = { width: 1440, height: 900 }) {
     ],
   });
   let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
   const extId = new URL(sw.url()).host;
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
   await page.goto(`chrome-extension://${extId}/workspace.html`);
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   await seedSampleProfiles(page, ['Northwind Bank', 'Meridian Bank']);
   return { context, page, pageErrors };
 }
@@ -409,14 +409,19 @@ async function openInReview(page, fixturePaths) {
   // A CSV row can render a beat later than a PDF's, and a just-dropped row
   // sits in a transient "Reading statement…" state before it offers either
   // an OCR or Map button - wait for every row to exist before driving them.
-  await page.waitForFunction((n) => document.querySelectorAll('.file-row').length >= n, list.length, { timeout: 30000 }).catch(() => {});
+  await page.waitForFunction((n) => document.querySelectorAll('.file-row').length >= n, list.length, { timeout: 120000 }).catch(() => {});
 
   // Drive each file row's own OCR-then-map flow independently - a page-wide
   // badge selector (not scoped to the row that was just OCR'd) can resolve
   // early off a DIFFERENT already-matched row when several files are
   // dropped together, moving on before this row's own OCR actually finished
   // and silently reading it with zero warnings.
-  for (let round = 0; round < 60; round++) {
+  // A deadline, not a fixed round count: an idle round waits 500ms, so 60
+  // of them gave up after ~30s while text recognition on an image-only PDF
+  // was still running (the gate runs this straight after e2e-extension.mjs,
+  // on a busy machine) - Review then opened with a file that had no rows.
+  const settleDeadline = Date.now() + 300000;
+  while (Date.now() < settleDeadline) {
     const ocrBtn = await page.$('.file-row button:has-text("Read it with on-device text recognition")');
     if (ocrBtn) {
       const row = await ocrBtn.evaluateHandle((b) => b.closest('.file-row'));
@@ -458,7 +463,7 @@ async function openInReview(page, fixturePaths) {
       return rows.length >= n && [...rows].every((r) => r.querySelector('.badge-ok, .badge-warn, .badge-low'));
     }, list.length);
     if (allBadged) break;
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
   }
   await openReviewFromHome(page);
   await page.waitForSelector('#review-body:not([hidden])', { timeout: 10000 });
@@ -814,14 +819,29 @@ async function pdfYToPixel(pdfPath, pageNum, y, pageWidthPt, paneWidthPx, zoom =
 }
 
 /** Click each extracted row in turn until the source pane lands on `wantPage` with an outline drawn, or every row's been tried. Returns the row's description text, or null. */
+/**
+ * Click a review row and wait for the source pane to finish catching up with
+ * it. The jump is async (render the target page, update the N/M label, then
+ * draw the outline), and the outline box carries its own data-row-id, so
+ * waiting for THAT row's box is the only reliable settle signal - a flat
+ * timeout reads the previous row's stale outline (or none at all on a loaded
+ * machine).
+ */
+async function clickRowAndSettle(page, rowSel) {
+  const rowId = await page.$eval(rowSel, (tr) => tr.dataset.rowId);
+  await page.click(rowSel);
+  await page.waitForSelector(`#source-pdf-scroll .anchor-row-highlight.outlined[data-row-id="${rowId}"]`, { timeout: 60000 }).catch(() => {});
+  return rowId;
+}
+
 async function clickUntilOnPage(page, wantPage, maxRows = 30) {
   const rowCount = await page.$$eval('#review-table tbody tr[data-row-id]', (trs) => trs.length);
   for (let i = 0; i < Math.min(rowCount, maxRows); i++) {
-    await page.click(`#review-table tbody tr[data-row-id]:nth-child(${i + 1})`);
-    await page.waitForTimeout(250);
+    const rowSel = `#review-table tbody tr[data-row-id]:nth-child(${i + 1})`;
+    const rowId = await clickRowAndSettle(page, rowSel);
     const pageLabel = await page.$eval('#pdf-page-label', (el) => el.textContent.trim()).catch(() => '');
     const pageNum = Number((pageLabel.match(/^(\d+)\//) || [])[1]);
-    const outlined = await page.$('#source-pdf-scroll .anchor-row-highlight.outlined');
+    const outlined = await page.$(`#source-pdf-scroll .anchor-row-highlight.outlined[data-row-id="${rowId}"]`);
     if (pageNum === wantPage && outlined) {
       const desc = await page.$eval(`#review-table tbody tr[data-row-id]:nth-child(${i + 1}) .desc-text`, (el) => el.textContent.trim());
       return desc;
@@ -866,8 +886,7 @@ async function runOutlineAlignmentVerification() {
     try {
       const fixture = path.join(extensionPath, 'test', 'fixtures', 'northwind_transaction_history_image.pdf');
       await openInReview(page, fixture);
-      await page.click('#review-table tbody tr[data-row-id]:nth-child(1)');
-      await page.waitForTimeout(400);
+      await clickRowAndSettle(page, '#review-table tbody tr[data-row-id]:nth-child(1)');
       const first = await page.evaluate(() => {
         const el = document.querySelector('#source-pdf-scroll .anchor-row-highlight.outlined');
         return el ? el.getBoundingClientRect().top : null;
@@ -877,8 +896,7 @@ async function runOutlineAlignmentVerification() {
 
       const rowCount = await page.$$eval('#review-table tbody tr[data-row-id]', (trs) => trs.length);
       if (rowCount > 1) {
-        await page.click('#review-table tbody tr[data-row-id]:nth-child(2)');
-        await page.waitForTimeout(400);
+        await clickRowAndSettle(page, '#review-table tbody tr[data-row-id]:nth-child(2)');
         const second = await page.evaluate(() => {
           const el = document.querySelector('#source-pdf-scroll .anchor-row-highlight.outlined');
           return el ? { top: el.getBoundingClientRect().top, height: el.getBoundingClientRect().height } : null;
@@ -937,8 +955,7 @@ async function runOutlineAlignmentVerification() {
       const { pageWidthPt } = await loadPageItems(fixture, 1);
 
       console.log('1. clicking the first row, waiting for the source pane to outline it...');
-      await page.click('#review-table tbody tr[data-row-id]:nth-child(1)');
-      await page.waitForTimeout(400);
+      await clickRowAndSettle(page, '#review-table tbody tr[data-row-id]:nth-child(1)');
       const desc = await page.$eval('#review-table tbody tr[data-row-id]:nth-child(1) .desc-text', (el) => el.textContent.trim());
       const needle = desc.split('\n')[0].trim().slice(0, 12);
       const heightPx = await page.evaluate(() => document.querySelector('#source-pdf-scroll .anchor-row-highlight.outlined')?.getBoundingClientRect().height ?? null);

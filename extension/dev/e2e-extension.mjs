@@ -46,14 +46,14 @@ async function launchExtensionContext() {
     ],
   });
   let [sw] = context.serviceWorkers();
-  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
   const extensionId = new URL(sw.url()).host;
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/workspace.html`, { waitUntil: 'load' });
-  await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
   return { context, page, pageErrors };
 }
 
@@ -74,7 +74,7 @@ function bottomShotter(page, prefix) {
 /** Drop a fixture on Home and open the wizard for it, whether it auto-matches (Change drawer -> Update mapping) or not (the "Map this statement" card). */
 async function dropAndOpenWizard(page, fixturePath) {
   await page.$('#file-input').then((el) => el.setInputFiles(fixturePath));
-  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low, #attention-cards button:has-text("Set up")', { timeout: 60000 });
+  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low, #attention-cards button:has-text("Set up")', { timeout: 240000 });
   // Scoped to #attention-cards: an unscoped button:has-text("Set up") can
   // match an unrelated hidden template elsewhere on the page (a different
   // screen's markup, always in the DOM but display:none) and then hang
@@ -105,7 +105,22 @@ async function dropAndOpenWizard(page, fixturePath) {
  * intro - nothing to bypass).
  */
 async function skipConfirmToFullWizard(page) {
+  // The confirm screens are rendered asynchronously after the wizard opens,
+  // so "is #wizard-confirm hidden?" is only meaningful once the wizard has
+  // settled into one of its two entry states. Reading it too early used to
+  // see the still-hidden confirm block, return a no-op, and then hang for
+  // 30s clicking a #wizard-next that the confirm screens keep hidden.
+  await page.waitForFunction(() => {
+    const confirm = document.getElementById('wizard-confirm');
+    const footer = document.getElementById('wizard-footer');
+    return (confirm && !confirm.hidden) || (footer && footer.offsetParent !== null);
+  }, { timeout: 30000 });
   if (!(await page.$('#wizard-confirm:not([hidden])'))) return;
+  // Some layouts open on the date-format focus screen ahead of Screen A.
+  if (await page.isVisible('#confirm-focus').catch(() => false)) {
+    await page.click('#confirm-focus-done');
+    await page.waitForSelector('#confirm-a:not([hidden])', { timeout: 20000 });
+  }
   await page.click('#confirm-off');
   await page.waitForTimeout(200);
   await page.click('#confirm-fix-other');
@@ -191,7 +206,7 @@ async function runFlagResolutionScenario() {
 
   console.log('1. drop the flagged-rows fixture...');
   await page.$('#file-input').then((el) => el.setInputFiles(fixture));
-  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low, #attention-cards button:has-text("Set up")', { timeout: 60000 });
+  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low, #attention-cards button:has-text("Set up")', { timeout: 240000 });
 
   // Follow-up A (QA-REPORT.md finding 7): on a completely fresh profile
   // store this fixture won't auto-match at all - no profile ships with the
@@ -854,7 +869,7 @@ async function runManualRangeScenario() {
 
   console.log('7. re-drop the same file, confirm it auto-matches (rangeRules round-tripped through the saved profile)...');
   await page.$('#file-input').then((el) => el.setInputFiles(fixture));
-  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low', { timeout: 15000 });
+  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low', { timeout: 120000 });
   await shotStep('08-home-redrop-matched');
 
   const cleanLog = await assertCleanLog(page, 'manual range/sheet selection grid (range)', pageErrors);

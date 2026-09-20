@@ -113,7 +113,7 @@ async function main() {
 
   try {
     let [sw] = context.serviceWorkers();
-    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
     const extId = new URL(sw.url()).host;
     console.log('extension id:', extId);
 
@@ -121,7 +121,7 @@ async function main() {
     const pageErrors = [];
     page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
     await page.goto(`chrome-extension://${extId}/workspace.html`);
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
 
     const results = [];
     for (const f of files) {

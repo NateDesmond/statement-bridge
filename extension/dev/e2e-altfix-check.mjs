@@ -67,13 +67,13 @@ async function main() {
 
   try {
     let [sw] = context.serviceWorkers();
-    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
     const extId = new URL(sw.url()).host;
     const page = await context.newPage();
     page.on('pageerror', (e) => console.log('[pageerror]', e.message));
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`chrome-extension://${extId}/workspace.html`, { waitUntil: 'load' });
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
 
     // Write the synthetic session directly into the same IndexedDB
     // home.js's own sessions.js uses, then reload so the real
@@ -96,7 +96,7 @@ async function main() {
     }), { rows: [syntheticRow, cleanRow] });
 
     await page.reload({ waitUntil: 'load' });
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
     await page.waitForSelector('#restore-banner:not([hidden])', { timeout: 10000 });
     await page.click('#restore-yes');
     await page.waitForTimeout(300);

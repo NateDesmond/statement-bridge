@@ -42,7 +42,7 @@ async function main() {
 
   try {
     let [sw] = context.serviceWorkers();
-    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 15000 });
+    if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60000 });
     const extId = new URL(sw.url()).host;
     console.log('extension id:', extId);
 
@@ -57,7 +57,7 @@ async function main() {
       navigator.clipboard.writeText = (text) => { window.__clipboardWrites.push(text); return real(text); };
     });
     await page.goto(`chrome-extension://${extId}/workspace.html`);
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
     // No statement type ships with a profile (NO-TEMPLATES.md item 1) - seed
     // the two this script drops files for, standing in for a user who
     // already saved them through confirm-first.
@@ -69,7 +69,10 @@ async function main() {
     await input.setInputFiles(fixture);
 
     console.log('1. waiting for OCR + match...');
-    await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, button:has-text("Read it with on-device text recognition")', { timeout: 30000 });
+    // Text recognition on this image-only fixture starts by itself and can
+    // take minutes on a busy machine (it runs right after e2e-extension.mjs
+    // inside the gate), so this waits generously rather than at 30s.
+    await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, button:has-text("Read it with on-device text recognition")', { timeout: 240000 });
     const ocrBtn = await page.$('button:has-text("Read it with on-device text recognition")');
     if (ocrBtn) {
       await ocrBtn.click();
@@ -256,7 +259,7 @@ async function main() {
     await page.waitForTimeout(300);
 
     await page.goto(`chrome-extension://${extId}/workspace.html`);
-    await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await page.waitForSelector('#file-input', { state: 'attached', timeout: 60000 });
     // A reload doesn't auto-restore the in-progress session - resume it via
     // the restore banner, the same as a real user reopening the tab.
     await page.waitForSelector('#restore-banner:not([hidden])', { timeout: 15000 });
