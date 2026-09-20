@@ -11,26 +11,26 @@ function t(offsetMs) { return new Date(NOW - 100000 + offsetMs).toISOString(); }
 
 function realisticEvents() {
   return [
-    { t: t(0), stage: 'home.drop', message: 'file dropped', data: { name: 'sc_all.csv', size: 12345 } },
-    { t: t(10), stage: 'home.drop', message: 'file type detected', data: { name: 'sc_all.csv', type: 'text' } },
+    { t: t(0), stage: 'home.drop', message: 'file dropped', data: { name: 'card_all.csv', size: 12345 } },
+    { t: t(10), stage: 'home.drop', message: 'file type detected', data: { name: 'card_all.csv', type: 'text' } },
     { t: t(50), stage: 'home.match', message: 'match applied', data: {
-      file: 'sc_all.csv', profile: 'Standard Chartered credit card', confidence: 0.95, rows: 310,
+      file: 'card_all.csv', profile: 'Standard Chartered credit card', confidence: 0.95, rows: 310,
       bank: 'Standard Chartered', statementType: 'credit_card', fileType: 'csv', quickLookRows: 2,
     } },
-    { t: t(80), stage: 'review', message: 'count check rendered', data: { sourceFile: 'sc_all.csv', extractedCount: 310, sourceLines: 310, matches: true, tone: 'ok' } },
+    { t: t(80), stage: 'review', message: 'count check rendered', data: { sourceFile: 'card_all.csv', extractedCount: 310, sourceLines: 310, matches: true, tone: 'ok' } },
     { t: t(90), stage: 'review', message: 'file summary + checks', data: {
-      sourceFile: 'sc_all.csv', rowCount: 310, byCurrency: { SGD: 310 }, balanceReconciles: true,
+      sourceFile: 'card_all.csv', rowCount: 310, byCurrency: { SGD: 310 }, balanceReconciles: true,
       flagsHistogram: { possible_duplicate: 1 }, quickLookRows: 2,
     } },
-    { t: t(200), stage: 'home.drop', message: 'file dropped', data: { name: 'aug_2026_dbs.pdf', size: 55555 } },
-    { t: t(210), stage: 'home.pdf', message: 'image-only PDF detected at drop, starting on-device text recognition automatically', data: { file: 'aug_2026_dbs.pdf', totalChars: 0, pages: 3 } },
-    { t: t(220), stage: 'home.ocr', message: 'Text recognition completed', data: { file: 'aug_2026_dbs.pdf', pages: 3 } },
+    { t: t(200), stage: 'home.drop', message: 'file dropped', data: { name: 'aug_2026_savings.pdf', size: 55555 } },
+    { t: t(210), stage: 'home.pdf', message: 'image-only PDF detected at drop, starting on-device text recognition automatically', data: { file: 'aug_2026_savings.pdf', totalChars: 0, pages: 3 } },
+    { t: t(220), stage: 'home.ocr', message: 'Text recognition completed', data: { file: 'aug_2026_savings.pdf', pages: 3 } },
     { t: t(230), stage: 'home.match', message: 'text recognition match applied', data: {
-      file: 'aug_2026_dbs.pdf', profile: 'DBS savings', confidence: 0.91, rows: 31,
+      file: 'aug_2026_savings.pdf', profile: 'DBS savings', confidence: 0.91, rows: 31,
       bank: 'DBS', statementType: 'savings', fileType: 'pdf', quickLookRows: 0,
     } },
     { t: t(240), stage: 'home.parse', message: 'a parse error happened, oh no', data: {
-      file: 'aug_2026_dbs.pdf', message: 'boom', stack: 'Error: boom\n  at parsePdf (pdf.js:123:45)\n  at readAll (worker.js:9:1)',
+      file: 'aug_2026_savings.pdf', message: 'boom', stack: 'Error: boom\n  at parsePdf (pdf.js:123:45)\n  at readAll (worker.js:9:1)',
     } },
   ];
 }
@@ -83,8 +83,8 @@ test('report serializes to readable JSON', () => {
 
 test('the report never contains a real file name', () => {
   const json = reportToJson(build());
-  assert.ok(!json.includes('sc_all.csv'), json);
-  assert.ok(!json.includes('aug_2026_dbs.pdf'), json);
+  assert.ok(!json.includes('card_all.csv'), json);
+  assert.ok(!json.includes('aug_2026_savings.pdf'), json);
 });
 
 test('the report never contains a per-row array (transactions, descriptions, amounts, dates)', () => {

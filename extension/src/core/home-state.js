@@ -52,7 +52,7 @@ export function allRowsSkipped(rows) {
  * zero rows, or unreadable dates on more than half of them (hasUnreadableDates'
  * >50% rule) - a real extraction failure, never a healthy match, no matter
  * how confident matchProfile was about the header/preamble alone (a real
- * debug log, 2026-09-17: "sc_all.csv" matched "sc test" at 0.9 confidence and
+ * debug log, 2026-09-17: "sc_2026.csv" matched a stale saved type at 0.9 confidence and
  * still showed healthy with 0 rows).
  */
 export function matchExtractionFailed(rows) {
@@ -60,7 +60,7 @@ export function matchExtractionFailed(rows) {
 }
 
 // --- Item 1: pick among tied match candidates by extraction quality --------
-// A real bug: two candidates ("sc test", a user
+// A real bug: two candidates ("card test", a user
 // profile, and an older saved "Standard Chartered credit card, CSV") tied at
 // 0.9 confidence. Signature score alone can't tell them apart - one of them
 // had amount mapped to a sparse column (a stale suggester bug baked into an

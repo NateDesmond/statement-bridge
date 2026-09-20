@@ -3,7 +3,7 @@
 // (the caller passes `now`) - so every branch is unit-testable without a
 // browser.
 //
-// Item 10 (Nate, furious, and right): the report used to embed the whole
+// Item 10: the report used to embed the whole
 // (merely field-masked) debug log, which read as "your entire transaction
 // list" - a session with real statements in it produced a report shaped
 // like one. The report now carries NO per-transaction entries, anonymised or

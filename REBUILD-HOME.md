@@ -1,4 +1,4 @@
-# Home / export / menu rebuild (Nate's cold walk, 2026-09-18). Standard: clean, beautiful, one decision at a time.
+# Home / export / menu rebuild (cold walk, 2026-09-18). Standard: clean, beautiful, one decision at a time.
 
 Principles: one primary action per screen; everything else collapsed by default; never show a control that has nothing to act on; never show the same information twice; visual hierarchy with three tiers (headline, body, quiet); plain words; no decoration that reads as something else.
 

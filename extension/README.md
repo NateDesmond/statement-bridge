@@ -150,7 +150,7 @@ Every row from an OCR'd file carries flag `ocr` (informational only -
 warning filter both explicitly exclude it, so a clean OCR read still shows a
 plain "All checks pass" badge). `low_confidence_ocr`, a real warning, fires
 only on the amount or date-group TOKEN itself falling below 70 confidence -
-narrowed from an earlier whole-line version (Nate, 2026-09-16: stepping
+narrowed from an earlier whole-line version (2026-09-16: stepping
 through low-confidence rows one by one made OCR feel untrustworthy when the
 actual transaction data was fine, just a misread merchant word). `core/pdf.js`'s
 `extractRows`/`extractGroupedRows` track `_amountConfidence`/`_dateConfidence`

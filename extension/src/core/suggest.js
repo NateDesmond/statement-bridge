@@ -525,7 +525,7 @@ function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 // item 9b (NO-TEMPLATES verification): most banks already ARE their own
 // common short code (DBS, UOB, OCBC, HSBC, ANZ...), so a filename like
 // "uob_statement.csv" matches BANK_NAMES directly. A multi-word name's own
-// short code is a different token though - "sc_all.csv" names Standard
+// short code is a different token though - "sc_2026.csv" names Standard
 // Chartered by an abbreviation the full-name regex above can never match.
 // FILENAME-only (never scanned against document body text, where a bare
 // "sc"/"boa" token is far more likely to be unrelated prose than a bank

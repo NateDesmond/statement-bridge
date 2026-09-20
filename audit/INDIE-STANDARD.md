@@ -1,4 +1,4 @@
-# The standard (Nate, 2026-09-18)
+# The standard (2026-09-18)
 "A careful, handmade indie tool that's shockingly easy to use, just works (does what it says on the tin), and has just the right amount of depth when and where needed, while still being intuitive from start to finish."
 
 ## How to audit against it
