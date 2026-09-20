@@ -10,15 +10,15 @@ import { fileURLToPath } from 'node:url';
 import { parseGrid, applyProfileVersion } from '../src/core/csv.js';
 import { normalizeRecords } from '../src/core/normalize.js';
 import { fileSummary, countCheck } from '../src/core/checks.js';
-import { builtinProfiles } from '../src/core/builtin-profiles.js';
+import { sampleProfiles } from './fixtures/sample-profiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.join(__dirname, 'fixtures', 'harbour_card_crdr.csv');
 
 function load() {
   const text = fs.readFileSync(fixturePath, 'utf-8');
-  const profile = builtinProfiles().find((p) => p.id === 'builtin-harbour-card');
-  const version = profile.versions.find((v) => v.id === 'builtin-harbour-card-v2-crdr');
+  const profile = sampleProfiles().find((p) => p.id === 'sample-harbour-card');
+  const version = profile.versions.find((v) => v.id === 'sample-harbour-card-v2-crdr');
   return { text, profile, version };
 }
 

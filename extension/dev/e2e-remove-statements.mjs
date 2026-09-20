@@ -138,7 +138,7 @@ async function main() {
     await gotoScreen(page, 'profiles');
     const profileCount = await page.$$eval('#screen-profiles .bank-group', (els) => els.length).catch(() => -1);
     await page.screenshot({ path: path.join(shotsDir, 'remove-06-profiles-after-clear.png'), fullPage: false });
-    check('Statement types screen still shows saved/built-in types after Clear statements', profileCount > 0, `found ${profileCount} statement-type-ish elements`);
+    check('Statement types screen still shows saved types after Clear statements', profileCount > 0, `found ${profileCount} statement-type-ish elements`);
 
     console.log('7. re-dropping meridian_savings.csv auto-matches after Clear statements...');
     await goBack(page);

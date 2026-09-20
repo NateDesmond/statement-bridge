@@ -67,15 +67,22 @@ export function isExactDuplicateFile({ count, total, bytesA, bytesB, otherFileTo
  * masked account number, or the user's saved account label) and always wins
  * over the row's own `account_label`: two files matched to different profile
  * ids/names for the same physical account (e.g. a user-saved profile vs a
- * builtin one) must fingerprint identically, and a profile-agnostic label
+ * another saved one) must fingerprint identically, and a profile-agnostic label
  * computed once per file is the only value guaranteed consistent across
  * callers - the row's own `account_label` can be missing (e.g. a freshly
  * wizard-mapped file's normalizeRecords call never received one) even though
  * the file it belongs to knows its account fine.
+ *
+ * Returns null for a row with no parsed date (an unparseable-date row has
+ * nothing real to compare dates against) - same root cause as normalize.js's
+ * own within-file possible_duplicate fingerprint, fixed the same way: two
+ * rows that both failed to parse a date must never merge with each other
+ * just because they share that same null.
  */
 export function fingerprint(row, accountLabel) {
+  if (!row.date) return null;
   const acct = accountLabel ?? row.account_label ?? '';
-  return [acct, row.date ?? '', row.amount ?? '', row.currency ?? '', descriptionKey(row.description_raw)].join('|');
+  return [acct, row.date, row.amount ?? '', row.currency ?? '', descriptionKey(row.description_raw)].join('|');
 }
 
 /**
@@ -93,6 +100,7 @@ export function mergeAcrossFiles(files) {
     const counts = new Map();
     for (const row of rows) {
       const fp = fingerprint(row, accountLabel);
+      if (fp == null) continue; // no valid date - never participates in matching
       counts.set(fp, (counts.get(fp) || 0) + 1);
     }
     return counts;
@@ -107,6 +115,7 @@ export function mergeAcrossFiles(files) {
     const counts = perFileCounts[fileIdx];
     for (const row of rows) {
       const fp = fingerprint(row, accountLabel);
+      if (fp == null) continue;
       const count = counts.get(fp);
       const best = bestFileIndexByFp.get(fp);
       if (!best || count > best.count || (count === best.count && best.ocr && !ocr)) {
@@ -120,6 +129,7 @@ export function mergeAcrossFiles(files) {
   files.forEach(({ rows, accountLabel }, fileIdx) => {
     for (const row of rows) {
       const fp = fingerprint(row, accountLabel);
+      if (fp == null) { merged.push(row); continue; } // no valid date - never merged
       const seenElsewhere = files.some((f, i) => i !== fileIdx && perFileCounts[i].has(fp));
       if (!seenElsewhere) { merged.push(row); continue; }
       const best = bestFileIndexByFp.get(fp);

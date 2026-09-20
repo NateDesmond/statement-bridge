@@ -9,6 +9,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { sampleProfiles } from '../test/fixtures/sample-profiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(__dirname, '..');
@@ -44,6 +45,15 @@ async function launchExtensionContext() {
   return { context, page };
 }
 
+// No statement type ships with a profile (NO-TEMPLATES.md item 1) - seed the
+// saved profile a returning user would already have (test/fixtures/
+// sample-profiles.js) so these result/decision shots still show an
+// auto-matched file, not an unmapped one.
+async function seedProfiles(page, banks) {
+  const wanted = sampleProfiles().filter((p) => banks.includes(p.bank));
+  await page.evaluate(async (profiles) => { await chrome.storage.local.set({ profiles }); }, wanted);
+}
+
 async function shotBoth(page, label) {
   for (const width of [1440, 1280]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -72,6 +82,7 @@ async function main() {
   // 5/6: result (healthy CSV, no decisions).
   {
     const { context, page } = await launchExtensionContext();
+    await seedProfiles(page, ['Meridian Bank']);
     await page.$('#file-input').then((el) => el.setInputFiles(path.join(fixturesDir, 'meridian_savings.csv')));
     await page.waitForSelector('.file-row .badge-ok', { timeout: 15000 });
     await page.waitForSelector('#export-panel:not([hidden])', { timeout: 5000 });
@@ -82,6 +93,7 @@ async function main() {
   // 7/8: decisions with a PDF snippet.
   {
     const { context, page } = await launchExtensionContext();
+    await seedProfiles(page, ['Northwind Bank']);
     await page.$('#file-input').then((el) => el.setInputFiles(path.join(fixturesDir, 'northwind_transaction_history_flags.pdf')));
     await page.waitForSelector('.decision-row', { timeout: 20000 });
     await page.waitForTimeout(600); // let the async snippet crop finish rendering
@@ -90,7 +102,7 @@ async function main() {
   }
 
   // 9/10: decisions with a CSV snippet (synthetic file with a within-file
-  // duplicate transaction, same shape as the Meridian Bank savings builtin profile).
+  // duplicate transaction, same shape as the seeded Meridian Bank savings profile).
   {
     const csv = [
       'Account Details For: TAN WEI MING',
@@ -111,6 +123,7 @@ async function main() {
     fs.writeFileSync(fixture, csv);
 
     const { context, page } = await launchExtensionContext();
+    await seedProfiles(page, ['Meridian Bank']);
     await page.$('#file-input').then((el) => el.setInputFiles(fixture));
     await page.waitForSelector('.decision-row', { timeout: 15000 });
     await shotBoth(page, 'decisions-csv-snippet');

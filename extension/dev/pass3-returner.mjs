@@ -3,6 +3,12 @@
 // Uses a FIXED userDataDir (not mkdtemp) so profile/storage persists across
 // separate node invocations - this is what lets "close and reopen the tab"
 // and the later monthly-path phase see the profiles set up earlier.
+//
+// No profile ships with the extension (NO-TEMPLATES.md item 1) - run the
+// phases in this order so every fixture has a saved profile by the time a
+// later phase expects it to auto-match with zero setup:
+//   setup-csv -> setup-pdf -> setup-meridian -> reopen-check -> monthly-path
+//   -> layout-changed -> re-drop
 import { chromium } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -161,6 +167,36 @@ async function main() {
       }
       await shot(page, '14-pdf-home-after-save');
       appendLog({ phase, clicksSoFar: clicks, seconds: seconds() });
+    } else if (phase === 'setup-meridian') {
+      // The monthly-path phase below drops a fresh copy of meridian_savings.csv
+      // expecting it to auto-match "with zero setup", the same as a returning
+      // user's second month would for a statement type they already set up
+      // last month - no profile ships with the extension, so save that
+      // profile for real here via confirm-first before monthly-path ever runs.
+      const fixture = path.join(fixturesDir, 'meridian_savings.csv');
+      await dropFile(page, fixture);
+      await openWizard(page);
+      await shot(page, '15-meridian-confirm-a');
+      const yesDisabled = await page.$eval('#confirm-yes', (b) => b.disabled).catch(() => null);
+      appendLog({ phase, note: 'meridian confirm-a yesDisabled', yesDisabled });
+      if (yesDisabled) {
+        await click(page, '#confirm-off');
+        await page.waitForTimeout(200);
+        await click(page, '#confirm-fix-other');
+        await page.waitForSelector('#step-2.active', { timeout: 8000 });
+        await shot(page, '16-meridian-map-fields');
+        await advanceWizardTo(page, 4);
+        await click(page, '#wizard-next');
+        await page.waitForTimeout(800);
+      } else {
+        await click(page, '#confirm-yes');
+        await page.waitForTimeout(300);
+        await shot(page, '16b-meridian-confirm-c');
+        await click(page, '#confirm-save');
+        await page.waitForTimeout(800);
+      }
+      await shot(page, '17-meridian-home-after-save');
+      appendLog({ phase, clicksSoFar: clicks, seconds: seconds() });
     } else if (phase === 'reopen-check') {
       // "Close and reopen the tab": this is a fresh node invocation against
       // the same persistent profileDir, i.e. a fresh tab/context reading
@@ -171,17 +207,18 @@ async function main() {
     } else if (phase === 'monthly-path') {
       // NEW copies of both custom fixtures, renamed + CSV dates pushed one
       // month later (image PDF: renamed only, dates baked into the scan
-      // image can't be edited without re-rastering), plus one builtin fixture.
+      // image can't be edited without re-rastering), plus the Meridian Bank
+      // fixture the setup-meridian phase already saved a profile for.
       const csvSrc = fs.readFileSync(path.join(fixturesDir, 'generic_unknown_bank.csv'), 'utf8');
       const csvNextMonth = csvSrc.replace(/(\d{2})\/(\d{2})\/2026/g, (m, d, mo) => `${d}/${String(Number(mo) + 1).padStart(2, '0')}/2026`);
       const csvOct = path.join(profileDir, 'generic_unknown_bank_october.csv');
       fs.writeFileSync(csvOct, csvNextMonth);
       const pdfOct = path.join(profileDir, 'summit_grouped_2line_image_october.pdf');
       fs.copyFileSync(path.join(fixturesDir, 'summit_grouped_2line_image.pdf'), pdfOct);
-      const builtin = path.join(fixturesDir, 'meridian_savings.csv'); // builtin, auto-matches with zero setup
+      const meridian = path.join(fixturesDir, 'meridian_savings.csv'); // already set up by the setup-meridian phase, auto-matches with zero setup
 
       const dropAt = Date.now();
-      await dropFile(page, [csvOct, pdfOct, builtin]);
+      await dropFile(page, [csvOct, pdfOct, meridian]);
       await waitCopyEnabled(page, 90000);
       const readySec = ((Date.now() - dropAt) / 1000).toFixed(1);
       await shot(page, '30-monthly-all-ready');
@@ -213,7 +250,8 @@ async function main() {
       // Rename a header in a fresh copy of the custom CSV profile - keeps
       // the amount/description columns intact but the date header no longer
       // matches "When" exactly, forcing formatChanged (Update mapping),
-      // same technique e2e-extension.mjs's map5 scenario uses for a builtin.
+      // same single-header-rename technique e2e-extension.mjs's map5
+      // scenario uses.
       const csvSrc = fs.readFileSync(path.join(fixturesDir, 'generic_unknown_bank.csv'), 'utf8');
       const changed = csvSrc.replace('When,What,Value', 'Whn,What,Value');
       const changedPath = path.join(profileDir, 'generic_unknown_bank_layoutchanged.csv');

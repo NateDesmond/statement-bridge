@@ -246,7 +246,13 @@ export function normalizeRecords(records, version, meta = {}) {
       }
     }
 
-    if (!skipped) {
+    // A row with no valid date (flagged 'unparseable_date' above, not
+    // dropped) has nothing real to compare its date against - two such rows
+    // both fingerprinting on date=null would collide and wrongly flag as
+    // possible_duplicate even when their (unreadable) raw dates are actually
+    // different calendar dates. Same exclusion this row already gets from
+    // every other date-anchored check (e.g. date_outside_period above).
+    if (!skipped && date) {
       const fingerprint = [meta.accountLabel, date, amountResult.minor, currency, description_raw.toLowerCase()].join('|');
       const count = (seen.get(fingerprint) || 0) + 1;
       seen.set(fingerprint, count);

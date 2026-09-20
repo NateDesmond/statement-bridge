@@ -284,6 +284,7 @@ export function createReview({ storage, getFiles, onUpdateMapping, persist, nav,
     log('review', 'file summary + checks', {
       sourceFile: file.name, rowCount: summary.rowCount, byCurrency: summary.byCurrency,
       balanceReconciles: balance.reconciles, flagsHistogram,
+      quickLookRows: file.rows.filter(hasWarningFlag).length,
     });
 
     const host = $('#review-summary');

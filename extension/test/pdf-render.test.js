@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import { blockLines } from '../src/ui/pdf-render.js';
 import { groupItemsIntoLines, extractPdfPagesRows } from '../src/core/pdf.js';
 
+// Item 7 (NO-TEMPLATES, 2026-09-20): renderRowSnippet/renderRowMagnifier
+// themselves need a canvas/DOM (page.render, document.createElement
+// ('canvas'), CanvasRenderingContext2D) that Node's test runner has none of -
+// same reason only blockLines (the pure piece) is unit-tested above, not
+// renderRowSnippet. blockLines is exactly what both crops share for
+// "which lines does this block cover", so its correctness already covers the
+// piece that would otherwise need faking a canvas to test either function's
+// bigger pipeline. The magnifier's own real behaviour (bigger crop, whole-
+// line padding, positioned floating panel) is covered by dev/e2e-magnifier.mjs
+// against the real bundled-Chromium extension instead.
+
 // REBUILD-HOME item 5a (2026-09-18): the decision-card snippet's root-cause
 // bug was that it never looked past a single line (source_y alone) - a
 // multi-line block whose amount sits below its own description lines fell

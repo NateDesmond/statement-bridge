@@ -20,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, '..');
 
 // A fictional bank (HARDENING.md's shared rule: no real bank names anywhere),
-// matching the naming convention builtin-profiles.js's own "Northwind Bank"
+// matching the naming convention a saved "Northwind Bank"
 // Transaction History PDF profile already uses, so a real person's remembered
 // password formula for this statement type reads naturally in the fixture.
 export const PASSWORD = 'sb-test-nric-1990';

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseCsvChunked, runParseJob } from '../src/worker.js';
-import { builtinProfiles } from '../src/core/builtin-profiles.js';
+import { sampleProfiles } from './fixtures/sample-profiles.js';
 
-const dbsSavingsVersion = builtinProfiles().find((p) => p.id === 'builtin-meridian-savings').versions[0];
+const dbsSavingsVersion = sampleProfiles().find((p) => p.id === 'sample-meridian-savings').versions[0];
 const csvFixture = () => readFileSync(fileURLToPath(new URL('./fixtures/meridian_savings.csv', import.meta.url)), 'utf-8');
 
 function collector() {

@@ -456,42 +456,33 @@
           <h1>Report a problem</h1>
           <button class="close-btn" type="button" id="report-close-btn" aria-label="Close">&times;</button>
         </div>
-        <p class="pdf-anchor-hint" data-test="report-intro">Tell us what happened. Nothing about your files leaves this device except what you choose to send in this email.</p>
+        <p class="pdf-anchor-hint" data-test="report-intro">Only anonymous details are sent: what happened, which statement (without its name), how it was read, and any errors. Never your transactions, amounts, dates or account numbers.</p>
         <div class="panel">
           <h2 class="section-title">What happened?</h2>
           <p class="pdf-anchor-hint" style="margin:0 0 10px;">Plain words are fine, e.g. "the amount was wrong on row 3".</p>
           <textarea id="report-what" rows="4" style="width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--paper-line);" placeholder="What did you expect, and what happened instead?"></textarea>
 
-          <h2 class="section-title" style="margin-top:16px;">Which file?</h2>
-          <select id="report-file" style="width:100%;max-width:360px;"><option value="">(not one file in particular)</option></select>
+          <h2 class="section-title" style="margin-top:16px;">Which statement?</h2>
+          <select id="report-file" style="width:100%;max-width:360px;"><option value="">(not one in particular)</option></select>
 
-          <h2 class="section-title" style="margin-top:16px;">
-            <label style="display:flex;align-items:center;gap:8px;font:inherit;font-weight:inherit;">
-              <input type="checkbox" id="report-include-log" checked>
-              Include the debug log
-            </label>
-          </h2>
-          <p class="pdf-anchor-hint" id="report-log-summary" style="margin:0 0 12px;"></p>
-
-          <h2 class="section-title">What will be sent</h2>
+          <h2 class="section-title" style="margin-top:16px;">What will be sent</h2>
           <ul class="report-summary-list" id="report-summary-list"></ul>
           <details id="report-raw-details">
             <summary class="rs-link">Show the exact report</summary>
-            <p class="pdf-anchor-hint" style="margin:8px 0;">Descriptions, statement types and amounts are masked or stripped before this ever leaves the device. This is exactly what will be copied:</p>
+            <p class="pdf-anchor-hint" style="margin:8px 0;">This is exactly what will be copied - counts and structure only, never a transaction, amount, date, account number or file name:</p>
             <pre class="signatures-preview" id="report-preview" style="max-height:220px;overflow:auto;"></pre>
           </details>
 
-          <!-- Item 15 (coordinator, 2026-09-18): the anonymised report above
-               is for sending to us; "Copy debug log" here is the full,
-               un-anonymised log, for the owner's own on-device debugging -
-               a visible secondary action, never removed again, with a
-               one-line note on the difference. -->
+          <!-- item 10: "Copy report" (anonymous, sent to us) and "Copy full
+               log" (raw, never sent, for the owner's own troubleshooting)
+               are two separate, clearly labelled actions - never the same
+               button, and the full log one never contributes to the report
+               above it. -->
           <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;">
             <button class="btn btn-brass btn-sm" type="button" id="report-send-btn">Copy report and open email</button>
-            <button class="btn btn-ghost btn-sm" type="button" id="report-copy-debuglog-btn">Copy debug log</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="report-copy-debuglog-btn">Copy full log (for your own troubleshooting, never sent)</button>
             <span id="report-status" class="pdf-anchor-hint" role="status" aria-live="polite" style="margin:0;"></span>
           </div>
-          <p class="pdf-anchor-hint" style="margin:6px 0 0;">"Copy report" is anonymised, for sending to us. "Copy debug log" is the full log, for your own troubleshooting - it can include statement descriptions and amounts.</p>
 
           <div id="report-done" hidden style="margin-top:14px;">
             <p class="pdf-anchor-hint">Copied. An email draft should be open, addressed to <strong id="report-email"></strong>. If it did not open, write to that address from any email app and paste the report from your clipboard.</p>
@@ -531,7 +522,6 @@
         <div id="wizard-confirm" hidden>
           <div id="confirm-a" class="confirm-step">
             <h2 class="section-title confirm-heading" id="confirm-a-heading" tabindex="-1"></h2>
-            <div class="confirm-totals" id="confirm-a-totals"></div>
             <div id="confirm-a-preview"></div>
             <div class="confirm-actions">
               <button class="btn btn-brass btn-confirm-giant" type="button" id="confirm-yes" data-test="confirm-yes">Yes, looks right</button>

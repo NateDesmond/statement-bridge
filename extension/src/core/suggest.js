@@ -487,18 +487,32 @@ export function suggestNumberFormat(values) {
 
 // --- Wizard step 1 "Basics" pre-fill -------------------------------------
 
+// item 3 (NO-TEMPLATES): this is detection VOCABULARY, not a shipped
+// template - it never pre-fills a profile, it only helps a real file's own
+// text/filename suggest a name for the statement type the user is about to
+// save (or confirm a saved one still matches). Longer/more specific names
+// are listed before a name they contain (e.g. 'Standard Chartered' has no
+// short-name collision risk here, but keep that ordering habit for any
+// future addition) since bankNameInText/suggest just need ANY match, not
+// the most specific one, so order doesn't currently change behavior - noted
+// for whoever extends this next.
 export const BANK_NAMES = [
   'DBS', 'POSB', 'OCBC', 'UOB', 'Citi', 'HSBC', 'Standard Chartered', 'Maybank',
-  'Chase', 'Amex', 'Bank of America', 'Wells Fargo', 'Revolut', 'Wise', 'Trust',
-  'GXS', 'MariBank',
+  'Chase', 'Amex', 'Bank of America', 'BofA', 'Wells Fargo', 'Revolut', 'Wise', 'Trust',
+  'GXS', 'MariBank', 'Barclays', 'Monzo', 'CommBank', 'ANZ', 'RBC', 'TD',
+  'Deutsche', 'N26', 'HDFC', 'SBI', 'MUFG', 'SMBC', 'Hang Seng', 'CIMB',
 ];
 
 const BANK_COUNTRY = {
   DBS: 'Singapore', POSB: 'Singapore', OCBC: 'Singapore', UOB: 'Singapore',
   Trust: 'Singapore', GXS: 'Singapore', MariBank: 'Singapore',
-  Maybank: 'Malaysia', Citi: 'United States', Chase: 'United States', Amex: 'United States',
-  'Bank of America': 'United States', 'Wells Fargo': 'United States',
+  Maybank: 'Malaysia', CIMB: 'Malaysia', Citi: 'United States', Chase: 'United States', Amex: 'United States',
+  'Bank of America': 'United States', BofA: 'United States', 'Wells Fargo': 'United States',
   HSBC: 'United Kingdom', 'Standard Chartered': 'United Kingdom', Revolut: 'United Kingdom', Wise: 'United Kingdom',
+  Barclays: 'United Kingdom', Monzo: 'United Kingdom',
+  CommBank: 'Australia', ANZ: 'Australia', RBC: 'Canada', TD: 'Canada',
+  Deutsche: 'Germany', N26: 'Germany', HDFC: 'India', SBI: 'India',
+  MUFG: 'Japan', SMBC: 'Japan', 'Hang Seng': 'Hong Kong',
 };
 
 const CURRENCY_COUNTRY = {
@@ -508,13 +522,28 @@ const CURRENCY_COUNTRY = {
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+// item 9b (NO-TEMPLATES verification): most banks already ARE their own
+// common short code (DBS, UOB, OCBC, HSBC, ANZ...), so a filename like
+// "uob_statement.csv" matches BANK_NAMES directly. A multi-word name's own
+// short code is a different token though - "sc_all.csv" names Standard
+// Chartered by an abbreviation the full-name regex above can never match.
+// FILENAME-only (never scanned against document body text, where a bare
+// "sc"/"boa" token is far more likely to be unrelated prose than a bank
+// code) - detection vocabulary, not a template; extend as real short codes
+// turn up.
+const FILENAME_BANK_ALIASES = { sc: 'Standard Chartered', boa: 'Bank of America', wf: 'Wells Fargo' };
+
 /** Detect a known bank name from statement preamble/header text and/or filename. */
 export function detectBankName(text = '', filename = '') {
   // Normalise filename separators (_ - .) to spaces so \b boundaries work
   // against "uob_statement.csv" the same as they do against prose text.
-  const hay = `${text} ${filename.replace(/[_.-]/g, ' ')}`;
+  const filenameSpaced = filename.replace(/[_.-]/g, ' ');
+  const hay = `${text} ${filenameSpaced}`;
   for (const name of BANK_NAMES) {
     if (new RegExp(`\\b${escapeRe(name)}\\b`, 'i').test(hay)) return name;
+  }
+  for (const token of filenameSpaced.toLowerCase().split(/\s+/)) {
+    if (FILENAME_BANK_ALIASES[token]) return FILENAME_BANK_ALIASES[token];
   }
   const m = text.match(/\b([A-Z][A-Za-z&. ]{0,30}Bank\b)/);
   return m ? m[1].trim() : '';

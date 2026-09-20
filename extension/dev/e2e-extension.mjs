@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { assertCleanLog } from './lib/assert-clean-log.mjs';
+import { sampleProfiles } from '../test/fixtures/sample-profiles.js';
 
 let checkFailures = 0;
 function check(label, ok, detail) {
@@ -193,10 +194,11 @@ async function runFlagResolutionScenario() {
   await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low, #attention-cards button:has-text("Set up")', { timeout: 60000 });
 
   // Follow-up A (QA-REPORT.md finding 7): on a completely fresh profile
-  // store this fixture doesn't always auto-match a built-in profile the way
-  // QA's own long-lived session saw it do - so don't rely on that. Either
-  // way, get the file mapped once (via the "Map this statement" wizard, or
-  // it's already matched), then force a SECOND wizard open specifically
+  // store this fixture won't auto-match at all - no profile ships with the
+  // extension (NO-TEMPLATES.md item 1) - so save one via the wizard first.
+  // Either way, get the file mapped once (via the "Set up" wizard, or it's
+  // already matched from an earlier run of this same context), then force a
+  // SECOND wizard open specifically
   // through the Change drawer's "Update mapping" link - the entry point QA
   // could not exercise - so the wizard's own Test-step flag-resolution UI
   // (not Home's card or Review's chip) is what actually gets tested below.
@@ -332,11 +334,16 @@ async function runUnknownCsvMappingScenario() {
  * no isPdf() guard. Renaming "Transaction Date" -> "Txn Date" (still in the
  * date synonym dictionary, so Map fields still resolves date on its own)
  * is the exact single-header-rename profiles.js's own matchProfile comment
- * names as what turns a builtin-dbs-savings exact match into formatChanged:
- * true (Layout changed / Update mapping), never a fresh "Map this
- * statement". Walks Basics -> Map fields -> Test -> Save and relies on
- * assertCleanLog to fail on the pageerror or the wizard.* stack entry this
- * bug used to leave behind.
+ * names as what turns an exact match into formatChanged: true (Layout
+ * changed / Update mapping), never a fresh "Set up". Walks Basics -> Map
+ * fields -> Test -> Save and relies on assertCleanLog to fail on the
+ * pageerror or the wizard.* stack entry this bug used to leave behind.
+ *
+ * No profile ships with the extension (NO-TEMPLATES.md item 1), so this
+ * seeds the matching Meridian Bank savings profile itself first - standing
+ * in for a user who already saved the un-renamed export through
+ * confirm-first - since what's under test here is the Update-mapping bug,
+ * not the confirm-first save flow.
  */
 async function runCsvLayoutChangedUpdateMappingScenario() {
   console.log('\n=== scenario: CSV layout-changed via Update mapping (prefix map5) ===');
@@ -349,6 +356,9 @@ async function runCsvLayoutChangedUpdateMappingScenario() {
   const { context, page, pageErrors } = await launchExtensionContext();
   const shotStep = shotter(page, 'map5');
   const shotBottom = bottomShotter(page, 'map5');
+
+  await page.evaluate(async (profiles) => { await chrome.storage.local.set({ profiles }); },
+    sampleProfiles().filter((p) => p.bank === 'Meridian Bank'));
 
   console.log('1. drop the renamed-header Meridian Bank export, wait for the Layout-changed card...');
   await page.$('#file-input').then((el) => el.setInputFiles(fixture));
@@ -446,10 +456,16 @@ async function runConfirmYesGenericBankScenario() {
  * Task verification 2: harbour_card_crdr.csv with "Transaction Date"
  * renamed to "Txn Date" (still in the date synonym dictionary, so mapping
  * still resolves on its own - the exact single-header-rename technique
- * map5 uses) turns the builtin-dbs-credit-card-v2-crdr exact match into
- * formatChanged, landing on the confirm-first wizard via the Home "Update
- * mapping" card. Verifies Screen A's "This looks different from last
- * time..." heading (item 4), then the plain Yes path to Save.
+ * map5 uses) turns an exact match into formatChanged, landing on the
+ * confirm-first wizard via the Home "Update mapping" card. Verifies Screen
+ * A's "This looks different from last time..." heading (item 4), then the
+ * plain Yes path to Save.
+ *
+ * No profile ships with the extension (NO-TEMPLATES.md item 1), so this
+ * seeds the matching Harbour Card credit-card profile itself first -
+ * standing in for a user who already saved the un-renamed export through
+ * confirm-first - since what's under test here is the Update-mapping
+ * heading, not the confirm-first save flow.
  */
 async function runConfirmUpdateMappingScenario() {
   console.log('\n=== scenario: confirm-first Update-mapping heading, harbour_card_crdr.csv renamed header (prefix confirmupdate) ===');
@@ -461,6 +477,9 @@ async function runConfirmUpdateMappingScenario() {
 
   const { context, page, pageErrors } = await launchExtensionContext();
   const shotStep = shotter(page, 'confirmupdate');
+
+  await page.evaluate(async (profiles) => { await chrome.storage.local.set({ profiles }); },
+    sampleProfiles().filter((p) => p.bank === 'Harbour Card'));
 
   console.log('1. drop the renamed-header export, wait for the Layout-changed card, click Update mapping...');
   await page.$('#file-input').then((el) => el.setInputFiles(fixture));
@@ -844,6 +863,75 @@ async function runManualRangeScenario() {
   if (!cleanLog.ok) throw new Error(`range scenario: ${cleanLog.problems.join('; ')}`);
 }
 
+/**
+ * Item B (NO-TEMPLATES, 2026-09-20): the default export is the union of what
+ * was actually imported - Date/Account/Description/Amount/Currency plus only
+ * the optional fields the loaded statements really carry, never Statement
+ * type/Bank/File, and never a blank Account cell. Loads a PDF and a CSV
+ * (whose own "Posting Date"/"Type" columns are what widens the union), then
+ * screenshots the result card's export preview at both widths.
+ */
+async function runUnionExportScenario() {
+  console.log('\n=== scenario: union default export (prefix union2) ===');
+  const { context, page, pageErrors } = await launchExtensionContext();
+  const outDir = path.join(os.homedir(), 'Desktop', 'StatementBridge', 'audit', 'fix-shots');
+  fs.mkdirSync(outDir, { recursive: true });
+
+  for (const name of ['northwind_transaction_history_flags.pdf', 'anchor_checking.csv']) {
+    console.log(`1. drop ${name}, confirm-first setup (Set up -> Yes -> Save)...`);
+    await dropAndOpenWizard(page, path.join(extensionPath, 'test', 'fixtures', name));
+    // anchor_checking.csv is month-first, which the wizard can't tell on its
+    // own - it opens straight on the date-format picker (the same focus
+    // screen "Something's off -> the dates" reaches). Answer it, then carry
+    // on to Screen A.
+    if (await page.isVisible('#confirm-focus').catch(() => false)) {
+      await page.selectOption('#w-dateformat', 'MM/DD/YYYY');
+      await page.waitForTimeout(300);
+      await page.click('#confirm-focus-done');
+    }
+    await page.waitForSelector('#confirm-a:not([hidden])', { timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('confirm-a-heading')?.textContent?.trim().length > 0, { timeout: 30000 });
+    await page.click('#confirm-yes');
+    await page.waitForSelector('#confirm-c:not([hidden])', { timeout: 20000 });
+    await page.click('#confirm-save');
+    await page.waitForSelector('#export-panel:not([hidden])', { timeout: 30000 });
+    await page.waitForTimeout(800);
+  }
+
+  const headers = await page.$$eval('#result-table thead th', (ths) => ths.map((th) => th.textContent.trim()));
+  console.log('   column list:', JSON.stringify(headers));
+  check('default export starts with Date, Account, Description, Amount, Currency',
+    JSON.stringify(headers.slice(0, 5)) === JSON.stringify(['Date', 'Account', 'Description', 'Amount', 'Currency']), JSON.stringify(headers));
+  for (const banned of ['Statement type', 'Bank', 'File']) {
+    check(`default export never includes ${banned}`, !headers.some((h) => h.toLowerCase() === banned.toLowerCase()), JSON.stringify(headers));
+  }
+  check('at most 8 columns in the preview', headers.length <= 8, `columns=${headers.length}`);
+
+  const accountCells = await page.$$eval('#result-table tbody td[data-field="account_label"]', (tds) => tds.map((td) => td.textContent.trim()));
+  check('no empty Account cell', accountCells.length > 0 && accountCells.every((t) => t.length > 0), JSON.stringify([...new Set(accountCells)]));
+
+  // No header may be cut off by the preview's own horizontal scroll box.
+  const truncated = await page.$$eval('#result-table thead th', (ths) => ths
+    .filter((th) => th.scrollWidth > th.clientWidth + 1 || th.getBoundingClientRect().right > th.closest('.preset-preview-scroll').getBoundingClientRect().right + 1)
+    .map((th) => th.textContent.trim()));
+  check('no truncated header', truncated.length === 0, JSON.stringify(truncated));
+
+  const summary = await page.textContent('#change-drawer-title').catch(() => '');
+  check('export-settings summary does not call an untouched default "Customised"', !/Customised/.test(summary || ''), summary || '');
+
+  const card = await page.$('#export-panel');
+  for (const width of [1440, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(400);
+    await card.screenshot({ path: path.join(outDir, `union2-${width}.png`) });
+  }
+  console.log('   screenshots:', path.join(outDir, 'union2-1440.png'), path.join(outDir, 'union2-1280.png'));
+
+  const cleanLog = await assertCleanLog(page, 'union default export (union2)', pageErrors);
+  await context.close();
+  if (!cleanLog.ok) throw new Error(`union2 scenario: ${cleanLog.problems.join('; ')}`);
+}
+
 // Optional CLI filter (`node dev/e2e-extension.mjs map2 map3 ...`) so a long
 // run can be split into several sub-400s invocations without ever running
 // two at once - each name still launches its own fresh browser context in
@@ -861,6 +949,7 @@ const SCENARIOS = {
   firsttimerde: runFirstTimerGermanCsvScenario,
   setup: runConfirmScreensGalleryScenario,
   range: runManualRangeScenario,
+  union2: runUnionExportScenario,
 };
 
 async function main() {

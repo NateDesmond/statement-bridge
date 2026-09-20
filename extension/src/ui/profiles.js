@@ -46,19 +46,15 @@ export function createProfilesScreen({ storage, onMapNewStatement }) {
             <div class="vr-actions"></div>
           `;
           const actions = row.querySelector('.vr-actions');
-          if (!profile.builtIn) {
-            actions.appendChild(makeBtn('Rename', async () => {
-              const name = prompt('New name', profile.name);
-              if (name) { await updateProfile(storage, profile.id, { name }); await render(); }
-            }));
-            actions.appendChild(makeBtn('Duplicate', async () => { await duplicateProfile(storage, profile.id); await render(); }));
-            actions.appendChild(makeBtn('Delete', async () => {
-              if (!confirm(`Delete statement type "${profile.name}"?`)) return;
-              await deleteProfile(storage, profile.id); await render();
-            }, true));
-          } else {
-            actions.appendChild(makeBtn('Duplicate', async () => { await duplicateProfile(storage, profile.id); await render(); }));
-          }
+          actions.appendChild(makeBtn('Rename', async () => {
+            const name = prompt('New name', profile.name);
+            if (name) { await updateProfile(storage, profile.id, { name }); await render(); }
+          }));
+          actions.appendChild(makeBtn('Duplicate', async () => { await duplicateProfile(storage, profile.id); await render(); }));
+          actions.appendChild(makeBtn('Delete', async () => {
+            if (!confirm(`Delete statement type "${profile.name}"?`)) return;
+            await deleteProfile(storage, profile.id); await render();
+          }, true));
           wrap.appendChild(row);
         });
       }

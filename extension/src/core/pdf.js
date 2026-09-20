@@ -442,9 +442,9 @@ const CURRENCY_ZERO_DECIMALS = new Set(['JPY', 'KRW', 'IDR', 'VND']);
 // A line whose SHAPE is never a transaction amount line, regardless of what
 // number happens to be on it - checked before the amount regex runs at all.
 // This is the DEFAULT list, applied even with no profile/wizard config at
-// all (a grouped profile not yet mapped, or a builtin without its own
+// all (a grouped profile not yet mapped, or a saved profile without its own
 // ignoreLinePatterns); a matched profile's own ignoreLinePatterns (see
-// builtin-profiles.js) is additional, not a replacement. Once
+// PROFILE_SCHEMA.md) is additional, not a replacement. Once
 // matchAmountLine stopped requiring a decimal point (some banks print round
 // amounts with none), an account summary line like "Available Balance SGD
 // 33,889.56" reads exactly like a transaction unless excluded by its own
@@ -758,12 +758,18 @@ export function detectGroupedSignConvention(lines, customAmountRe) {
  * alone - it could be a type/category line for the transaction that just
  * closed (DBS's real layout: a "Point-of-Sale Transaction · POS" line right
  * after the amount) or the start of the NEXT block's description (UOB,
- * worst case). Guessing "it's a type line" by default overfit to DBS
- * specifically, so it's opt-in: `pdfConfig.grouped.trailingTypeLine: true`
- * (set on DBS's own builtin profile) claims exactly the first such line as
- * `type` and drops any further one as trailing boilerplate (unchanged from
- * the old behavior); without it, that same line instead becomes part of the
- * NEXT block's description, per the block rule above.
+ * worst case). `pdfConfig.grouped.trailingTypeLine` forces one reading or
+ * the other (true: claim exactly the first such line as `type`, drop any
+ * further one as trailing boilerplate; false: never claim it). Left unset
+ * (every unmapped/auto-detected file, which is what the wizard and
+ * dev/auto-version.mjs build), the block's own SHAPE decides, per layout
+ * rather than per bank: if the closing amount line carried its description
+ * inline ahead of the amount, that block needs no further lines, so what
+ * follows is its trailing type/category line - if it did not (the
+ * description sat on its own line above the amount), following lines are
+ * the next block's description. Defaulting to "next description" for every
+ * layout is what prepended a DBS-style type line onto the following
+ * transaction's description (2026-09-20, northwind_transaction_history_flags).
  * @param {{y:number, items:object[]}[]} lines
  * @param {{grouped?: {dateGroupPattern?:string, amountEndPattern?:string, trailingTypeLine?:boolean}, ignoreLinePatterns?:string[]}} pdfConfig
  * @returns {{date:string, description_raw:string, amount:string, currency:string, type:string}[]}
@@ -774,7 +780,7 @@ export function extractGroupedRows(lines, pdfConfig = {}) {
   const customAmountRe = cfg.amountEndPattern ? new RegExp(cfg.amountEndPattern) : null;
   const signConvention = cfg.signConvention || 'signed';
   const columnBands = cfg.columnBands || null;
-  const trailingTypeLine = !!cfg.trailingTypeLine;
+  const trailingTypeLine = typeof cfg.trailingTypeLine === 'boolean' ? cfg.trailingTypeLine : null; // null = decide per block from its shape (see doc comment)
   // A page footer ("Page 2 of 3") or the "Transactions as of" balance summary
   // line doesn't match a date-group or an amount-ending line, so without
   // this it would silently get merged into a block's description - drop
@@ -787,6 +793,7 @@ export function extractGroupedRows(lines, pdfConfig = {}) {
   const rows = [];
   let current = null; // the most recently closed row - only ever touched again to receive a trailingTypeLine's one claimed line
   let typeConsumed = true; // whether `current`'s trailingTypeLine slot has already been filled (or there is no `current` yet)
+  let claimTrailing = trailingTypeLine === true; // does the block that just closed own the lines that follow it? (config, else its own shape)
   let pendingLines = []; // Item 3/4: non-amount, non-date lines seen since the last block close - the next block's description
   let pendingLineRefs = []; // same lines, kept alongside for tagSource - a UOB-style block ("2line": description on its own line, amount on the NEXT line) has to anchor the outline box to the FIRST of these, not the amount line itself
 
@@ -800,6 +807,7 @@ export function extractGroupedRows(lines, pdfConfig = {}) {
       currentDate = dateMatch[1] || dateMatch[2];
       currentDateConfidence = lineConfidence(line); // the date-group token itself, see pdf.js's PROFILE_SCHEMA note
       pendingLines = []; pendingLineRefs = []; // a stray leftover line right before a date group is preamble noise, not part of any block
+      claimTrailing = trailingTypeLine === true; // a new date group closes the previous block for good
       continue;
     }
 
@@ -850,11 +858,14 @@ export function extractGroupedRows(lines, pdfConfig = {}) {
       if (topLine !== line) extendSourceTo(current, line);
       rows.push(current);
       pendingLines = []; pendingLineRefs = [];
-      typeConsumed = !trailingTypeLine;
+      // Unset config: an inline description means this block is already
+      // complete, so whatever follows is its own trailing type line.
+      claimTrailing = trailingTypeLine === null ? !!inline : trailingTypeLine;
+      typeConsumed = !claimTrailing;
       continue;
     }
 
-    if (trailingTypeLine) {
+    if (claimTrailing) {
       // The type line's own confidence never affects the row (per product
       // decision: a low-confidence type/category word is not worth a
       // warning); a second continuation line is trailing boilerplate (a

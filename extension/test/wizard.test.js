@@ -88,13 +88,13 @@ test('groupedWholeFileSampleRows returns real values for the Map-fields "Sample 
   assert.equal(rows[0].description_raw, 'Grab GRA-123');
   assert.equal(rows[0].amount, '-20.83');
   assert.equal(rows[0].currency, 'SGD');
-  // Item 4 (2026-09-17): an unmapped file's generic preview no longer
-  // assumes DBS's own "type line right after the amount" layout by default
-  // - a trailing continuation line only becomes `type` when a matched
-  // profile opts in (grouped.trailingTypeLine, e.g. DBS's builtin profile).
-  // With no next transaction to claim it as description either, it's
-  // simply dropped here.
-  assert.equal(rows[0].type, '');
+  // Item C (2026-09-20): an unmapped file with no grouped.trailingTypeLine
+  // set now decides per block from its shape - this block's description sat
+  // inline on the amount line, so the block was already complete and the
+  // "Transport" line after it is its type, not the next row's description
+  // (which is what used to prepend a type line onto the following
+  // transaction, see core/pdf.js's extractGroupedRows doc comment).
+  assert.equal(rows[0].type, 'Transport');
 });
 
 test('groupedWholeFileSampleRows reads every page, not just the first', () => {

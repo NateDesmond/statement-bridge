@@ -636,3 +636,43 @@ test('detectGroupedSignConvention: mostly-signed lines auto-detect as "signed"',
 test('INCORRECT_PASSWORD matches pdf.js\'s own PasswordResponses.INCORRECT_PASSWORD value', () => {
   assert.equal(INCORRECT_PASSWORD, 2);
 });
+
+// Item C (2026-09-20, northwind_transaction_history_flags): with no
+// trailingTypeLine set (every unmapped/auto-detected file), a DBS-style
+// block's type line was falling into the NEXT block's description, so the
+// GRAB row read "Point-of-Sale Transaction · POS GRAB* A-9988776 SINGAPORE
+// SG". A block whose amount line carried its description inline is already
+// complete, so the line after it is that block's own type line.
+test('extractGroupedRows: with no trailingTypeLine config, an inline-description block claims the line after it as `type` instead of prepending it to the next description', () => {
+  const items = [
+    { str: 'Yesterday, 15 Sep 2026', x: 50, y: 610 },
+    { str: 'BAT 2C2*LAZADA Singapore SGP 12SEP 4628-XXXX', x: 50, y: 592 }, { str: 'SGD - 20.83', x: 430, y: 592 },
+    { str: 'Point-of-Sale Transaction · POS', x: 50, y: 578 },
+    { str: 'GRAB* A-9988776 SINGAPORE SG', x: 50, y: 560 }, { str: 'SGD 1,200.00', x: 430, y: 560 },
+    { str: 'Point-of-Sale Transaction · POS', x: 50, y: 546 },
+  ];
+  const rows = extractGroupedRows(groupItemsIntoLines(items), {});
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].description_raw, 'GRAB* A-9988776 SINGAPORE SG');
+  assert.equal(rows[1].type, 'Point-of-Sale Transaction · POS');
+  assert.equal(rows[0].description_raw, 'BAT 2C2*LAZADA Singapore SGP 12SEP 4628-XXXX');
+  assert.equal(rows[0].type, 'Point-of-Sale Transaction · POS');
+});
+
+// The other half of the same rule: a block whose description sits on its own
+// line ABOVE the amount (UOB/"worst case" layouts) must keep treating the
+// lines after an amount as the NEXT block's description, not as a type line.
+test('extractGroupedRows: with no trailingTypeLine config, a description-above-amount block still feeds following lines to the next block', () => {
+  const items = [
+    { str: '15 Sep 2026', x: 50, y: 610 },
+    { str: 'FAIRPRICE FINEST SGP', x: 50, y: 592 },
+    { str: 'SGD - 48.20', x: 430, y: 578 },
+    { str: 'SHOPEE SG *8823', x: 50, y: 560 },
+    { str: 'SGD - 216.30', x: 430, y: 546 },
+  ];
+  const rows = extractGroupedRows(groupItemsIntoLines(items), {});
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].description_raw, 'FAIRPRICE FINEST SGP');
+  assert.equal(rows[1].description_raw, 'SHOPEE SG *8823');
+  assert.equal(rows[1].type, '');
+});

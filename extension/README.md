@@ -75,12 +75,9 @@ src/core/date.js        date parsing per dateFormat, day/month order + year infe
 src/core/normalize.js   fields/transforms/signConvention -> standard transaction rows
 src/core/suggest.js     rule-based (no AI) mapping suggestions
 src/core/profiles.js    profile CRUD, matching, backup/restore JSON
-src/core/builtin-profiles.js  starter profiles for fictional example banks (Meridian Bank
-                        savings, Harbour Card credit card, Riverside/Summit/Anchor Bank savings
-                        or checking, Lattice Bank tab-padded credit card, Northwind Bank grouped
-                        Transaction History PDF). Meridian Bank savings has two CSV versions: v1
-                        for a short-preamble layout, v2 for a longer-preamble layout with no
-                        running Balance column and dates as "15 Sep 2026"
+src/core/builtin-profiles.js  exports an empty list - no statement type ships with the
+                        extension; every profile is created by a user through the wizard. Kept
+                        as the vocabulary/shape reference point alongside PROFILE_SCHEMA.md.
 src/core/storage.js     storage adapter (chrome.storage.local, or in-memory for tests)
 src/core/checks.js      balance check, count check, per-file summary; countCheckGrouped +
                         groupedCountLabel are the grouped-rowModel PDF equivalent, shared by the
@@ -139,9 +136,9 @@ page text (`fileType: 'pdf'`; `core/profiles.js`'s `matchProfile` now filters
 out any profile whose `fileType` differs from the file's before scoring, so a
 PDF - OCR'd or not - can never match a CSV profile, formatChanged or not),
 then
-`extractPdfPagesRows()`/`normalizeRecords()` against the OCR items, so the
-built-in "Northwind Bank savings, Transaction History PDF" profile (`rowModel:
-'grouped'`) matches and extracts an OCR'd statement exactly like a real one.
+`extractPdfPagesRows()`/`normalizeRecords()` against the OCR items, so a
+saved grouped-layout profile (`rowModel: 'grouped'`) matches and extracts an
+OCR'd statement exactly like a real one.
 If nothing matches, the file falls through to the ordinary "new statement"
 card and "Map this statement" opens the wizard against the cached OCR items
 (`src/ui/wizard.js`'s `renderAnchorPicker` uses `entry.ocrPages[0].items`
@@ -431,9 +428,9 @@ exits non-zero on any FAIL:
    `dev/lib/assert-clean-log.mjs` - fails on any page error or any
    `core/debuglog.js` entry carrying a `stack` (a real bug, never
    informational logging). `dev/e2e-stale-profile.mjs` seeds
-   `chrome.storage.local` with a broken user profile (same signatures as a
-   built-in, a mapping that silently loses amounts) BEFORE dropping the
-   matching fixture, and asserts the working built-in wins on extraction
+   `chrome.storage.local` with a good, working user profile plus a broken one
+   (same signatures, a mapping that silently loses amounts) BEFORE dropping
+   the matching fixture, and asserts the good profile wins on extraction
    quality, the row count is right, the losing-profile caption shows, and
    Copy for Sheets has an amount on every row - see home-state.js's
    `selectMatchCandidate` doc comment for the real bug this exists for.
@@ -473,9 +470,8 @@ cleanly when the folder or manifest is missing.
 - ~~PDF matching at drop time~~: done. `src/ui/home.js`'s drop handler loads
   the PDF (`core/pdf.js`'s `loadPdfPages`), builds page-1 text, and runs it
   through the same `matchProfile()` path CSV/XLSX use (`pdfText`/`preambleText`
-  signals plus filename), so a saved or built-in PDF profile (e.g. "Northwind
-  Bank savings, Transaction History PDF") auto-applies and shows its health badge
-  like a CSV match. This needed a `matchProfile()` fix too: a PDF profile's
+  signals plus filename), so a saved PDF profile auto-applies and shows its
+  health badge like a CSV match. This needed a `matchProfile()` fix too: a PDF profile's
   `signatures.headerText` is always `[]` (no header row to compare), which
   used to cap every PDF match's confidence at 0.4 (weighting a header score
   that could never be anything but 0) and always flag it `formatChanged`; PDF
@@ -501,7 +497,7 @@ cleanly when the folder or manifest is missing.
   debug log.
 - **XLSX profile signatures**: xlsx files are read into a grid via SheetJS in
   the UI layer and reuse `core/csv.js`'s `applyProfileVersion`, but no
-  built-in xlsx starter profile or xlsx-specific signature matching exists yet.
+  xlsx-specific signature matching exists yet.
 - **Mapping wizard step 2/3 editing UI**: the wizard shows suggested mappings
   read-only (step 2 table) and a rough test/save flow (steps 3-4); there is no
   UI yet to override an individual field's source column, add a transform, or
@@ -531,7 +527,7 @@ cleanly when the folder or manifest is missing.
 - **Currency-unknown and missing-rate cards are unit-tested, not screenshot-verified
   end to end**: `core/home-state.js`'s `attentionCards` covers `currencyUnknown`
   and `exportReadiness` covers missing rate pairs, and `home.js` renders both
-  card kinds, but no built-in profile in the fixtures produces a null-currency
+  card kinds, but no fixture profile in the tests produces a null-currency
   row or a real foreign currency, so those two specific renders were
   reviewed by code inspection rather than a live screenshot. Low confidence,
   layout changed, warnings, new statement, and duplicates-merged were all

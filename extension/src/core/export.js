@@ -1,6 +1,7 @@
 // Export presets: build CSV/TSV text from normalized rows per a column preset.
 
 import { formatMinor } from './amount.js';
+import { defaultAccountLabel } from './home-state.js';
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Sheets/Excel serial date epoch: day 0 is 1899-12-30 (the classic Lotus
@@ -82,6 +83,17 @@ export function fieldValue(row, field, preset) {
   // needs its own currency for decimal-place-aware formatting (item 2).
   if (field === 'converted_amount') return row.converted_amount == null ? '' : formatAmountOut(row.converted_amount, row.converted_currency, null);
   if (field === 'flags') return (row.flags || []).join(';');
+  // Item B (NO-TEMPLATES, 2026-09-20): Account is never blank. A row whose
+  // account_label was never filled in (normalized before the file's own label
+  // was worked out) falls back to the same "<bank> <statement type>" shape
+  // defaultAccountLabel builds, then to the file name - anything but an empty
+  // column in a default export whose whole job is saying which account a row
+  // came from.
+  if (field === 'account_label') {
+    return row.account_label
+      || defaultAccountLabel({ bank: row.bank, statementType: row.statement_type, name: row.source_file || '' }, null)
+      || '';
+  }
   return row[field] ?? '';
 }
 
@@ -209,6 +221,71 @@ export const DEFAULT_PRESET_MODE_B = {
 export function isDefaultPresetColumns(preset) {
   const fields = (preset?.columns || []).map((c) => c.field).join(',');
   return fields === DEFAULT_PRESET.columns.map((c) => c.field).join(',');
+}
+
+// Does any row, in any statement group, carry a non-empty value for `field`?
+// Same "at least one" rule preset-editor.js's fieldCoverage uses, with fixed
+// date/sign options so presence never depends on a caller's own preset choices.
+function fieldPresentAnywhere(field, groupsWithRows) {
+  return groupsWithRows.some((g) => g.rows.some((r) =>
+    !r.excluded && !r.skipped && fieldValue(r, field, { dateFormat: 'YYYY-MM-DD', signConvention: 'signed' }) !== ''));
+}
+
+// Item 6 (NO-TEMPLATES), narrowed by item B (2026-09-20): every additional
+// column - beyond the always-present Date/Account/Description/Amount/Currency
+// - that a session's default export widens to include, in this fixed order.
+// This list is exhaustive: Statement type, Bank and File describe the FILE,
+// not the transaction, and repeating one constant down every row is noise in
+// the thing the user pastes into a sheet (they already name the statement in
+// the Account column). Balance is out for the same reason it is dropped from
+// a preview that has none - it's a silent cross-check, never a goal - and the
+// "With balance" layout is one click away for anyone who wants it.
+// `type` is the transaction-type column a mapping can fill in (wizard extras
+// land on rows under their bare slug, e.g. anchor_checking.csv's "Type").
+const UNION_OPTIONAL_FIELDS = [
+  { field: 'post_date', name: 'Posting date' },
+  { field: 'reference', name: 'Reference' },
+  { field: 'type', name: 'Type' },
+  { field: 'orig_amount', name: 'Original amount' },
+  { field: 'orig_currency', name: 'Original currency' },
+];
+
+/**
+ * Item 6 (NO-TEMPLATES): the default export is the union of what was
+ * actually imported this session, not one static column list - always Date/
+ * Account/Description/Amount/Currency, then every UNION_OPTIONAL_FIELDS
+ * column present in at least one row of at least one statement - and nothing
+ * else. No fileGroups, or none with rows (fresh install, Settings with
+ * nothing loaded), falls back to exactly DEFAULT_PRESET's static shape -
+ * never an empty column list.
+ * @param {{label:string, rows:object[]}[]} fileGroups
+ */
+export function unionPreset(fileGroups) {
+  const groupsWithRows = (fileGroups || []).filter((g) => g.rows?.length);
+  if (!groupsWithRows.length) return DEFAULT_PRESET;
+
+  const columns = [
+    { field: 'date', name: 'Date' },
+    { field: 'account_label', name: 'Account' },
+    { field: 'description_raw', name: 'Description' },
+    { field: 'amount', name: 'Amount' },
+    { field: 'currency', name: 'Currency' },
+  ];
+  // Original amount/currency only earn a column when some row was actually
+  // converted; a row whose original currency equals its currency adds nothing.
+  const anyConverted = groupsWithRows.some((g) => g.rows.some((r) =>
+    !r.excluded && !r.skipped && r.orig_currency && r.currency && r.orig_currency !== r.currency));
+  for (const f of UNION_OPTIONAL_FIELDS) {
+    if (f.field.startsWith('orig_') ? anyConverted : fieldPresentAnywhere(f.field, groupsWithRows)) columns.push(f);
+  }
+
+  return { columns, dateFormat: 'YYYY-MM-DD', signConvention: 'signed', headerRow: true };
+}
+
+/** Sibling to isDefaultPresetColumns for the dynamic union default (item 6): true when a preset's columns still exactly match what unionPreset(fileGroups) would produce for this session right now - used the same way, to decide whether Mode B should widen it with conversion columns. */
+export function isUnionPresetColumns(preset, fileGroups) {
+  const fields = (preset?.columns || []).map((c) => c.field).join(',');
+  return fields === unionPreset(fileGroups).columns.map((c) => c.field).join(',');
 }
 
 // Item 7 (REBUILD-HOME): the six built-in column layouts, offered as radio

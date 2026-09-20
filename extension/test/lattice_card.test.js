@@ -17,14 +17,14 @@ import { parseGrid, applyProfileVersion } from '../src/core/csv.js';
 import { suggestMapping, suggestHeaderRow } from '../src/core/suggest.js';
 import { normalizeRecords } from '../src/core/normalize.js';
 import { matchProfile, MATCH_THRESHOLD } from '../src/core/profiles.js';
-import { builtinProfiles } from '../src/core/builtin-profiles.js';
+import { sampleProfiles } from './fixtures/sample-profiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.join(__dirname, 'fixtures', 'lattice_card_tabbed.csv');
 
 function load() {
   const text = fs.readFileSync(fixturePath, 'utf-8');
-  const profile = builtinProfiles().find((p) => p.id === 'builtin-lattice-card');
+  const profile = sampleProfiles().find((p) => p.id === 'sample-lattice-card');
   const version = profile.versions[0];
   return { text, profile, version };
 }
@@ -58,12 +58,12 @@ test('suggestMapping maps amount to the fully-filled "SGD Amount" column, never 
   assert.ok(!mapping.some((m) => m.source === 'Foreign Currency Amount' && m.field === 'amount'), 'Foreign Currency Amount never wins amount');
 });
 
-test('the built-in Lattice Bank credit card profile matches the fixture at >= 0.9 confidence', async () => {
+test('the Lattice Bank credit card profile matches the fixture at >= 0.9 confidence', async () => {
   const { text, profile } = load();
   const grid = await parseGrid(text);
   const headerRow = suggestHeaderRow(grid);
   const preambleText = grid.slice(0, headerRow).flat().join(' ');
-  const results = matchProfile({ header: grid[headerRow], preambleText, filename: 'lattice_card_tabbed.csv', fileType: 'csv' }, builtinProfiles());
+  const results = matchProfile({ header: grid[headerRow], preambleText, filename: 'lattice_card_tabbed.csv', fileType: 'csv' }, sampleProfiles());
   const top = results[0];
   assert.equal(top.profile.id, profile.id);
   assert.ok(top.confidence >= 0.9 - 1e-9, `confidence ${top.confidence} >= 0.9`);

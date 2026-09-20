@@ -146,6 +146,35 @@ test('possible_duplicate needs the SAME date too - two coffee purchases on diffe
   assert.deepEqual(rows[1].flags, [], 'same vendor and amount on a different date is not a duplicate');
 });
 
+// Item 5 (2026-09-20): a row whose date column fails to parse is kept (and
+// flagged 'unparseable_date'), not dropped - normalize.js's own fingerprint
+// used to fall back to `date` = null for such a row, so two DIFFERENT
+// unreadable-date rows with the same amount/description silently shared that
+// same null and got wrongly flagged possible_duplicate against each other.
+// A row with no valid date has nothing real to compare dates against, so it
+// must never participate in the possible_duplicate check at all.
+test('possible_duplicate: two rows with unparseable dates are never flagged as duplicates of each other, even with the same amount/description (item 5)', () => {
+  const records = [
+    { 'Transaction Date': 'not a date', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+    { 'Transaction Date': 'also not a date', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+  ];
+  const rows = normalizeRecords(records, dbsVersion, {});
+  assert.ok(rows[0].flags.includes('unparseable_date'));
+  assert.ok(rows[1].flags.includes('unparseable_date'));
+  assert.ok(!rows[0].flags.includes('possible_duplicate'));
+  assert.ok(!rows[1].flags.includes('possible_duplicate'));
+});
+
+test('possible_duplicate: same-day/same-amount/same-description rows ARE still flagged (existing correct behavior)', () => {
+  const records = [
+    { 'Transaction Date': '01/06/2026', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+    { 'Transaction Date': '01/06/2026', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+  ];
+  const rows = normalizeRecords(records, dbsVersion, {});
+  assert.deepEqual(rows[0].flags, []);
+  assert.ok(rows[1].flags.includes('possible_duplicate'));
+});
+
 test('crdr sign convention', () => {
   const version = {
     id: 'v2', dateFormat: 'DD/MM/YYYY', numberFormat: '1,234.56', signConvention: 'crdr',

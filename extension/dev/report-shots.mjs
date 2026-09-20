@@ -61,25 +61,25 @@ async function main() {
   await page.click('#report-close-btn');
   await page.waitForFunction(() => !document.getElementById('screen-report').classList.contains('open'));
 
-  // Drop a real statement so the "which file" dropdown and the debug log
-  // have real content to show off the anonymised preview.
+  // Drop a real statement so the "which statement" dropdown and the
+  // structural summary have real content to show off the anonymised preview.
   const input = await page.$('#file-input');
   await input.setInputFiles(path.join(fixturesDir, 'meridian_savings.csv'));
   await page.waitForTimeout(1500);
 
-  // 2: filled form with a file picked and the anonymised preview visible,
-  // the sheet open right over the Home screen behind it.
+  // 2: filled form with a statement picked and the anonymised preview
+  // visible, the sheet open right over the Home screen behind it.
   await openReportSheet(page);
   await page.fill('#report-what', 'The credit amount on 05/06 copied as blank.');
-  await page.selectOption('#report-file', { label: 'meridian_savings.csv' });
+  await page.selectOption('#report-file', { index: 1 });
   await page.waitForTimeout(150);
   await page.screenshot({ path: path.join(shotsDir, nextName('filled-with-preview')) });
 
-  // 3: log excluded - the summary line should say so plainly.
-  await page.uncheck('#report-include-log');
+  // 3: the "Show the exact report" disclosure, expanded - structural detail
+  // only, no file name and no per-transaction data.
+  await page.click('#report-raw-details summary');
   await page.waitForTimeout(150);
-  await page.screenshot({ path: path.join(shotsDir, nextName('log-excluded')) });
-  await page.check('#report-include-log');
+  await page.screenshot({ path: path.join(shotsDir, nextName('exact-report-shown')) });
 
   // 4: after "Copy report and open email" - the confirmation panel.
   await page.click('#report-send-btn');

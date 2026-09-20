@@ -1,6 +1,5 @@
 // Profile CRUD (chrome.storage.local via a storage adapter), matching, backup/restore.
 
-import { builtinProfiles } from './builtin-profiles.js';
 import { BANK_NAMES } from './suggest.js';
 
 function escapeRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -16,50 +15,9 @@ function uuid() {
   });
 }
 
-// A profile set already seeded on a prior load is never re-seeded, so a
-// builtin profile/version added or refined in a later code update (e.g.
-// builtin-dbs-savings-v2-real, added after v1 shipped) silently never
-// reaches an install that seeded before it existed - the stored copy is
-// frozen at seed time forever. Root cause of a real regression: a device
-// that had already seeded profiles kept matching a real DBS export against
-// its stale, pre-v2 builtin-dbs-savings only, long after the code gained
-// the version that actually matches it. Missing builtin profiles/versions
-// are appended by id on every load; an existing builtin version already in
-// storage (learned alternatives, edits, all of it) is never touched or
-// replaced, and user-created (non-builtin) profiles are untouched too.
-function mergeBuiltinUpdates(stored, seeded) {
-  let changed = false;
-  const profiles = stored.map((p) => ({ ...p, versions: [...p.versions] }));
-  const byId = new Map(profiles.map((p) => [p.id, p]));
-  for (const seededProfile of seeded) {
-    const existing = byId.get(seededProfile.id);
-    if (!existing) {
-      profiles.push(seededProfile);
-      byId.set(seededProfile.id, seededProfile);
-      changed = true;
-      continue;
-    }
-    const versionIds = new Set(existing.versions.map((v) => v.id));
-    for (const seededVersion of seededProfile.versions) {
-      if (!versionIds.has(seededVersion.id)) {
-        existing.versions.push(seededVersion);
-        changed = true;
-      }
-    }
-  }
-  return { profiles, changed };
-}
-
 export async function loadProfiles(storage) {
   const stored = await storage.get(STORAGE_KEY);
-  const seeded = builtinProfiles();
-  if (!stored) {
-    await storage.set(STORAGE_KEY, seeded);
-    return seeded;
-  }
-  const { profiles, changed } = mergeBuiltinUpdates(stored, seeded);
-  if (changed) await storage.set(STORAGE_KEY, profiles);
-  return profiles;
+  return stored || [];
 }
 
 async function saveProfiles(storage, profiles) {

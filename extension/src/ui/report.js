@@ -1,39 +1,47 @@
 // "Report a problem" screen: reachable from the gear menu, Settings, the
 // wizard's error state and Home's "Could not read" cards (see app.js for the
-// onOpenReport wiring). All assembly (the anonymisation, the report JSON,
-// the mailto shape) lives in core/report.js and core/anonymize.js, both pure
-// and unit-tested; this file is only the DOM around them.
+// onOpenReport wiring). All assembly (the session summary, the report JSON,
+// the mailto shape) lives in core/report.js and core/session-report.js, both
+// pure and unit-tested; this file is only the DOM around them.
+//
+// Item 10: the report never carries a per-transaction entry or a file name.
+// "Which statement" lists anonymous, auto-generated labels (built from the
+// current session's own debug log, same as what ends up in the report) - not
+// the real file list. The full, un-anonymised debug log is still available,
+// as a clearly separate action that is never sent anywhere.
 
 import { all as allDebugLogEvents, asText as debugLogText } from '../core/debuglog.js';
 import { buildReport, buildMailto, reportToJson, SUPPORT_EMAIL } from '../core/report.js';
+import { buildSessionSummary } from '../core/session-report.js';
 
 const $ = (sel) => document.querySelector(sel);
 
-export function createReportScreen({ getFiles }) {
-  let prefillFileName = '';
+export function createReportScreen() {
+  let prefillLabel = '';
 
   function extensionVersion() {
     try { return chrome.runtime.getManifest().version; } catch { return 'unknown'; }
   }
 
-  function renderFileOptions() {
-    const select = $('#report-file');
-    const files = getFiles?.() || [];
-    select.innerHTML = '<option value="">(not one file in particular)</option>'
-      + files.map((f) => `<option value="${f.name}">${f.name}</option>`).join('');
-    select.value = files.some((f) => f.name === prefillFileName) ? prefillFileName : '';
+  function statements() {
+    return buildSessionSummary(allDebugLogEvents()).statements;
   }
 
-  function includeLog() { return $('#report-include-log').checked; }
+  function renderFileOptions() {
+    const select = $('#report-file');
+    const list = statements();
+    select.innerHTML = '<option value="">(not one in particular)</option>'
+      + list.map((s) => `<option value="${s.label}">${s.summary}</option>`).join('');
+    select.value = list.some((s) => s.label === prefillLabel) ? prefillLabel : '';
+  }
 
   function currentReport() {
     return buildReport({
       extensionVersion: extensionVersion(),
       userAgent: (typeof navigator !== 'undefined' && navigator.userAgent) || 'unknown',
       whatHappened: $('#report-what').value,
-      fileName: $('#report-file').value,
-      includeLog: includeLog(),
-      events: includeLog() ? allDebugLogEvents() : [],
+      statementLabel: $('#report-file').value,
+      events: allDebugLogEvents(),
     });
   }
 
@@ -42,12 +50,12 @@ export function createReportScreen({ getFiles }) {
       email: SUPPORT_EMAIL,
       extensionVersion: extensionVersion(),
       whatHappened: $('#report-what').value,
-      fileName: $('#report-file').value,
+      statementLabel: $('#report-file').value,
     });
   }
 
-  // Item 15: a plain-language summary is what shows by default - the exact
-  // JSON "Copy report" will put on the clipboard is still right there,
+  // A plain-language summary is what shows by default - the exact JSON
+  // "Copy report" will put on the clipboard is still right there,
   // verifiable, just behind a "Show the exact report" disclosure instead of
   // being the first thing every user sees.
   function renderSummaryList(r) {
@@ -55,9 +63,9 @@ export function createReportScreen({ getFiles }) {
     if (!list) return;
     const items = [
       r.whatHappened.trim() ? 'Your message' : 'No message written yet',
-      r.fileName ? `File: ${r.fileName}` : 'No file selected',
-      r.logIncluded ? `Debug log included, ${(r.log || []).length} entries` : 'No debug log included',
-      `Extension version ${r.extensionVersion}`,
+      r.statement ? `About: ${r.statement}` : 'Not about one statement in particular',
+      `${r.statements.length} statement${r.statements.length === 1 ? '' : 's'} in this session, structural details only (no file names, no transactions)`,
+      `Extension version ${r.extensionVersion}, ${r.browser} on ${r.os}`,
     ];
     list.innerHTML = '';
     for (const text of items) {
@@ -73,7 +81,6 @@ export function createReportScreen({ getFiles }) {
   function renderPreview() {
     const r = currentReport();
     $('#report-preview').textContent = reportToJson(r);
-    $('#report-log-summary').textContent = includeLog() ? r.logNote : 'No debug log will be included.';
     renderSummaryList(r);
   }
 
@@ -109,26 +116,26 @@ export function createReportScreen({ getFiles }) {
   function wire() {
     $('#report-what').addEventListener('input', renderPreview);
     $('#report-file').addEventListener('change', renderPreview);
-    $('#report-include-log').addEventListener('change', renderPreview);
     $('#report-send-btn').addEventListener('click', send);
     $('#report-copy-again-btn').addEventListener('click', async () => {
       try { await copyReport(); setStatus('Report copied again.'); }
       catch { setStatus("Couldn't copy - select the preview above to copy it by hand."); }
     });
-    // Item 15 (coordinator, 2026-09-18): the full, un-anonymised debug log,
-    // for the owner's own troubleshooting - a separate action from the
-    // anonymised "Copy report" above it, never the same button.
+    // The full, un-anonymised debug log, for the owner's own
+    // troubleshooting - a separate action from the anonymised "Copy report"
+    // above it, never the same button, never sent anywhere by this screen.
     $('#report-copy-debuglog-btn')?.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(debugLogText()); setStatus('Debug log copied.'); }
+      try { await navigator.clipboard.writeText(debugLogText()); setStatus('Full log copied (not sent).'); }
       catch { setStatus('Clipboard access was denied.'); }
     });
   }
 
-  /** Opens the screen (app.js shows it right after) prefilled from a given file's name, e.g. from a "Could not read" card. */
+  /** Opens the screen (app.js shows it right after), optionally prefilled from a real file name (e.g. from a "Could not read" card) - translated here to its anonymous label, never carried further as the real name. */
   function open(fileName) {
-    prefillFileName = fileName || '';
+    const { nameToLabel } = buildSessionSummary(allDebugLogEvents());
+    const found = (nameToLabel || []).find(([name]) => name === fileName);
+    prefillLabel = found ? found[1] : '';
     $('#report-what').value = '';
-    $('#report-include-log').checked = true;
     $('#report-done').hidden = true;
     setStatus('');
     renderFileOptions();

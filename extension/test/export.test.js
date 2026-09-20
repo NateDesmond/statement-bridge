@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCsv, buildTsv, suggestFilename, preExportSummary, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, fieldValue } from '../src/core/export.js';
+import { buildCsv, buildTsv, suggestFilename, preExportSummary, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, unionPreset, isUnionPresetColumns, fieldValue } from '../src/core/export.js';
 import { convertToTarget } from '../src/core/currency.js';
 
 const rows = [
@@ -149,6 +149,88 @@ test('formatDateOut covers every DATE_FORMATS option', async () => {
   assert.equal(formatDateOut(iso, 'isoWithTime'), '2026-09-05');
   // Google Sheets serial number: day 0 is 1899-12-30.
   assert.equal(formatDateOut(iso, 'sheetsSerial'), String(Math.round((Date.UTC(2026, 8, 5) - Date.UTC(1899, 11, 30)) / 86400000)));
+});
+
+// Item 6 (NO-TEMPLATES): the default export is the union of what was
+// actually imported this session.
+test('unionPreset: no fileGroups, or none with rows, falls back to exactly DEFAULT_PRESET\'s static shape', () => {
+  assert.deepEqual(unionPreset(undefined), DEFAULT_PRESET);
+  assert.deepEqual(unionPreset([]), DEFAULT_PRESET);
+  assert.deepEqual(unionPreset([{ label: 'Empty file', rows: [] }]), DEFAULT_PRESET);
+});
+
+test('unionPreset: always starts with Date, Account, Description, Amount, Currency', () => {
+  const groups = [{ label: 'DBS savings', rows: [{ date: '2026-06-01', account_label: 'DBS', description_raw: 'Coffee', amount: -350, currency: 'SGD' }] }];
+  const fields = unionPreset(groups).columns.map((c) => c.field);
+  assert.deepEqual(fields.slice(0, 5), ['date', 'account_label', 'description_raw', 'amount', 'currency']);
+});
+
+test('unionPreset: adds Posting date/Reference/Type/Original amount/Original currency only when present, in a fixed order', () => {
+  const groups = [
+    { label: 'Standard Chartered credit card', rows: [{ date: '2026-06-01', account_label: 'SC', description_raw: 'Coffee', amount: -350, currency: 'SGD', reference: 'REF001', orig_amount: -260, orig_currency: 'USD' }] },
+    { label: 'DBS savings', rows: [{ date: '2026-06-02', account_label: 'DBS', description_raw: 'Salary', amount: 500000, currency: 'SGD', post_date: '2026-06-03', type: 'ACH_CREDIT' }] },
+  ];
+  const fields = unionPreset(groups).columns.map((c) => c.field);
+  assert.deepEqual(fields, ['date', 'account_label', 'description_raw', 'amount', 'currency', 'post_date', 'reference', 'type', 'orig_amount', 'orig_currency']);
+  assert.deepEqual(unionPreset(groups).columns.map((c) => c.name), ['Date', 'Account', 'Description', 'Amount', 'Currency', 'Posting date', 'Reference', 'Type', 'Original amount', 'Original currency']);
+});
+
+test('unionPreset: with no optional field present, the default export is exactly the base five', () => {
+  const groups = [{ label: 'DBS savings', rows: [
+    { date: '2026-06-01', account_label: 'DBS', description_raw: 'Coffee', amount: -350, currency: 'SGD', post_date: null, reference: '', type: '' },
+    { date: '2026-06-02', account_label: 'DBS', description_raw: 'Salary', amount: 500000, currency: 'SGD' },
+  ] }];
+  assert.deepEqual(unionPreset(groups).columns.map((c) => c.field), ['date', 'account_label', 'description_raw', 'amount', 'currency']);
+});
+
+// Item B (2026-09-20): Statement type/Bank/File describe the statement, not
+// the transaction, and Balance is a silent cross-check - none of them widen
+// the default export, however many rows carry one.
+test('unionPreset: never includes Statement type, Bank, File or Balance', () => {
+  const groups = [{ label: 'DBS savings', rows: [
+    { date: '2026-06-01', account_label: 'DBS', description_raw: 'Coffee', amount: -350, currency: 'SGD', balance: 100000, statement_type: 'current', bank: 'DBS', source_file: 'dbs.pdf' },
+  ] }];
+  const fields = unionPreset(groups).columns.map((c) => c.field);
+  for (const banned of ['statement_type', 'bank', 'source_file', 'balance']) assert.ok(!fields.includes(banned), banned);
+});
+
+// Item B: Account is the one column whose whole job is saying which statement
+// a row came from, so it is never blank - a row that never got an
+// account_label falls back to its bank + statement type, then its file name.
+test('fieldValue: Account falls back to the statement label, never an empty cell', () => {
+  assert.equal(fieldValue({ account_label: 'Northwind Bank current ****3210' }, 'account_label', {}), 'Northwind Bank current ****3210');
+  assert.equal(fieldValue({ account_label: null, bank: 'Northwind Bank', statement_type: 'current' }, 'account_label', {}), 'Northwind Bank current');
+  assert.equal(fieldValue({ account_label: null, source_file: 'statement.csv' }, 'account_label', {}), 'statement.csv');
+});
+
+test('buildCsv: Account column carries the fallback label for rows with no account_label', () => {
+  const rows = [{ date: '2026-06-01', description_raw: 'Coffee', amount: -350, currency: 'SGD', bank: 'Northwind Bank', statement_type: 'current' }];
+  const preset = unionPreset([{ label: 'Northwind', rows }]);
+  const [, dataLine] = buildCsv(rows, preset).split('\r\n');
+  assert.equal(dataLine.split(',')[1], 'Northwind Bank current');
+});
+
+test('unionPreset: a field present in only one of several statements still gets included (union, not intersection)', () => {
+  const groups = [
+    { label: 'A', rows: [{ date: '2026-06-01', amount: -1, currency: 'SGD' }] },
+    { label: 'B', rows: [{ date: '2026-06-02', amount: -2, currency: 'SGD', reference: 'R1' }] },
+    { label: 'C', rows: [{ date: '2026-06-03', amount: -3, currency: 'SGD' }] },
+  ];
+  assert.ok(unionPreset(groups).columns.some((c) => c.field === 'reference'));
+});
+
+test('unionPreset: matches DEFAULT_PRESET\'s own dateFormat/signConvention/headerRow shape', () => {
+  const preset = unionPreset([{ label: 'A', rows: [{ date: '2026-06-01' }] }]);
+  assert.equal(preset.dateFormat, DEFAULT_PRESET.dateFormat);
+  assert.equal(preset.signConvention, DEFAULT_PRESET.signConvention);
+  assert.equal(preset.headerRow, DEFAULT_PRESET.headerRow);
+});
+
+test('isUnionPresetColumns: true for the untouched union default, false once customised away from it', () => {
+  const groups = [{ label: 'DBS savings', rows: [{ date: '2026-06-01', reference: 'REF001' }] }];
+  const union = unionPreset(groups);
+  assert.equal(isUnionPresetColumns(union, groups), true);
+  assert.equal(isUnionPresetColumns({ columns: [{ field: 'date', name: 'Date' }] }, groups), false);
 });
 
 test('fieldValue money_out/money_in split by the internal sign, never both non-empty', () => {

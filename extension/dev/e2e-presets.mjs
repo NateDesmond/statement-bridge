@@ -1,11 +1,11 @@
 // Verifies the export column-layout rework (REBUILD-HOME item 7, 2026-09-18)
 // against the REAL unpacked extension (bundled Chromium only, never the
 // user's Chrome): drop the Northwind Bank image-only PDF fixture (auto-OCR
-// against the built-in "Northwind Bank savings, Transaction History PDF"
-// profile, which has an extra_type "Type" column), open the Home Change
-// drawer's layout cards + Customise pills, enable Type, screenshot the
-// editor + preview, Copy for Sheets, and assert the clipboard TSV carries
-// the Type column.
+// against a seeded "Northwind Bank savings, Transaction History PDF" profile
+// - standing in for one a user already saved through confirm-first, which
+// has an extra_type "Type" column), open the Home Change drawer's layout
+// cards + Customise pills, enable Type, screenshot the editor + preview,
+// Copy for Sheets, and assert the clipboard TSV carries the Type column.
 //
 // Run with: NODE_PATH=<a node_modules with playwright + cached chromium> node dev/e2e-presets.mjs
 import { chromium } from 'playwright';
@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { assertCleanLog } from './lib/assert-clean-log.mjs';
 import { gotoScreen, goBack } from './lib/nav.mjs';
+import { sampleProfiles } from '../test/fixtures/sample-profiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(__dirname, '..');
@@ -57,6 +58,11 @@ async function main() {
     });
     await page.goto(`chrome-extension://${extId}/workspace.html`);
     await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    // No statement type ships with a profile (NO-TEMPLATES.md item 1) - seed
+    // the two this script drops files for, standing in for a user who
+    // already saved them through confirm-first.
+    await page.evaluate(async (profiles) => { await chrome.storage.local.set({ profiles }); },
+      sampleProfiles().filter((p) => ['Northwind Bank', 'Meridian Bank'].includes(p.bank)));
 
     const fixture = path.join(extensionPath, 'test', 'fixtures', 'northwind_transaction_history_image.pdf');
     const input = await page.$('#file-input');
@@ -156,9 +162,10 @@ async function main() {
     const typeColIdx = clipLines[0].split('\t').indexOf('Type');
     const dataTypeValues = clipLines.slice(1).filter(Boolean).map((l) => l.split('\t')[typeColIdx]);
     // Not every grouped-PDF row has a type line (a continuation/footer line
-    // can legitimately leave it blank - see builtin-profiles.js's comment on
-    // this profile) - the real bug being checked is that a Type value that
-    // DOES exist actually reaches the export, not that every row has one.
+    // can legitimately leave it blank - see this profile's shape in
+    // test/fixtures/sample-profiles.js) - the real bug being checked is that
+    // a Type value that DOES exist actually reaches the export, not that
+    // every row has one.
     check('clipboard TSV carries at least one real, non-empty Type value', dataTypeValues.some((v) => v && v.trim()), dataTypeValues.join(' | '));
 
     console.log('5. checking Settings\' "Start from" picker...');

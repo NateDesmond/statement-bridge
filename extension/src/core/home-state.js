@@ -61,7 +61,7 @@ export function matchExtractionFailed(rows) {
 
 // --- Item 1: pick among tied match candidates by extraction quality --------
 // A real bug: two candidates ("sc test", a user
-// profile, and the built-in "Standard Chartered credit card, CSV") tied at
+// profile, and an older saved "Standard Chartered credit card, CSV") tied at
 // 0.9 confidence. Signature score alone can't tell them apart - one of them
 // had amount mapped to a sparse column (a stale suggester bug baked into an
 // old saved profile) and extracted almost nothing, but tied on header text
@@ -98,8 +98,8 @@ export function extractionQuality(rows, dateLedLineCount) {
  * (capped at MAX_SCORED_CANDIDATES) is actually built via `buildRows` and
  * scored; the highest quality wins. A tie in quality (within
  * QUALITY_TIE_MARGIN of the best) favours the most recently saved USER
- * profile (never a builtin) over an equally-good one, since a builtin's
- * mapping is fixed code while a user's own reflects their latest choice.
+ * profile over an equally-good older one, since the newer save reflects
+ * their latest choice.
  * @param {{profile:object, version:object, confidence:number}[]} matches - matchProfile's ranked candidates
  * @param {number} dateLedLineCount - see extractionQuality
  * @param {(match:object) => object[]|null} buildRows - runs the pipeline for one candidate; may throw/return null on a bad config

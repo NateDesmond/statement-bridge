@@ -492,25 +492,25 @@ test('extractionQuality: penalises missing_amount/unparseable_date rates, reward
   assert.ok(missingAmounts < 0.5, `${missingAmounts} should read as clearly bad`);
 });
 
-test('selectMatchCandidate: a tied-confidence broken user profile loses to a working built-in on quality', () => {
+test('selectMatchCandidate: a tied-confidence broken profile loses to a working one on quality', () => {
   const brokenUserProfile = { profile: { id: 'user-1', name: 'sc test', builtIn: false }, version: { id: 'v1', createdAt: '2026-09-16T00:00:00Z' }, confidence: 0.9 };
-  const workingBuiltin = { profile: { id: 'builtin-sc', name: 'Lattice Bank credit card, CSV', builtIn: true }, version: { id: 'v1', createdAt: '2026-09-01T00:00:00Z' }, confidence: 0.9 };
-  const matches = [brokenUserProfile, workingBuiltin]; // broken one first, the harder order to get right
+  const workingGood = { profile: { id: 'good-sc', name: 'Lattice Bank credit card, CSV', builtIn: true }, version: { id: 'v1', createdAt: '2026-09-01T00:00:00Z' }, confidence: 0.9 };
+  const matches = [brokenUserProfile, workingGood]; // broken one first, the harder order to get right
   const rowsByProfile = {
     'user-1': [row({ amount: null, flags: ['missing_amount'] }), row({ amount: null, flags: ['missing_amount'] }), row()],
-    'builtin-sc': [row(), row(), row()],
+    'good-sc': [row(), row(), row()],
   };
   const { picked, scored } = selectMatchCandidate(matches, 3, (m) => rowsByProfile[m.profile.id]);
-  assert.equal(picked.match.profile.id, 'builtin-sc');
+  assert.equal(picked.match.profile.id, 'good-sc');
   assert.equal(scored.length, 2);
   assert.ok(scored.every((s) => typeof s.quality === 'number'));
 });
 
-test('selectMatchCandidate: a near-tied quality gap favours the more recently saved user profile over an equally-good builtin', () => {
-  const olderBuiltin = { profile: { id: 'builtin', name: 'Builtin', builtIn: true }, version: { id: 'v1', createdAt: '2026-01-01T00:00:00Z' }, confidence: 0.95 };
+test('selectMatchCandidate: a near-tied quality gap favours the more recently saved profile over an equally-good older one', () => {
+  const olderProfile = { profile: { id: 'older', name: 'Older profile', builtIn: true }, version: { id: 'v1', createdAt: '2026-01-01T00:00:00Z' }, confidence: 0.95 };
   const newerUser = { profile: { id: 'user', name: 'My profile', builtIn: false }, version: { id: 'v2', createdAt: '2026-09-01T00:00:00Z' }, confidence: 0.9 };
-  const matches = [olderBuiltin, newerUser];
-  const rowsByProfile = { builtin: [row(), row()], user: [row(), row()] }; // identical quality
+  const matches = [olderProfile, newerUser];
+  const rowsByProfile = { older: [row(), row()], user: [row(), row()] }; // identical quality
   const { picked } = selectMatchCandidate(matches, 2, (m) => rowsByProfile[m.profile.id]);
   assert.equal(picked.match.profile.id, 'user');
 });

@@ -56,7 +56,7 @@ function buildGroupedVersion(flatLines) {
   return {
     pdf: { rowModel: 'grouped', grouped: { signConvention, columnBands: signDetection.columnBands || undefined } },
     fields: { date: { source: 'date' }, description_raw: { source: ['description_raw'] }, amount: { source: 'amount' }, currency: { mode: 'column', source: 'currency' } },
-    dateFormat: 'DD MMM YYYY', // extractGroupedRows always emits "D MMM YYYY" text, per builtin-profiles.js
+    dateFormat: 'DD MMM YYYY', // extractGroupedRows always emits "D MMM YYYY" text
     // The outer signConvention is always 'signed': extractGroupedRows already
     // resolved the real sign (pdf.grouped.signConvention above) into the
     // amount string itself - see wizard.js's buildVersionFromWizard for the

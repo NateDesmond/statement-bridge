@@ -149,7 +149,7 @@ export function createSettingsScreen({ storage, sessionStore, onCleared, onOpenR
       $('#delete-everything-btn').disabled = true;
       await render();
       onCleared?.();
-      announce('Everything erased. Built-in statement types were restored.');
+      announce('Everything erased.');
     });
   }
 

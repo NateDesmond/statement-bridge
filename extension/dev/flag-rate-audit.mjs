@@ -95,7 +95,7 @@ async function runPrivateFiles() {
       out.push({
         file: `file ${fileNum}`, total, flagged,
         pct: total ? Math.round((flagged / total) * 1000) / 10 : null,
-        note: total == null ? 'not mapped this session (no built-in/saved statement type matched); skipped' : undefined,
+        note: total == null ? 'not mapped this session (no saved statement type matched); skipped' : undefined,
       });
       await page.close();
     }
@@ -126,7 +126,7 @@ async function main() {
       const pFlagged = mapped.reduce((s, r) => s + r.flagged, 0);
       console.log(`Overall (${mapped.length} mapped files, ${pTotal} rows): ${pFlagged} flagged (${Math.round((pFlagged / pTotal) * 1000) / 10}%)`);
     } else {
-      console.log('No file mapped to a built-in/saved statement type this session - nothing to measure (this run never maps them, only reads whatever already auto-matches).');
+      console.log('No file mapped to a saved statement type this session - nothing to measure (this run never maps them, only reads whatever already auto-matches).');
     }
   }
 }

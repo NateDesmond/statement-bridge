@@ -12,6 +12,22 @@ test('fingerprint is stable for identical rows and normalizes description', () =
   assert.equal(a, b);
 });
 
+// Item 5 (2026-09-20): same root cause as normalize.js's within-file
+// possible_duplicate flag - a row with no parsed date (date: null, kept as an
+// 'unparseable_date' row upstream, not dropped) must never fingerprint-match
+// another such row just because both fall back to the same empty value.
+test('fingerprint returns null for a row with no parsed date', () => {
+  assert.equal(fingerprint(row({ date: null })), null);
+});
+
+test('cross-file merge never merges two rows that both have no parsed date, even with the same account/amount/description', () => {
+  const fileA = { sourceFile: 'a.csv', rows: [row({ date: null })] };
+  const fileB = { sourceFile: 'b.csv', rows: [row({ date: null })] };
+  const { merged, removed } = mergeAcrossFiles([fileA, fileB]);
+  assert.equal(merged.length, 2, 'both rows kept - a null date is never proof of a real overlap');
+  assert.equal(removed.length, 0);
+});
+
 test('within-file duplicates are kept as-is', () => {
   const fileRows = [row(), row()]; // identical, same file
   const { merged, removed } = mergeAcrossFiles([{ sourceFile: 'a.csv', rows: fileRows }]);
@@ -28,8 +44,8 @@ test('cross-file overlap is merged, keeping the max-occurrence file', () => {
 });
 
 test('cross-file merge keys off the account, not the profile: two files matched to different profile ids/names for the same account still merge', () => {
-  // Simulates the real bug: a user-saved profile ("DBS savings, PDF") and a
-  // builtin one ("Northwind Bank savings, Transaction History PDF") both extract the
+  // Simulates the real bug: two different saved profiles ("DBS savings, PDF"
+  // and "Northwind Bank savings, Transaction History PDF") both extract the
   // same account's rows. The rows themselves carry no consistent
   // account_label (one file's rows even have it null, e.g. a freshly
   // wizard-mapped file whose meta never got an accountLabel) - only the

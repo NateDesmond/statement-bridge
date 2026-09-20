@@ -13,13 +13,13 @@ const fixturesDir = path.join(extensionPath, 'test', 'fixtures');
 const shotsDir = path.join(__dirname, '..', '..', 'audit', 'pass2');
 fs.mkdirSync(shotsDir, { recursive: true });
 
-const CSV = path.join(fixturesDir, 'meridian_savings.csv'); // builtin-meridian-savings, auto-matches
-const PDF_TEXT = path.join(fixturesDir, 'northwind_transaction_history_sample.pdf'); // builtin-northwind-transaction-history-pdf, auto-matches
-const PDF_IMAGE = path.join(fixturesDir, 'northwind_transaction_history_image.pdf'); // same bank, image-only -> OCR then auto-matches
+const CSV = path.join(fixturesDir, 'meridian_savings.csv'); // set up once via confirm-first below, then auto-matches
+const PDF_TEXT = path.join(fixturesDir, 'northwind_transaction_history_sample.pdf'); // set up once via confirm-first below, then auto-matches
+const PDF_IMAGE = path.join(fixturesDir, 'northwind_transaction_history_image.pdf'); // same bank, image-only -> OCR then auto-matches PDF_TEXT's saved profile
 // Note: image.pdf's transactions overlap the text sample.pdf's (same synthetic
-// bank/period in the fixture set - there is only one builtin PDF profile),
-// so dropping all three together is also a real "accidental duplicate scan"
-// scenario: dedupe should fold the overlap in with zero extra clicks.
+// bank/period in the fixture set - there is only one Northwind Bank profile
+// to save), so dropping all three together is also a real "accidental
+// duplicate scan" scenario: dedupe should fold the overlap in with zero extra clicks.
 
 async function launch() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pass2-'));
@@ -81,25 +81,87 @@ async function waitCopyEnabled(page, timeout = 90000) {
   }
 }
 
+/** Opens the wizard for the most recently dropped file: the "Set up" attention card for a new statement type. */
+async function openWizard(page) {
+  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low, #attention-cards button:has-text("Set up")', { timeout: 60000 });
+  const mapBtn = await page.$('#attention-cards button:has-text("Set up")');
+  if (mapBtn) await mapBtn.click();
+  await page.waitForSelector('#screen-wizard.active', { timeout: 10000 });
+}
+/** Clicks Continue until the wizard reaches the given step index, or leaves the wizard (Save profile went through). */
+async function advanceWizardTo(page, stepIndex, maxClicks = 6) {
+  for (let i = 0; i < maxClicks; i++) {
+    if (await page.$(`#step-${stepIndex}.active`)) return true;
+    if (!(await page.$('#screen-wizard.active'))) return false;
+    await page.click('#wizard-next');
+    await page.waitForTimeout(400);
+  }
+  return !!(await page.$(`#step-${stepIndex}.active`));
+}
+/**
+ * Drops a fixture and saves a profile for it for real, via confirm-first -
+ * no statement type ships with the extension (NO-TEMPLATES.md item 1), so
+ * this stands in for a first-time user's own save, the "month one" a
+ * returning user's month two builds on. Screen A's Yes path when the
+ * auto-detected preview already looks right, otherwise "Something's off" ->
+ * "Something else" -> manual Map fields, same branch pass3-returner.mjs's
+ * setup phases use.
+ */
+async function setupViaConfirmFirst(page, fixturePath, label) {
+  await dropFile(page, fixturePath);
+  await openWizard(page);
+  await shot(page, `00-setup-${label}-confirm-a`);
+  const yesDisabled = await page.$eval('#confirm-yes', (b) => b.disabled).catch(() => null);
+  if (yesDisabled) {
+    await page.click('#confirm-off');
+    await page.waitForTimeout(200);
+    await page.click('#confirm-fix-other');
+    await page.waitForSelector('#step-2.active', { timeout: 8000 });
+    await shot(page, `00-setup-${label}-map-fields`);
+    await advanceWizardTo(page, 4);
+    await page.click('#wizard-next');
+  } else {
+    await page.click('#confirm-yes');
+    await page.waitForTimeout(300);
+    await shot(page, `00-setup-${label}-confirm-c`);
+    await page.click('#confirm-save');
+  }
+  await page.waitForTimeout(800);
+  await page.waitForSelector('.file-row .badge-ok, .file-row .badge-warn, .file-row .badge-low', { timeout: 30000 });
+}
+
 async function main() {
   const { context, page } = await launch();
   const log = [];
   const t0 = Date.now();
   try {
-    // --- Seed: confirm all three fixtures auto-match a builtin profile with zero setup (that IS "already set up" for a builtin) ---
-    console.log('Seeding: verifying the three fixtures auto-match builtin profiles with no wizard...');
-    await dropFile(page, [CSV, PDF_TEXT, PDF_IMAGE]);
+    // --- Month one (first time): no statement type ships with the extension
+    // (NO-TEMPLATES.md item 1) - save real profiles via confirm-first for
+    // both statement types first, the way an actual first-time user would,
+    // before this script ever claims a "returning user" scenario. ---------
+    console.log('Month one: saving Meridian Bank + Northwind Bank profiles via confirm-first...');
+    await setupViaConfirmFirst(page, CSV, 'csv');
+    await setupViaConfirmFirst(page, PDF_TEXT, 'pdf');
+    // PDF_IMAGE shares the Northwind Bank profile just saved above (same
+    // synthetic bank/period, only one PDF profile in this fixture set) -
+    // drop it too so OCR runs and it folds in as a duplicate of PDF_TEXT's
+    // transactions, exactly like a returning user's accidental duplicate
+    // scan would, with zero extra wizard clicks.
+    await dropFile(page, PDF_IMAGE);
+    const seedOcrBtn = await page.$('button:has-text("Read it with on-device text recognition")');
+    if (seedOcrBtn) await seedOcrBtn.click();
     await waitCopyEnabled(page, 90000);
     await shot(page, '00-seed-all-three-healthy');
-    const setupClicksNeeded = await page.$('#attention-cards button:has-text("Set up")');
     const rowCount = await page.$$eval('.file-row', (els) => els.length);
     const seedBtnState = await page.$eval('#copy-tsv-btn', (b) => ({ disabled: b.disabled, cls: b.className })).catch(() => null);
     const seedBlockNote = await page.$eval('#export-blocked-note', (el) => el.textContent).catch(() => null);
     const seedRowTexts = await page.$$eval('.file-row', (els) => els.map((e) => e.innerText.replace(/\n/g, ' | ')));
-    log.push(`Seed: builtin-matching fixtures reached Copy-ready with 0 wizard clicks (Set up button present: ${!!setupClicksNeeded}; ${rowCount} file row(s) shown - image.pdf's transactions overlap sample.pdf's in this fixture set, so it folds in as a duplicate rather than a 3rd distinct row).`);
-    log.push(`Seed evidence: copy-tsv-btn=${JSON.stringify(seedBtnState)}, blockNote="${seedBlockNote}", rows=${JSON.stringify(seedRowTexts)}`);
+    log.push(`Month one: saved both profiles via confirm-first, then all three fixtures reached Copy-ready (${rowCount} file row(s) shown - image.pdf's transactions overlap sample.pdf's in this fixture set, so it folds in as a duplicate rather than a 3rd distinct row).`);
+    log.push(`Month one evidence: copy-tsv-btn=${JSON.stringify(seedBtnState)}, blockNote="${seedBlockNote}", rows=${JSON.stringify(seedRowTexts)}`);
 
-    // --- Month two starts here: fresh reload, empty file list, profiles still known (builtins are baked in, not session state). ---
+    // --- Month two starts here: fresh reload, empty file list, both
+    // profiles still known (saved via confirm-first above, session storage
+    // persists across a reload of the same extension). ---
     await page.reload({ waitUntil: 'load' });
     await page.waitForSelector('#file-input', { state: 'attached' });
     await shot(page, '01-home-empty-month2');

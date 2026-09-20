@@ -131,9 +131,7 @@ registerBackHandler(() => {
   return false;
 });
 
-const report = createReportScreen({
-  getFiles: () => state.files,
-});
+const report = createReportScreen();
 
 async function init() {
   await cleanupOldSessions(sessionStore).catch(() => {}); // best-effort; IndexedDB may be unavailable in some test shells

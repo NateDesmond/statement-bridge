@@ -30,6 +30,7 @@ async function openReviewFromHome(page) {
 import { withPdfjs, groupItemsIntoLines, lineText, loadPdfPages } from '../src/core/pdf.js';
 import { filenameSignature } from '../src/core/profiles.js';
 import { buildAutoVersion, pdfPageWidthPt } from './auto-version.mjs';
+import { sampleProfiles } from '../test/fixtures/sample-profiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(__dirname, '..');
@@ -40,6 +41,17 @@ let failures = 0;
 function check(label, ok, detail) {
   console.log(`${ok ? 'PASS' : 'FAIL'} - ${label}${detail ? ` (${detail})` : ''}`);
   if (!ok) failures++;
+}
+
+// No statement type ships with a profile any more (NO-TEMPLATES.md item 1) -
+// this file is testing the Review screen, not the profile-creation wizard,
+// so every scenario below seeds the saved profile a real user would already
+// have from a prior confirm-first save, straight into chrome.storage.local
+// (test/fixtures/sample-profiles.js - the same shapes the old shipped
+// profiles had), rather than driving the wizard UI just to get there.
+async function seedSampleProfiles(page, banks) {
+  const wanted = sampleProfiles().filter((p) => banks.includes(p.bank));
+  await page.evaluate(async (profiles) => { await chrome.storage.local.set({ profiles }); }, wanted);
 }
 
 async function main() {
@@ -72,6 +84,7 @@ async function main() {
     page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
     await page.goto(`chrome-extension://${extId}/workspace.html`);
     await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+    await seedSampleProfiles(page, ['Northwind Bank', 'Meridian Bank']);
 
     const fixture = path.join(extensionPath, 'test', 'fixtures', 'northwind_transaction_history_image.pdf');
     const input = await page.$('#file-input');
@@ -384,6 +397,7 @@ async function launchWorkspace(viewport = { width: 1440, height: 900 }) {
   page.on('pageerror', (e) => { pageErrors.push(e); console.log('[pageerror]', e.message); });
   await page.goto(`chrome-extension://${extId}/workspace.html`);
   await page.waitForSelector('#file-input', { state: 'attached', timeout: 15000 });
+  await seedSampleProfiles(page, ['Northwind Bank', 'Meridian Bank']);
   return { context, page, pageErrors };
 }
 
@@ -452,8 +466,8 @@ async function openInReview(page, fixturePaths) {
 }
 
 /**
- * Seeds a saved profile for a fixture that no built-in profile auto-matches,
- * so it becomes reviewable without driving the wizard UI. Builds the
+ * Seeds a saved profile for a fixture that seedSampleProfiles above doesn't
+ * cover, so it becomes reviewable without driving the wizard UI. Builds the
  * version the same way an unmapped file's own auto-detect would (dev/
  * auto-version.mjs - the same helper the OCR-recall audit and the
  * ocr-generalisation regression suite use), gives it a filename-only
@@ -667,8 +681,8 @@ async function runPerFileCountdownThenAllDone() {
       // vary run to run) - a second copy of the SAME statement also gets
       // recognized as the same transactions cross-file and merged away
       // (dedupe.js) instead of staying its own reviewable file. A small CSV
-      // sharing the built-in Meridian Bank savings header (so it auto-matches, no OCR
-      // or wizard needed) with a malformed date and a duplicate pair gives a
+      // sharing the seeded Meridian Bank savings profile's header (so it
+      // auto-matches, no OCR or wizard needed) with a malformed date and a duplicate pair gives a
       // second, actually-different statement with deterministic warnings.
       const secondCsvDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-e2e-review-second-'));
       const secondFixture = path.join(secondCsvDir, 'dbs_savings_second.csv');
@@ -910,14 +924,14 @@ async function runOutlineAlignmentVerification() {
   } // end SB_SKIP_AB guard
 
   // --- (c) two-line-style grouped layout: description on its own line,
-  // amount on the NEXT line - the box must span both. This fixture has no
-  // built-in profile that auto-matches it, so without a saved profile it
-  // never becomes reviewable - seed one first (step 0). ---------------------
+  // amount on the NEXT line - the box must span both. This fixture isn't one
+  // of seedSampleProfiles' banks, so without its own saved profile it never
+  // becomes reviewable - seed one first (step 0). ---------------------------
   {
     const { context, page, pageErrors } = await launchWorkspace();
     try {
       const fixture = path.join(extensionPath, 'test', 'fixtures', 'summit_grouped_2line.pdf');
-      console.log('0. seeding a saved profile for this fixture (no built-in profile auto-matches it)...');
+      console.log('0. seeding a saved profile for this fixture (not one seedSampleProfiles covers)...');
       await seedProfileForFixture(page, fixture, 'Summit Bank');
       await openInReview(page, fixture);
       const { pageWidthPt } = await loadPageItems(fixture, 1);

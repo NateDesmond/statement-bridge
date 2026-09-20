@@ -1,0 +1,4 @@
+Seed: builtin-matching fixtures reached Copy-ready with 0 wizard clicks (Set up button present: false; 2 file row(s) shown - image.pdf's transactions overlap sample.pdf's in this fixture set, so it folds in as a duplicate rather than a 3rd distinct row).
+Seed evidence: copy-tsv-btn={"disabled":false,"cls":"btn btn-brass btn-copy"}, blockNote="", rows=["Meridian Bank savings ****7890 | Done, 5 transactions | ✕","Northwind Bank savings ****7890 | Done, 5 transactions | Same transactions as northwind_transaction_history_image.pdf, not added again. | ✕"]
+Monthly path: drag-drop (1 action) + 1 click (Copy). Files rendered in 0.1s, all healthy/Copy enabled at 3.9s, copy done at 4.0s. (headless timing, indicative)
+Case C: while first file still reading, Copy disabled=true, note="Reading 1 of 2 statements, 5 rows so far"

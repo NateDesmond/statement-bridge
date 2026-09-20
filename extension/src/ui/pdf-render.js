@@ -108,6 +108,15 @@ const CARD_DPR = 2; // rendered at 2x for a crisp bitmap
 const LINE_TARGET_PX = 16; // a legible line height (CSS px) the crop is scaled to hit, when width isn't the binding constraint
 const LINE_PAD_PX = 24; // horizontal padding either side of the block's own text span, in page-render canvas px
 
+// Item 7 (NO-TEMPLATES, 2026-09-20): the magnifier's own sizing - about 560
+// CSS px wide (vs the on-card crop's 360) and a doubled line-target height
+// ("2x magnified"), rendered from a higher-resolution page re-render (scale 3
+// vs the on-card crop's default 2) so it's an actually sharper crop, not a
+// CSS-scaled blowup of the small canvas.
+const MAG_MAX_W = 560;
+const MAG_LINE_TARGET_PX = LINE_TARGET_PX * 2;
+const MAG_SCALE = 3;
+
 /**
  * Item 5a/5b (REBUILD-HOME, 2026-09-18): the block of lines a row's snippet
  * should cover - every line whose y falls between the block's top (the
@@ -131,23 +140,25 @@ export function blockLines(lines, anchor) {
 }
 
 /**
- * Simple B's decision-card snippet: a crop of the rendered page covering the
- * row's own FULL transaction block (source_page/source_y/source_h/source_y2 -
- * the same fields review.js's source-pane outline reads), plus half a line of
- * context above and below, in ONE crop - never split into pieces, the card
- * grows to fit instead (item 5b). Renders the whole page first (renderPdfPage/
- * opts.items for an OCR'd file, same contract as review.js's source pane)
- * then copies just the block's neighbourhood out of that canvas into a small
- * one - no separate "render only this region" path in pdf.js to keep in sync
- * with the real one.
+ * Shared crop-region math + block-finding + highlight drawing behind both
+ * renderRowSnippet (the small on-card crop) and renderRowMagnifier (item 7's
+ * bigger hover/focus crop) - same pipeline (render the page, find the row's
+ * block via blockLines, crop it plus context, scale to fit a target width/
+ * line-height, wash the block's own lines), differing only in how much
+ * context padding and how big the result is scaled to. Renders the whole
+ * page first (renderPdfPage/opts.items for an OCR'd file, same contract as
+ * review.js's source pane) then copies just the block's neighbourhood out of
+ * that canvas into a small one - no separate "render only this region" path
+ * in pdf.js to keep in sync with the real one.
  * @param {ArrayBuffer} bytes
  * @param {{page:number, y:number, h?:number, y2?:number|null}} anchor - PDF-space anchor (row.original.source_page/source_y/source_h/source_y2)
- * @param {{items?: object[], scale?: number, cropWidthPx?: number}} [opts] - `items` for an OCR'd file (see renderPdfPage); `cropWidthPx` is only the no-matching-line fallback width
+ * @param {{items?: object[], scale?: number, cropWidthPx: number}} opts - `items` for an OCR'd file (see renderPdfPage); `cropWidthPx` is the no-matching-line fallback width (page-render px), required (callers default it)
+ * @param {{padLines: number, maxWidthPx: number, lineTargetPx: number, dpr: number, defaultScale: number}} sizing - padLines: lines of context above/below the block; maxWidthPx/dpr: the result's CSS/bitmap sizing cap; lineTargetPx: legible line height (CSS px) to scale toward; defaultScale: page-render resolution when opts.scale isn't given
  * @returns {Promise<HTMLCanvasElement|null>} null when the row has no page anchor to crop (e.g. a columns-rowModel PDF, or a CSV row - callers fall back to a text snippet there)
  */
-export async function renderRowSnippet(bytes, anchor, opts = {}) {
+async function renderBlockCrop(bytes, anchor, opts, sizing) {
   if (!anchor || anchor.page == null || anchor.y == null) return null;
-  const scale = opts.scale ?? 2; // page-render resolution; the card's own display size is computed below, independent of this
+  const scale = opts.scale ?? sizing.defaultScale;
   const { canvas, viewport, items } = await renderPdfPage(bytes, anchor.page, scale, opts.items ? { items: opts.items } : {});
   const pageCtx = canvas.getContext('2d');
 
@@ -158,16 +169,14 @@ export async function renderRowSnippet(bytes, anchor, opts = {}) {
   const blockBottomY = anchor.y2 ?? anchor.y;
   const textTop = pdfYToCanvasPixel(blockTopY, viewport);
   const textBottom = pdfYToCanvasPixel(blockBottomY, viewport);
-  // Item 5b: half a line of context above and below the block, not a whole
-  // extra line either side.
-  const pad = lineH * 0.5;
+  const pad = lineH * sizing.padLines;
   const cropTop = Math.max(0, textTop - pad);
   const cropBottom = Math.min(canvas.height, textBottom + pad);
   const cropHeight = Math.max(1, cropBottom - cropTop);
 
   // Horizontal span across EVERY line in the block, not just one - the
   // amount is often on a different line than the block's own anchor line.
-  let left = 0, right = Math.min(canvas.width, opts.cropWidthPx ?? 480);
+  let left = 0, right = Math.min(canvas.width, opts.cropWidthPx);
   if (block.length) {
     pageCtx.font = `${lineH}px sans-serif`;
     let minLeft = Infinity, maxRight = -Infinity;
@@ -185,25 +194,25 @@ export async function renderRowSnippet(bytes, anchor, opts = {}) {
   const cropWidth = Math.max(1, right - left);
 
   // Item 5b: ONE crop, sized to the block itself - no fixed box, no split.
-  // Scaled so a line of text renders at a legible LINE_TARGET_PX CSS height,
-  // capped to CARD_MAX_W CSS px wide (a very long line shrinks slightly
-  // instead of ever being cut into two pieces); the card grows to fit
-  // whatever height that produces for a multi-line block.
+  // Scaled so a line of text renders at a legible target CSS height, capped
+  // to a max CSS width (a very long line shrinks slightly instead of ever
+  // being cut into two pieces); the result grows to fit whatever height that
+  // produces for a multi-line block.
   const lineCount = Math.max(1, Math.round(cropHeight / lineH));
-  const targetHeightPx = lineCount * LINE_TARGET_PX * CARD_DPR;
-  const fit = Math.min((CARD_MAX_W * CARD_DPR) / cropWidth, targetHeightPx / cropHeight);
-  const snippet = document.createElement('canvas');
-  snippet.width = Math.max(1, Math.round(cropWidth * fit));
-  snippet.height = Math.max(1, Math.round(cropHeight * fit));
-  // The card grows to fit (item 5b): CSS display size is the bitmap's own
-  // pixel size divided back down by CARD_DPR, so a taller multi-line block
+  const targetHeightPx = lineCount * sizing.lineTargetPx * sizing.dpr;
+  const fit = Math.min((sizing.maxWidthPx * sizing.dpr) / cropWidth, targetHeightPx / cropHeight);
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, Math.round(cropWidth * fit));
+  out.height = Math.max(1, Math.round(cropHeight * fit));
+  // The result grows to fit (item 5b): CSS display size is the bitmap's own
+  // pixel size divided back down by dpr, so a taller multi-line block
   // renders taller on screen instead of being squeezed into a fixed box.
-  snippet.style.width = `${snippet.width / CARD_DPR}px`;
-  snippet.style.height = `${snippet.height / CARD_DPR}px`;
-  const ctx = snippet.getContext('2d');
+  out.style.width = `${out.width / sizing.dpr}px`;
+  out.style.height = `${out.height / sizing.dpr}px`;
+  const ctx = out.getContext('2d');
   ctx.fillStyle = '#e8e4d8'; // matches .decision-snippet's own background so any letterboxing is invisible
-  ctx.fillRect(0, 0, snippet.width, snippet.height);
-  ctx.drawImage(canvas, left, cropTop, cropWidth, cropHeight, 0, 0, snippet.width, snippet.height);
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(canvas, left, cropTop, cropWidth, cropHeight, 0, 0, out.width, out.height);
 
   // Highlight every line of the block (a soft brass wash, not a hard box, so
   // the text underneath stays readable).
@@ -213,8 +222,52 @@ export async function renderRowSnippet(bytes, anchor, opts = {}) {
     const y0 = (lTop - cropTop) * fit;
     const y1 = (lBottom - cropTop) * fit;
     ctx.fillStyle = 'rgba(198, 161, 91, 0.28)';
-    ctx.fillRect(0, Math.max(0, y0), snippet.width, Math.max(1, y1 - Math.max(0, y0)));
+    ctx.fillRect(0, Math.max(0, y0), out.width, Math.max(1, y1 - Math.max(0, y0)));
   }
 
-  return snippet;
+  return out;
+}
+
+/**
+ * Simple B's decision-card snippet: a crop of the rendered page covering the
+ * row's own FULL transaction block (source_page/source_y/source_h/source_y2 -
+ * the same fields review.js's source-pane outline reads), plus half a line of
+ * context above and below, in ONE crop - never split into pieces, the card
+ * grows to fit instead (item 5b). See renderBlockCrop for the shared pipeline.
+ * @param {ArrayBuffer} bytes
+ * @param {{page:number, y:number, h?:number, y2?:number|null}} anchor - PDF-space anchor (row.original.source_page/source_y/source_h/source_y2)
+ * @param {{items?: object[], scale?: number, cropWidthPx?: number}} [opts] - `items` for an OCR'd file (see renderPdfPage); `cropWidthPx` is only the no-matching-line fallback width
+ * @returns {Promise<HTMLCanvasElement|null>} null when the row has no page anchor to crop (e.g. a columns-rowModel PDF, or a CSV row - callers fall back to a text snippet there)
+ */
+export async function renderRowSnippet(bytes, anchor, opts = {}) {
+  return renderBlockCrop(bytes, { ...anchor }, { ...opts, cropWidthPx: opts.cropWidthPx ?? 480 }, {
+    padLines: 0.5, // item 5b: half a line of context above/below
+    maxWidthPx: CARD_MAX_W,
+    lineTargetPx: LINE_TARGET_PX,
+    dpr: CARD_DPR,
+    defaultScale: 2,
+  });
+}
+
+/**
+ * Item 7 (NO-TEMPLATES): the decision-card magnifier's bigger crop - the same
+ * block renderRowSnippet finds, but with a WHOLE line of context above and
+ * below (not half a line - that's the small on-card crop's own choice) and
+ * scaled to about MAG_MAX_W CSS px wide at a doubled line-target height, from
+ * a higher-resolution page re-render (MAG_SCALE) so it reads as "the same
+ * crop, but bigger and with more surrounding context" rather than a
+ * CSS-scaled blowup of renderRowSnippet's own small canvas.
+ * @param {ArrayBuffer} bytes
+ * @param {{page:number, y:number, h?:number, y2?:number|null}} anchor
+ * @param {{items?: object[], scale?: number, cropWidthPx?: number}} [opts]
+ * @returns {Promise<HTMLCanvasElement|null>} null when the row has no page anchor to crop
+ */
+export async function renderRowMagnifier(bytes, anchor, opts = {}) {
+  return renderBlockCrop(bytes, { ...anchor }, { ...opts, cropWidthPx: opts.cropWidthPx ?? 720 }, {
+    padLines: 1, // item 7: a whole line of context above/below, not half
+    maxWidthPx: MAG_MAX_W,
+    lineTargetPx: MAG_LINE_TARGET_PX,
+    dpr: CARD_DPR,
+    defaultScale: MAG_SCALE,
+  });
 }

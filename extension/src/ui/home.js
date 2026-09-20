@@ -14,14 +14,14 @@ import { ocrDocument } from '../core/ocr.js';
 import { suggestHeaderRow } from '../core/suggest.js';
 import { loadProfiles, matchProfile, learnSignatures, pdfAnchorCandidates, updateVersionLastUsed, guessProfileByFilename, setProfilePasswordHint } from '../core/profiles.js';
 import { resolvePreset, filterByRange, coverageWarnings, formatShortDate } from '../core/daterange.js';
-import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, suggestFilename, LAYOUT_PRESETS } from '../core/export.js';
+import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, isUnionPresetColumns, unionPreset, suggestFilename, LAYOUT_PRESETS } from '../core/export.js';
 import { checkFileSize, checkBatchSize } from '../core/limits.js';
 import { fileSummary, countCheckGrouped, groupedCountLabel, rowFlagLabel, balanceCheck } from '../core/checks.js';
 import { mergeAcrossFiles, fingerprint, isExactDuplicateFile, sha256Hex, findDuplicateByHash } from '../core/dedupe.js';
 import { detectCurrency, convertToTarget, formatBothDirections } from '../core/currency.js';
 import { saveSession, sessionsNearingDeletion } from '../core/sessions.js';
 import { renderPresetEditor as renderPresetEditorInto, newPreset, applyLayoutPreset, matchLayoutKey, resolveWorkingPreset } from './preset-editor.js';
-import { renderRowSnippet } from './pdf-render.js';
+import { renderRowSnippet, renderRowMagnifier } from './pdf-render.js';
 import { resolveConfirm, resolveEdit, resolveExclude, hasUnresolvableFlag } from './rowedit.js';
 import { parseAmount, decimalsFor } from '../core/amount.js';
 import { log, error as logError, asText as debugLogText } from '../core/debuglog.js';
@@ -60,22 +60,46 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   // indexes into this same list. No user-named saved presets any more.
   const presets = LAYOUT_PRESETS.map((l) => applyLayoutPreset(newPreset(l.name), l.key));
   let activePreset = DEFAULT_PRESET; // item 6/7: the persisted "Last used" working set (layout + customisation) once loadPrefs() runs
+  // Item 6 (NO-TEMPLATES, 2026-09-20): true once the person has actually
+  // edited the working set (a Customise pill, a rename, a layout pick, a
+  // date-format/money-direction/header-row change) or picked an explicit
+  // "Start from" layout in Settings - from then on activePreset is theirs,
+  // persisted as "Last used" and never silently overwritten. False (the
+  // default) means activePreset instead tracks unionPreset(fileCoverageGroups())
+  // live, so a newly-available field (a second file's extra_* column, say)
+  // grows the shown columns automatically - see renderExportPanel.
+  let presetCustomized = false;
   let includeSourceColumns = false;
   let drawerOpen = false;
   let dedupeNotice = null; // { removed: [], accountLabel } for the merged/Undo card
   let restorePending = false;
   let profilesCache = []; // for the preset editor's extra_* column discovery; refreshed on drawer open
-  // Item 12: whether "Use a statement type I already set up" has anywhere
-  // useful to go. loadProfiles() always includes the app's own seeded
-  // built-in bank profiles (Meridian, Northwind, ...) even before a user has
-  // ever saved one themselves - "I already set up" means the user's own, so
-  // built-ins (id starts with "builtin-") don't count. Always 0 for a
-  // first-time user with no saved statement type of their own.
-  let savedProfileCount = 0;
+  // Item 12/item 2 (NO-TEMPLATES): whether "Use a statement type I already
+  // set up" has anywhere useful to go - always empty for a first-time user
+  // with no saved statement type of their own. Kept as the full list (not
+  // just a count) so a file-card's own link can be scoped to THIS file's
+  // file type (a CSV row has nowhere useful to go with only PDF types
+  // saved) without an extra async round-trip at render time.
+  let savedProfiles = [];
   async function refreshSavedProfileCount() {
-    const profiles = await loadProfiles(storage).catch(() => []);
-    savedProfileCount = profiles.filter((p) => !p.id?.startsWith('builtin-')).length;
+    savedProfiles = await loadProfiles(storage).catch(() => []);
     renderAttentionCards();
+  }
+
+  /** Saved statement types that could actually read this file (same file type) - never offer a PDF-only type for a CSV, or vice versa. */
+  function compatibleSavedProfiles(entry) {
+    const fileType = normalizedFileType(entry);
+    return savedProfiles.filter((p) => p.fileType === fileType);
+  }
+
+  /** Item 2: zero saved types -> nothing to link to; exactly one -> a direct "Use <name>" button (no picker to open); two or more -> the picker list. */
+  function appendUseExistingLink(actions, entry) {
+    const compatible = compatibleSavedProfiles(entry);
+    if (compatible.length === 1) {
+      appendSecondaryLink(actions, `Use ${compatible[0].name}`, () => useExistingProfile(entry, compatible[0]));
+    } else if (compatible.length > 1) {
+      appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
+    }
   }
   let lastExportCompositionKey = null; // dedupes the "export composition" debug log line (see renderExportPanel)
 
@@ -163,11 +187,19 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     rates = (await storage.get(RATES_KEY)) || {};
     // Item 6/7: the drawer's working set (layout + customisation) persists
     // as-is across sessions ("Last used") - no "Save as preset" needed for an
-    // edit to stick. With nothing persisted yet, prefs.defaultPreset is the
-    // "Start from" preference (an index into the six layouts in `presets`,
-    // or null/missing for "Last used", which - having nothing to resume -
-    // also just means presets[0], "Simple").
-    activePreset = resolveWorkingPreset(prefs.workingPreset, presets, prefs.defaultPreset);
+    // edit to stick. prefs.presetCustomized (item 6, NO-TEMPLATES) is the
+    // real "has this person ever actually touched it" flag - it's separate
+    // from prefs.workingPreset because copy/download also call
+    // saveLastUsedPrefs() (to persist range/currency prefs) even when the
+    // working set is still the untouched, auto-growing union default; using
+    // workingPreset's mere presence to mean "customised" would wrongly freeze
+    // it the first time someone just copies. An explicit "Start from" layout
+    // (prefs.defaultPreset, an index into `presets`) counts as customised too
+    // - it's a deliberate pick, not the union default.
+    presetCustomized = !!prefs.presetCustomized || (prefs.defaultPreset != null && !!presets[prefs.defaultPreset]);
+    activePreset = presetCustomized
+      ? resolveWorkingPreset(prefs.workingPreset, presets, prefs.defaultPreset)
+      : unionPreset(fileCoverageGroups()); // item 6: dynamic default - see renderExportPanel for the reactive re-grow as files change
   }
 
   async function saveLastUsedPrefs() {
@@ -179,6 +211,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       homeCurrency: targetCurrency,
       homeRateMode: rateMode,
       workingPreset: activePreset,
+      presetCustomized,
     });
   }
 
@@ -559,7 +592,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
 
   // --- Item 1: quality-scored candidate selection --------------------------
   // A real bug: two candidates tied on signature score alone (a broken
-  // user profile and the correct built-in), and the broken
+  // user profile and a correct one), and the broken
   // one won by list order. Before auto-applying the top-scored candidate,
   // every candidate within selectMatchCandidate's TIE_MARGIN is actually run
   // through the pipeline (main thread - this file isn't parsed for real
@@ -581,7 +614,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     return { dateLedLineCount, buildRows };
   }
 
-  /** The best-quality USER profile that scored worse than the picked candidate - item 2's "your profile could not read amounts" caption names this one, never a builtin. */
+  /** The best-quality USER profile that scored worse than the picked candidate - item 2's "your profile could not read amounts" caption names this one. */
   function findQualityLoser(scored, pickedMatch) {
     const pickedQuality = scored.find((s) => s.match === pickedMatch)?.quality ?? 0;
     const losers = (scored || [])
@@ -761,7 +794,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     stampQualityLoser(entry, match); // item 2
     persistProfileHealth(match, entry.rows); // item 3, fire-and-forget
     mergeDuplicates();
-    log('home.match', 'match applied', { file: entry.name, profile: match.profile.name, confidence: match.confidence, rows: entry.rows.length });
+    log('home.match', 'match applied', {
+      file: entry.name, profile: match.profile.name, confidence: match.confidence, rows: entry.rows.length,
+      bank: match.profile.bank, statementType: match.profile.statementType, fileType: match.profile.fileType,
+      rowModel: match.version?.pdf?.rowModel, quickLookRows: warningRowCount(entry.rows),
+    });
     renderAll();
     onFilesChanged?.();
     await autosave();
@@ -1020,7 +1057,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     stampQualityLoser(entry, match); // item 2
     persistProfileHealth(match, entry.rows); // item 3, fire-and-forget
     mergeDuplicates();
-    log('home.match', 'text recognition match applied', { file: entry.name, profile: match.profile.name, confidence: match.confidence, rows: entry.rows.length });
+    log('home.match', 'text recognition match applied', {
+      file: entry.name, profile: match.profile.name, confidence: match.confidence, rows: entry.rows.length,
+      bank: match.profile.bank, statementType: match.profile.statementType, fileType: match.profile.fileType,
+      rowModel: match.version?.pdf?.rowModel, quickLookRows: warningRowCount(entry.rows),
+    });
     renderAll();
     onFilesChanged?.();
     await autosave();
@@ -1103,8 +1144,13 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   async function openProfilePicker(entry) {
     const fileType = normalizedFileType(entry);
     const profiles = await loadProfiles(storage);
+    // Item 2 (NO-TEMPLATES): only statement types this file could actually be
+    // read with ever appear here - a wrong-file-type row used to be listed
+    // greyed-out with a disabled button (cursor:not-allowed), which reads as
+    // broken rather than simply irrelevant. Left out entirely instead.
+    const compatible = profiles.filter((p) => p.fileType === fileType);
     const byBank = new Map();
-    for (const p of profiles) {
+    for (const p of compatible) {
       const key = p.bank || 'Other';
       byBank.set(key, [...(byBank.get(key) || []), p]);
     }
@@ -1120,10 +1166,16 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     heading.textContent = 'Use a statement type I already set up';
     const hint = document.createElement('p');
     hint.className = 'pdf-anchor-hint';
-    hint.textContent = `Only statement types for the same file type (${fileType.toUpperCase()}) as "${entry.name}" can be used.`;
+    hint.textContent = `Statement types for the same file type (${fileType.toUpperCase()}) as "${entry.name}".`;
 
+    // Item 2: a real scrollable list (its own box, own scrollbar - not the
+    // whole dialog scrolling as one lump with the heading/footer) - keyboard
+    // (Tab between real <button> rows) and mouse both work the same as any
+    // other list in this app; force-visible-scrollbar keeps the bar itself
+    // always drawn rather than an overlay-scrollbar system hiding it until
+    // mid-scroll.
     const groupsHost = document.createElement('div');
-    groupsHost.className = 'profile-picker-groups';
+    groupsHost.className = 'profile-picker-groups force-visible-scrollbar';
     for (const [bank, list] of byBank) {
       const groupTitle = document.createElement('div');
       groupTitle.className = 'pp-group-title';
@@ -1133,10 +1185,8 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'pp-profile-btn';
-        const enabled = p.fileType === fileType;
-        btn.disabled = !enabled;
         btn.innerHTML = `<span>${p.name}</span><span class="pp-filetype">${(p.fileType || '').toUpperCase()}</span>`;
-        if (enabled) btn.onclick = () => { close(); useExistingProfile(entry, p); };
+        btn.onclick = () => { close(); useExistingProfile(entry, p); };
         groupsHost.appendChild(btn);
       }
     }
@@ -1173,7 +1223,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // accountLabel is the file's own account identity (bank + masked account,
     // or the user's saved label) - always pass it so the merge keys off the
     // account, never off which profile matched (a user-saved profile and a
-    // builtin one for the same account must fingerprint the same).
+    // another saved one for the same account must fingerprint the same).
     const preMergeCounts = filesWithRows.map((f) => f.rows.length);
     // ocr: true routes D3's CSV-over-OCR tie-break (mergeAcrossFiles keeps
     // the CSV/text file's row when two files' occurrence counts for the same
@@ -1320,7 +1370,18 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   // happens to exclude its blank dates (the "All dates" range does not).
   // Item 14a: neither does a file the user unchecked in the drawer's Sources
   // list (sourceIncluded folds both checks into one).
-  function allRows() { return state.files.filter(sourceIncluded).flatMap((f) => f.rows || []); }
+  // Item B (2026-09-20): rows normalized before the file's own account label
+  // was worked out carry account_label: null, which showed as an empty
+  // Account column in the default export. Fill it in here, where every
+  // consumer (preview, Copy, CSV) routes through, so the exported label is
+  // the file's real one ("Northwind Bank current ****3210"), not export.js's
+  // bank/type-only fallback.
+  function allRows() {
+    return state.files.filter(sourceIncluded).flatMap((f) => {
+      for (const r of f.rows || []) r.account_label ||= f.accountLabel || f.name;
+      return f.rows || [];
+    });
+  }
 
   function currentRange() {
     if (state.rangePreset === 'all') return { startISO: null, endISO: null };
@@ -1810,7 +1871,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     const snippet = document.createElement('div');
     snippet.className = 'decision-snippet';
     snippet.textContent = 'Loading…';
-    loadDecisionSnippet(file, row, snippet);
+    // Item 7: the magnifier only makes sense once we know the snippet ended
+    // up as a real page crop (loadDecisionSnippet resolves true) - a
+    // text-only fallback (CSV/XLSX, or a PDF row with no page anchor) has no
+    // optical detail to zoom into, so it gets no hover/focus wiring at all.
+    loadDecisionSnippet(file, row, snippet).then((isCanvas) => { if (isCanvas) wireSnippetMagnifier(snippet, file, row); });
 
     const body = document.createElement('div');
     body.className = 'decision-body';
@@ -1849,7 +1914,21 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     return `<div class="db-txn">${parts.join(' &middot; ')}</div><div class="db-why">${escapeHtml(decisionReasonLabel(row))}</div>`;
   }
 
-  /** Item 5's page/line snippet: a small crop around the row's own page anchor for a PDF (pdf-render.js's renderRowSnippet), or the raw CSV source line in monospace when there's no page to crop (a columns-rowModel PDF, or any CSV/XLSX row). */
+  /** Item 5a/item 7 shared: the row's page anchor (source_page/source_y/source_h/source_y2), or null when there's nothing to crop (a columns-rowModel PDF, or a CSV/XLSX row). */
+  function rowPageAnchor(row) {
+    return row.original?.source_page != null && row.original?.source_y != null
+      ? { page: row.original.source_page, y: row.original.source_y, h: row.original.source_h, y2: row.original.source_y2 ?? null }
+      : null;
+  }
+
+  /**
+   * Item 5's page/line snippet: a small crop around the row's own page anchor
+   * for a PDF (pdf-render.js's renderRowSnippet), or the raw CSV source line
+   * in monospace when there's no page to crop (a columns-rowModel PDF, or any
+   * CSV/XLSX row).
+   * @returns {Promise<boolean>} true when a real page-crop canvas was shown
+   *   (item 7: only then is there anything for the magnifier to zoom into).
+   */
   async function loadDecisionSnippet(file, row, container) {
     try {
       // Item 5a (root cause): source_y2 - the block's LAST line (e.g. the
@@ -1858,13 +1937,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       // source_y and could miss the row's own amount line entirely, or show
       // a neighbouring transaction's text instead. See pdf-render.js's
       // blockLines/renderRowSnippet doc comments.
-      const anchor = row.original?.source_page != null && row.original?.source_y != null
-        ? { page: row.original.source_page, y: row.original.source_y, h: row.original.source_h, y2: row.original.source_y2 ?? null }
-        : null;
+      const anchor = rowPageAnchor(row);
       if (file.type === 'pdf' && anchor && file.bytes) {
         const items = file.ocr ? file.ocrPages?.[anchor.page - 1]?.items : null;
         const canvas = await renderRowSnippet(file.bytes, anchor, items ? { items } : {});
-        if (canvas) { container.innerHTML = ''; container.appendChild(canvas); return; }
+        if (canvas) { container.innerHTML = ''; container.appendChild(canvas); return true; }
       }
     } catch (err) {
       logError('home.decisionSnippet', err, { file: file.name });
@@ -1882,6 +1959,91 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     container.innerHTML = line
       ? `<span class="decision-snippet-label">From your file:</span><span class="decision-snippet-line">${escapeHtml(shown)}</span>`
       : escapeHtml(shown);
+    return false;
+  }
+
+  // --- Item 7: snippet magnifier ---------------------------------------------
+  // Hover, keyboard focus, or a tap (touch has no hover) on a decision card's
+  // own small on-card crop shows a bigger, sharper re-render (pdf-render.js's
+  // renderRowMagnifier - an actual higher-resolution re-render, not a
+  // CSS-scaled blowup of the small canvas) in a floating panel anchored
+  // beside the card: to its right if there's room, its left otherwise, so it
+  // never overlaps the card's own text or buttons. Only ever wired onto a
+  // snippet that resolved to a real canvas (loadDecisionSnippet's return
+  // value) - a text-only fallback line has no optical detail to zoom into,
+  // so it gets no hover/focus wiring, no tabindex, no dead hover at all.
+  let openMagnifier = null; // { el, trigger } - at most one panel open at a time, across every card
+
+  function closeMagnifier() {
+    if (!openMagnifier) return;
+    document.removeEventListener('keydown', openMagnifier.onKey);
+    openMagnifier.el.remove();
+    openMagnifier = null;
+  }
+
+  /**
+   * Positions the (already-in-DOM, so offsetWidth/Height are real) panel
+   * beside the whole decision CARD (never just the snippet thumbnail inside
+   * it) - the card's own body text and Looks right/Fix buttons sit directly
+   * to the snippet's right in the same row, so anchoring off the snippet's
+   * own edge alone put the panel right on top of them (found live: the
+   * panel's left edge landed inside the card body's own bounding box).
+   * Flips to the left of the whole card when there isn't room on the right,
+   * and is clamped vertically to the viewport.
+   */
+  function positionMagnifier(panel, snippet) {
+    const card = snippet.closest('.decision-row') || snippet;
+    const cardRect = card.getBoundingClientRect();
+    const r = snippet.getBoundingClientRect();
+    const gap = 10;
+    const panelW = panel.offsetWidth || 560;
+    const panelH = panel.offsetHeight || 200;
+    const left = (window.innerWidth - cardRect.right >= panelW + gap)
+      ? cardRect.right + gap
+      : Math.max(gap, cardRect.left - panelW - gap);
+    const top = Math.min(Math.max(gap, r.top), Math.max(gap, window.innerHeight - panelH - gap));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+  }
+
+  function wireSnippetMagnifier(snippet, file, row) {
+    snippet.tabIndex = 0;
+    async function open(reason) {
+      closeMagnifier();
+      const panel = document.createElement('div');
+      panel.className = 'snippet-magnifier';
+      panel.textContent = 'Loading…';
+      document.body.appendChild(panel);
+      positionMagnifier(panel, snippet);
+      const onKey = (e) => { if (e.key === 'Escape') closeMagnifier(); };
+      document.addEventListener('keydown', onKey);
+      openMagnifier = { el: panel, trigger: snippet, onKey, reason };
+      try {
+        const anchor = rowPageAnchor(row);
+        const items = file.ocr ? file.ocrPages?.[anchor.page - 1]?.items : null;
+        const canvas = await renderRowMagnifier(file.bytes, anchor, items ? { items } : {});
+        if (openMagnifier?.el !== panel) return; // closed, or superseded by another trigger, while awaiting
+        if (!canvas) { closeMagnifier(); return; }
+        panel.innerHTML = '';
+        panel.appendChild(canvas);
+        positionMagnifier(panel, snippet);
+      } catch (err) {
+        logError('home.snippetMagnifier', err, { file: file.name });
+        if (openMagnifier?.el === panel) closeMagnifier();
+      }
+    }
+    snippet.addEventListener('mouseenter', () => open('hover'));
+    snippet.addEventListener('mouseleave', closeMagnifier);
+    snippet.addEventListener('focusin', () => open('focus'));
+    snippet.addEventListener('focusout', closeMagnifier);
+    // Touch has no hover or focus: a tap opens the panel, and a second tap on
+    // the same still-open panel closes it. A mouse click right after hover
+    // already opened the panel just re-opens the same panel (harmless) rather
+    // than closing what hover just showed.
+    snippet.addEventListener('click', () => {
+      if (openMagnifier?.trigger === snippet && openMagnifier.reason === 'click') closeMagnifier();
+      else open('click');
+    });
   }
 
   function resolveDecisionRow(file, row, nextRow, announcement) {
@@ -1996,7 +2158,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       actions.appendChild(mkBtn('btn-brass', 'Set up', () => onOpenWizard(entry)));
       // Item 12: dead weight on a first run with zero saved profiles - there is nowhere for
       // it to go with zero saved statement types.
-      if (savedProfileCount > 0) appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
+      appendUseExistingLink(actions, entry);
     } else if (card.kind === 'layoutChanged') {
       el.className = 'file-card';
       el.innerHTML = `<div class="fc-name">Layout changed</div>
@@ -2028,7 +2190,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
         <div class="fc-actions"></div>`;
       const actions = el.querySelector('.fc-actions');
       actions.appendChild(mkBtn('btn-brass', 'Set up again', () => onOpenWizard(entry)));
-      if (savedProfileCount > 0) appendSecondaryLink(actions, 'Use a statement type I already set up', () => openProfilePicker(entry));
+      appendUseExistingLink(actions, entry);
       appendSecondaryLink(actions, 'Report a problem', () => onOpenReport?.(entry));
     } else if (card.kind === 'lowConfidence') {
       // Item 13: no raw confidence number in front of a non-technical user -
@@ -2147,6 +2309,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   }
 
   function renderExportPanel() {
+    // Item 6 (NO-TEMPLATES): while the working set is still untouched, keep
+    // it tracking the union of what's actually loaded - runs on every file
+    // add/remove/match (renderAll -> renderExportPanel), so a newly-available
+    // field grows the shown columns without anyone having to ask.
+    if (!presetCustomized) activePreset = unionPreset(fileCoverageGroups());
     const panel = $('#export-panel');
     const rows = rowsInRange();
     const readiness = exportReadiness(state.files, { missingRatePairs: missingRatePairs(), rowCountInRange: rows.length });
@@ -2435,10 +2602,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     }
   }
 
-  /** "With balance" (a matched built-in layout) or "Customised" (edited away from every layout's own shape). */
+  /** "With balance" (a matched built-in layout), "Default" (the untouched union default, item B) or "Customised" (actually edited away from every layout's own shape). */
   function columnsSummaryLabel() {
     const key = matchLayoutKey(activePreset);
-    return key ? LAYOUT_PRESETS.find((l) => l.key === key)?.name : 'Customised';
+    if (key) return LAYOUT_PRESETS.find((l) => l.key === key)?.name;
+    return presetCustomized ? 'Customised' : 'Default';
   }
 
   function renderDrawer() {
@@ -2475,7 +2643,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       // Item 6/7: every edit (a new layout, or a Customise pill) updates the
       // working set immediately and persists it as "Last used" - no "Save as
       // preset" step exists any more.
-      onChange: (next) => { activePreset = next; saveLastUsedPrefs(); renderExportPanel(); },
+      // Item 6: any real edit here (layout pick, pill toggle/rename/reorder,
+      // date format, money direction, header row) is a customisation from
+      // now on - activePreset stops auto-growing with the union and persists
+      // exactly as edited.
+      onChange: (next) => { activePreset = next; presetCustomized = true; saveLastUsedPrefs(); renderExportPanel(); },
     });
 
     $('#source-cols-home').checked = includeSourceColumns;
@@ -2633,7 +2805,11 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   // component's own "Include header row" checkbox), not a second, separate
   // Home-only checkbox that silently overrode it at export time.
   function exportPreset() {
-    if (currencyMode === 'B' && isDefaultPresetColumns(activePreset)) {
+    // Item 6: the untouched default is now dynamic (unionPreset), not always
+    // the static DEFAULT_PRESET shape - isUnionPresetColumns is its sibling
+    // check, both kept since a preset can still land on the plain static
+    // shape too (e.g. a session with nothing beyond the always-present columns).
+    if (currencyMode === 'B' && (isDefaultPresetColumns(activePreset) || isUnionPresetColumns(activePreset, fileCoverageGroups()))) {
       return { ...activePreset, columns: DEFAULT_PRESET_MODE_B.columns };
     }
     return activePreset;

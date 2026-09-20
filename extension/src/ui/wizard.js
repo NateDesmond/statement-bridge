@@ -22,7 +22,7 @@ import {
   detectPdfRowModel, loadPdfPages, detectGroupedSignConvention, matchAmountLine, inferPdfColumns,
 } from '../core/pdf.js';
 import { balanceCheck, countCheck, countCheckGrouped, groupedCountLabel, fileSummary, flagLabel, rowFlagLabel } from '../core/checks.js';
-import { defaultAccountLabel } from '../core/home-state.js';
+import { defaultAccountLabel, warningRowCount } from '../core/home-state.js';
 import { formatShortDate } from '../core/daterange.js';
 import { buildFileRows } from '../core/pipeline.js';
 import { announce } from './nav.js';
@@ -676,19 +676,22 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       ? 'This looks different from last time. Does this look right?'
       : `We found ${count} transaction${count === 1 ? '' : 's'}${range}. Does this look right?`;
 
-    const cur = state.basics.currency || Object.keys(summary.byCurrency)[0] || '';
-    const totals = summary.byCurrency[cur] || { in: 0, out: 0 };
-    $('#confirm-a-totals').innerHTML = `
-      <div class="confirm-total-item in"><span class="num">${escapeHtml(formatMinorDisplay(totals.in, cur))}</span><span class="lbl">Money in</span></div>
-      <div class="confirm-total-item out"><span class="num">-${escapeHtml(formatMinorDisplay(totals.out, cur))}</span><span class="lbl">Money out</span></div>`;
+    // Item 4 (NO-TEMPLATES): the money in/out totals used to sit here - a
+    // per-currency sum of a preview screen's own 5-visible-row window reads
+    // as more authoritative than it is, and doesn't help answer "does this
+    // look right" the way the row preview itself does. Removed outright,
+    // not just hidden - #confirm-a-totals is gone from workspace.html too.
 
-    // Item 10: every row is in the DOM (not just the first 5) inside a
+    // Item 10/item 4: every row is in the DOM (not just the first 5) inside a
     // scroll box sized to show 5 at a time - same scroll pattern Home's own
     // result table uses (preset-editor.js's preset-preview-scroll-live) -
     // plus a caption so confirming "does this look right" is never silently
-    // vouching for rows that were never shown at all.
+    // vouching for rows that were never shown at all. force-visible-scrollbar
+    // keeps the scrollbar itself always drawn (never an invisible macOS/
+    // overlay-scrollbar-style bar someone has to discover by hovering first)
+    // and confirm-a-preview-fade adds a bottom fade cueing there's more below.
     $('#confirm-a-preview').innerHTML = `
-      <div class="preset-preview-scroll preset-preview-scroll-live" style="--preview-rows:5;" tabindex="0" role="region" aria-label="Transaction preview, scroll for more rows">
+      <div class="preset-preview-scroll preset-preview-scroll-live force-visible-scrollbar" style="--preview-rows:5;" tabindex="0" role="region" aria-label="Transaction preview, scroll for more rows">
         <table class="txn-table map-table">
           <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
           <tbody>${rows.map((r) => `<tr>
@@ -699,6 +702,7 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
         </table>
       </div>
       <p class="pdf-anchor-hint">${rows.length > 5 ? `Showing 5 of ${rows.length}. Scroll to see all.` : `All ${rows.length} row${rows.length === 1 ? '' : 's'}.`}</p>`;
+    $('#confirm-a-preview').classList.toggle('confirm-a-preview-fade', rows.length > 5);
     const yesBtn = $('#confirm-yes');
     const offBtn = $('#confirm-off');
     let notice = $('#confirm-a-notice');
@@ -2605,7 +2609,16 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       } else {
         entry.groupedCheckLabel = null;
       }
-      log('wizard.save', 'statement type saved', { file: entry.name, profileId: profile.id, versionId: version.id, rowCount: rows.length });
+      // Item 10: the same structured fields home.js's auto-match log calls
+      // carry, so core/session-report.js's problem-report summary reads a
+      // freshly wizard-saved file the same way it reads an auto-matched one
+      // - a save is not "a match", so it never fired 'home.match' at all,
+      // and the report used to have nothing to say about this statement.
+      log('wizard.save', 'statement type saved', {
+        file: entry.name, profileId: profile.id, versionId: version.id, rowCount: rows.length, rows: entry.rows.length,
+        bank: profile.bank, statementType: profile.statementType, fileType: profile.fileType,
+        rowModel: version.pdf?.rowModel, quickLookRows: warningRowCount(entry.rows),
+      });
       announce(`Statement type saved: ${profile.name}. Back on Home.`);
       onSaved?.(entry);
     } catch (e) {

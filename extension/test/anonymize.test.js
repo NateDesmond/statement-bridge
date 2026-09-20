@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { anonymizeEvents } from '../src/core/anonymize.js';
+import { anonymizeEvents, stripKnownFilenames, redactStack } from '../src/core/anonymize.js';
 
 function ev(stage, message, data) {
   return { t: '2026-09-18T00:00:00.000Z', stage, message, data };
@@ -41,15 +41,52 @@ test('free-text fields become a length marker regardless of field name', () => {
   assert.equal(out[0].data.payee, '<text 3 chars>');
 });
 
-test('safe keys (counts, positions, confidences, flags, file names, bank names) pass through', () => {
+test('safe keys (counts, positions, confidences, flags, bank names) pass through', () => {
   const out = anonymizeEvents([ev('home.match', 'match applied', {
-    file: 'statement.csv', bank: 'DBS', profileName: 'DBS savings', confidence: 0.92,
+    bank: 'DBS', confidence: 0.92,
     rows: 40, position: 3, ok: true, flagCounts: { lowConfidence: 2 },
   })]);
   assert.deepEqual(out[0].data, {
-    file: 'statement.csv', bank: 'DBS', profileName: 'DBS savings', confidence: 0.92,
+    bank: 'DBS', confidence: 0.92,
     rows: 40, position: 3, ok: true, flagCounts: { lowConfidence: 2 },
   });
+});
+
+// item 10: every profile is user-created (NO-TEMPLATES) and a real file name
+// is exactly the free text this exists to keep out - neither may pass
+// through unmasked just because of its key name.
+test('a file name and a profile\'s own display name never pass through unmasked', () => {
+  const out = anonymizeEvents([ev('home.match', 'match applied', {
+    file: 'jane_dbs_statement.csv', fileName: 'jane_dbs_statement.csv', sourceFile: 'jane_dbs_statement.csv',
+    name: 'jane_dbs_statement.csv', existing: 'jane_dbs_statement.csv',
+    profile: "Mom's joint account", profileName: "Mom's joint account", next: "Mom's joint account",
+  })]);
+  const json = JSON.stringify(out);
+  assert.ok(!json.includes('jane_dbs_statement'), json);
+  assert.ok(!json.includes("Mom's joint account"), json);
+});
+
+test('stripKnownFilenames replaces a known real file name with its anonymous label, and scrubs any other filename-shaped token', () => {
+  const out = stripKnownFilenames('failed reading jane_dbs_statement.csv near stray_other.pdf', [['jane_dbs_statement.csv', 'Statement 1']]);
+  assert.equal(out, 'failed reading Statement 1 near <file>');
+});
+
+test('stripKnownFilenames tolerates non-string input', () => {
+  assert.equal(stripKnownFilenames(undefined, []), undefined);
+  assert.equal(stripKnownFilenames(42, []), 42);
+});
+
+test('redactStack strips source file locations, keeps function names', () => {
+  const stack = 'Error: boom\n  at parseRow (pdf.js:123:45)\n  at readAll (worker.js:9:1)\n  at Object.<anonymous> (index.js:1:1)';
+  const out = redactStack(stack);
+  assert.ok(out.startsWith('Error: boom'));
+  assert.ok(!out.includes('pdf.js'));
+  assert.ok(!out.includes('worker.js'));
+  assert.ok(out.includes('at parseRow'));
+});
+
+test('redactStack tolerates non-string input', () => {
+  assert.equal(redactStack(undefined), undefined);
 });
 
 test('stacks survive (with digit-run masking as a defensive net)', () => {

@@ -165,6 +165,36 @@ test('fieldCoverage: None in this session when no file provides it, and when the
   assert.equal(fieldCoverage('extra_status', []).kind, 'none');
 });
 
+// Item 3/6: the coverage text actually rendered onto a pill (not just used to
+// filter which columns show up) - a pure helper so it's testable without a
+// DOM, same split blockLines/renderRowSnippet use.
+test('columnCoverageBadge: no badge for full coverage - reads as the plain "all" case', async () => {
+  const { columnCoverageBadge } = await import('../src/ui/preset-editor.js');
+  const groups = [
+    { label: 'Standard Chartered credit card', rows: [{ date: '2026-09-01' }] },
+    { label: 'DBS savings', rows: [{ date: '2026-09-02' }] },
+  ];
+  assert.equal(columnCoverageBadge('date', 'Date', groups), null);
+});
+
+test('columnCoverageBadge: partial coverage names the count and the covering statements', async () => {
+  const { columnCoverageBadge } = await import('../src/ui/preset-editor.js');
+  const groups = [
+    { label: 'Standard Chartered credit card', rows: [{ reference: 'REF001' }] },
+    { label: 'DBS savings', rows: [{ reference: '' }] },
+    { label: 'UOB card', rows: [{ reference: '' }] },
+  ];
+  const badge = columnCoverageBadge('reference', 'Reference', groups);
+  assert.equal(badge.text, '1/3');
+  assert.equal(badge.title, 'Reference: in 1 of 3 statements (Standard Chartered credit card)');
+});
+
+test('columnCoverageBadge: no badge (null) for a field nothing in the session provides', async () => {
+  const { columnCoverageBadge } = await import('../src/ui/preset-editor.js');
+  const groups = [{ label: 'DBS savings', rows: [{ date: '2026-09-01' }] }];
+  assert.equal(columnCoverageBadge('extra_status', 'Status', groups), null);
+});
+
 // Item 6: the "Last used" working-set model - editing the drawer live never
 // needs a "Save as preset" first, and the picker's label always reflects
 // whether the working set still matches a saved preset.

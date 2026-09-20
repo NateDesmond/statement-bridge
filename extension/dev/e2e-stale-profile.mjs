@@ -1,12 +1,13 @@
-// Gate item 4/5: a stale/broken USER
-// profile can tie a built-in on signature score and still win by list order,
-// even when its own mapping silently produces no usable amounts (or, item
-// 5's second scenario, an old profile version whose headerRow/dateFormat
-// drifted out of date). This seeds chrome.storage.local with such a profile
-// via the extension page BEFORE dropping the fixture, then asserts the
-// working built-in wins on extraction quality, the row count is right, the
-// explanatory caption names the losing profile, and Copy for Sheets carries
-// an amount on every row.
+// Gate item 4/5: a stale/broken user profile can tie a good, working user
+// profile on signature score and still win by list order, even when its own
+// mapping silently produces no usable amounts (or, item 5's second
+// scenario, an old profile version whose headerRow/dateFormat drifted out
+// of date). This seeds chrome.storage.local with BOTH the good profile
+// (standing in for one a user already saved through confirm-first) and the
+// stale one BEFORE dropping the fixture, then asserts the working profile
+// wins on extraction quality, the row count is right, the explanatory
+// caption names the losing profile, and Copy for Sheets carries an amount
+// on every row.
 //
 // Real unpacked extension, bundled Chromium only (never the user's Chrome,
 // never channel:'chrome'), test/fixtures/ synthetics only.
@@ -30,9 +31,37 @@ function check(label, ok, detail) {
   return ok;
 }
 
-// Same signatures as builtin-sc-credit-card-v1 (so it really ties on
-// score), but amount mapped to the sparse "Foreign Currency Amount" column -
-// the exact stale-suggester shape a real broken profile once carried.
+// The good, working profile for lattice_card_tabbed.csv - shaped the way a
+// user's own confirm-first save for this statement type would come out
+// (see PROFILE_SCHEMA.md / the fixture's own signatures).
+const goodLatticeProfile = {
+  schemaVersion: 1, id: 'user-lattice-card', bank: 'Lattice Bank', statementType: 'credit_card', fileType: 'csv',
+  country: 'SG', defaultCurrency: 'SGD', name: 'Lattice Bank credit card, CSV', builtIn: false,
+  versions: [{
+    id: 'user-lattice-card-v1', createdAt: '2026-09-01T00:00:00Z',
+    signatures: {
+      headerText: ['Date', 'DESCRIPTION', 'Foreign Currency Amount', 'SGD Amount'],
+      preambleKeywords: ['Transaction History:', 'LATTICE PLATINUM CARD'],
+      pdfAnchors: [], filenamePattern: '',
+    },
+    csv: { encoding: 'auto', delimiter: 'auto', headerRow: 2, skipRowsBefore: 2, footerRules: [], ignoreRowRules: [] },
+    fields: {
+      date: { source: 'Date' },
+      description_raw: { source: ['DESCRIPTION'] },
+      amount: { source: 'SGD Amount' },
+      currency: { mode: 'profileDefault' },
+      extra: [{ name: 'extra_foreign_currency_amount', source: 'Foreign Currency Amount' }],
+    },
+    dateFormat: 'DD/MM/YYYY',
+    signConvention: 'crdr',
+    pendingPrefix: '[UNPOSTED]',
+  }],
+};
+
+// A stale/broken USER profile with the same signatures as goodLatticeProfile
+// (so it really ties on score), but amount mapped to the sparse "Foreign
+// Currency Amount" column - the exact stale-suggester shape a real broken
+// profile once carried.
 const poisonedScProfile = {
   schemaVersion: 1, id: 'user-sc-test', bank: 'Lattice Bank', statementType: 'credit_card', fileType: 'csv',
   country: 'SG', defaultCurrency: 'SGD', name: 'sc test', builtIn: false,
@@ -56,10 +85,34 @@ const poisonedScProfile = {
   }],
 };
 
+// The good, working profile for meridian_savings.csv.
+const goodMeridianProfile = {
+  schemaVersion: 1, id: 'user-meridian-savings', bank: 'Meridian Bank', statementType: 'savings', fileType: 'csv',
+  country: 'SG', defaultCurrency: 'SGD', name: 'Meridian Bank savings, CSV', builtIn: false,
+  versions: [{
+    id: 'user-meridian-savings-v1', createdAt: '2026-09-01T00:00:00Z',
+    signatures: {
+      headerText: ['Transaction Date', 'Reference', 'Debit Amount', 'Credit Amount', 'Balance'],
+      preambleKeywords: ['Meridian Bank', 'Account Details For'],
+      pdfAnchors: [], filenamePattern: '',
+    },
+    csv: { encoding: 'auto', delimiter: 'auto', headerRow: 4, skipRowsBefore: 4, footerRules: [{ type: 'startsWith', value: 'Total' }], ignoreRowRules: [] },
+    fields: {
+      date: { source: 'Transaction Date' },
+      description_raw: { source: ['Reference', 'Transaction Ref'], join: ' ' },
+      amount: { debit: 'Debit Amount', credit: 'Credit Amount' },
+      balance: { source: 'Balance' },
+      currency: { mode: 'profileDefault' },
+    },
+    dateFormat: 'DD/MM/YYYY',
+    signConvention: 'debitCredit',
+  }],
+};
+
 // Item 5: a second, generalised scenario - an OLD version of a Meridian Bank savings
 // profile whose headerRow drifted off by one (points at the "Meridian Bank"
 // preamble line instead of the real header) and whose dateFormat is wrong.
-// Same signatures as builtin-dbs-savings-v1, so it still ties on score.
+// Same signatures as goodMeridianProfile, so it still ties on score.
 const staleDbsProfile = {
   schemaVersion: 1, id: 'user-dbs-old', bank: 'Meridian Bank', statementType: 'savings', fileType: 'csv',
   country: 'SG', defaultCurrency: 'SGD', name: 'My Meridian Bank savings (old)', builtIn: false,
@@ -115,11 +168,11 @@ async function launchExtensionContext() {
   return { context, page, pageErrors };
 }
 
-/** Seeds chrome.storage.local's 'profiles' key with just the poisoned profile - loadProfiles merges in the real builtins by id on its first call (profiles.js's mergeBuiltinUpdates), so this never has to hand-copy every builtin. */
-async function seedPoisonedProfile(page, profile) {
-  await page.evaluate(async (p) => {
-    await chrome.storage.local.set({ profiles: [p] });
-  }, profile);
+/** Seeds chrome.storage.local's 'profiles' key with the given profiles (the good one plus the stale/poisoned one). */
+async function seedProfiles(page, profiles) {
+  await page.evaluate(async (ps) => {
+    await chrome.storage.local.set({ profiles: ps });
+  }, profiles);
 }
 
 async function dropAndSettle(page, fileName, { timeout = 30000 } = {}) {
@@ -172,11 +225,11 @@ async function scenarioSc() {
   console.log('\n=== e2e-stale-profile: SC credit card, poisoned "sc test" profile ===');
   const { context, page, pageErrors } = await launchExtensionContext();
   try {
-    await seedPoisonedProfile(page, poisonedScProfile);
+    await seedProfiles(page, [goodLatticeProfile, poisonedScProfile]);
     const info = await dropAndSettle(page, 'lattice_card_tabbed.csv');
     console.log('   result:', JSON.stringify(info));
 
-    check('the built-in Lattice Bank profile wins, not the poisoned "sc test"', info.profileName === 'Lattice Bank credit card, CSV', info.profileName);
+    check('the good Lattice Bank profile wins, not the poisoned "sc test"', info.profileName === 'Lattice Bank credit card, CSV', info.profileName);
     check('a healthy (ok) badge, not a warning/failure from the poisoned profile', info.badgeTone === 'ok', `badge=${info.badgeLabel}`);
     check('all 6 real transactions extracted', info.rowCount === 6, info.rowCount);
     check(
@@ -201,11 +254,11 @@ async function scenarioDbs() {
   console.log('\n=== e2e-stale-profile: Meridian Bank savings, stale old profile version ===');
   const { context, page, pageErrors } = await launchExtensionContext();
   try {
-    await seedPoisonedProfile(page, staleDbsProfile);
+    await seedProfiles(page, [goodMeridianProfile, staleDbsProfile]);
     const info = await dropAndSettle(page, 'meridian_savings.csv');
     console.log('   result:', JSON.stringify(info));
 
-    check('the built-in Meridian Bank savings profile wins, not the stale old version', info.profileName === 'Meridian Bank savings, CSV', info.profileName);
+    check('the good Meridian Bank savings profile wins, not the stale old version', info.profileName === 'Meridian Bank savings, CSV', info.profileName);
     check('a healthy (ok) badge, not a warning/failure from the stale profile', info.badgeTone === 'ok', `badge=${info.badgeLabel}`);
     check(
       'the row explains that the stale Meridian Bank profile lost and offers to fix/delete it',

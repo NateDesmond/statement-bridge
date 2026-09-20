@@ -312,6 +312,19 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
   overflow:hidden;display:flex;align-items:center;justify-content:center;
 }
 .decision-snippet canvas{display:block;}
+.decision-snippet[tabindex]{cursor:zoom-in;}
+
+/* Item 7: the snippet magnifier - a floating, bigger/sharper re-render of a
+   card's own on-card crop, anchored beside the card (home.js's
+   positionMagnifier flips it to the card's left when there's no room on the
+   right) so it never overlaps the card's text or its Confirm/Fix buttons. */
+.snippet-magnifier{
+  position:fixed;z-index:90;background:var(--paper-raised);
+  border:1px solid var(--paper-line);border-radius:var(--radius);
+  box-shadow:0 10px 30px rgba(0,0,0,.35);padding:8px;
+  max-width:600px;font-size:12.5px;color:var(--ink-dim);
+}
+.snippet-magnifier canvas{display:block;max-width:100%;}
 .decision-snippet-text{
   padding:8px 10px;font-size:13px;color:#333;line-height:1.4;
   display:flex;flex-direction:column;gap:3px;overflow:hidden;
@@ -345,10 +358,14 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
 }
 .profile-picker{
   background:var(--paper-raised);border-radius:var(--radius);border:1px solid var(--paper-line);
-  width:420px;max-width:100%;max-height:80vh;overflow:auto;padding:20px;
+  width:420px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;padding:20px;
 }
 .profile-picker h3{margin:0 0 6px;font-size:15px;}
-.profile-picker-groups{margin-top:12px;display:flex;flex-direction:column;gap:4px;}
+/* Item 2 (NO-TEMPLATES): the list itself scrolls (own box, own visible
+   scrollbar via force-visible-scrollbar) - the heading/hint above and the
+   "Map this as a new statement"/Cancel footer below stay put, never
+   scrolling out of view along with a long list of saved types. */
+.profile-picker-groups{margin-top:12px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;max-height:min(50vh,420px);padding-right:4px;}
 .pp-group-title{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-dim);margin-top:10px;}
 .pp-group-title:first-child{margin-top:0;}
 .pp-profile-btn{
@@ -356,8 +373,7 @@ h2.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;co
   width:100%;text-align:left;appearance:none;border:1px solid var(--paper-line);background:#fff;
   border-radius:5px;padding:8px 10px;font:inherit;font-size:12.5px;cursor:pointer;
 }
-.pp-profile-btn:hover:not(:disabled){border-color:var(--brass);}
-.pp-profile-btn:disabled{opacity:.45;cursor:not-allowed;}
+.pp-profile-btn:hover,.pp-profile-btn:focus-visible{border-color:var(--brass);}
 .pp-filetype{font-size:10.5px;color:var(--ink-dim);}
 .profile-picker-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--paper-line);}
 
@@ -784,11 +800,6 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
    screen never reads as unfinished next to Statement types/Home/Check a
    statement, which all lead with a bold title. */
 .page-title{font-size:19px;color:var(--ink);line-height:1.4;font-weight:700;margin:0 0 12px;}
-.confirm-totals{display:flex;justify-content:center;gap:36px;margin:14px 0 20px;}
-.confirm-total-item{text-align:center;}
-.confirm-total-item .num{display:block;font-size:19px;font-weight:700;}
-.confirm-total-item.in .num{color:var(--ok);}
-.confirm-total-item.out .num{color:var(--danger);}
 .confirm-actions{display:flex;flex-direction:column;gap:10px;max-width:380px;margin:22px auto 0;}
 .btn-confirm-giant{font-size:15.5px;padding:14px 20px;min-height:52px;width:100%;justify-content:center;}
 .confirm-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
@@ -899,6 +910,9 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 }
 .column-pill.enabled{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
 .column-pill-label[contenteditable="true"]{outline:none;border-bottom:1px dashed currentColor;cursor:text;}
+/* Item 6 (NO-TEMPLATES): a partial-coverage column ("2 of 3 statements") gets
+   a small badge on its pill - unobtrusive, but visible without a hover. */
+.column-pill-coverage{margin-left:5px;font-size:9.5px;opacity:0.75;font-weight:600;}
 /* Item 4: the date format picker's live example, right next to its select. */
 .pg-example{display:block;margin-top:4px;font-size:11px;color:var(--ink-dim);}
 .money-direction-note{margin-top:10px;grid-column:1/-1;}
@@ -930,11 +944,58 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
    since the table's own width is content-driven (width:max-content above),
    not wrapped-and-squeezed. */
 .preset-preview-table th,.preset-preview-table td{height:32px;box-sizing:border-box;white-space:nowrap;}
+/* Item B (2026-09-20): the default export's 8 columns carry long free text (a
+   full description, "Northwind Bank current ****3210", a transaction type),
+   which pushed the table past the card and cut a HEADER in half ("ORIGI...") -
+   that reads as a broken column, not a scrollable one. The live preview
+   therefore shares the card's width between its columns instead of growing
+   past it: every header stays readable in full (wrapping to a second line if
+   it must) and it's the VALUES that ellipsize - preview only, the copied and
+   downloaded text is untouched. The full text stays in Review. --preview-cols
+   (set per render, like --preview-rows) keeps a wide layout readable: with more
+   columns than the card can give ~100px each, the table overflows and scrolls
+   as before rather than squeezing every column into a sliver. */
+.preset-preview-scroll-live .preset-preview-table{table-layout:fixed;width:100%;min-width:calc(var(--preview-cols, 5) * 100px);}
+.preset-preview-scroll-live .preset-preview-table td{overflow:hidden;text-overflow:ellipsis;}
+/* Description is the column people actually read; give it a double share. */
+.preset-preview-scroll-live .preset-preview-table th[data-field="description_raw"]{width:calc(200% / var(--preview-cols, 5));}
+/* A header may wrap to a second line rather than be cut off; the 32px height
+   on every th/td above acts as a minimum for a table cell, so a one-line
+   header keeps the box exactly header + PREVIEW_VISIBLE_ROWS rows tall. */
+.preset-preview-scroll-live .preset-preview-table thead th{white-space:normal;vertical-align:bottom;}
+.preset-preview-scroll-live .preset-preview-table [data-field="amount"],
+.preset-preview-scroll-live .preset-preview-table [data-field="currency"]{width:88px;}
+/* Wide enough for a full YYYY-MM-DD plus the "needs a quick look" dot. */
+.preset-preview-scroll-live .preset-preview-table [data-field="date"]{width:116px;}
 /* Item 1/3: the live "what will be copied" preview scrolls vertically inside
    a box exactly --preview-rows rows tall (plus its sticky header, already
    `position:sticky;top:0` on every table.txn-table th) - the Settings
    "Sample" preview (no --preview-rows set, 1-2 rows) never needs this. */
 .preset-preview-scroll-live{overflow-y:auto;max-height:calc((var(--preview-rows, 5) + 1) * 32px);}
+/* Item 4 (NO-TEMPLATES): the confirm screen's transaction preview must never
+   read as a short, complete list when it's actually scrollable - an overlay-
+   scrollbar system (macOS default) draws no bar at all until the box is
+   mid-scroll, so "Showing 5 of 37" was the only cue. force-visible-scrollbar
+   keeps a real, always-drawn bar: `scrollbar-width` (Firefox) already an
+   auto/thin, non-overlay track, and a styled ::-webkit-scrollbar (Chrome/
+   Safari/Edge) always paints a classic bar instead of an overlay one once
+   ANY -webkit-scrollbar rule targets it, no matter the OS scrollbar setting. */
+.force-visible-scrollbar{scrollbar-width:thin;scrollbar-color:var(--paper-line) transparent;}
+.force-visible-scrollbar::-webkit-scrollbar{width:10px;}
+.force-visible-scrollbar::-webkit-scrollbar-track{background:transparent;}
+.force-visible-scrollbar::-webkit-scrollbar-thumb{background:var(--paper-line);border-radius:5px;}
+.force-visible-scrollbar::-webkit-scrollbar-thumb:hover{background:var(--ink-dim);}
+/* Item 4: a bottom fade over the confirm preview - a second, at-a-glance cue
+   (on top of the scrollbar above) that there are more rows below the fold.
+   Positioned over the preview box itself, not inside it, so it never steals
+   space from the table or shifts the "Showing 5 of N" caption underneath it. */
+.confirm-a-preview-fade{position:relative;}
+.confirm-a-preview-fade::after{
+  content:"";position:absolute;left:0;right:0;
+  top:calc((var(--preview-rows, 5) + 1) * 32px - 28px);height:28px;
+  background:linear-gradient(to bottom, transparent, var(--paper-raised));
+  pointer-events:none;
+}
 .preset-preview-caption{margin:12px 0 4px;}
 .preset-preview-footcaption{margin:6px 0 0;}
 #home-preset-editor,.drawer-body,.export-panel{min-width:0;}

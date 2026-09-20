@@ -1,29 +1,33 @@
 // "Report a problem": assembles the JSON that goes on the clipboard and the
 // mailto: draft that opens beside it. Pure - no chrome.*, no DOM, no clock
-// (the caller passes `now`) - so every branch (consent honoured, the size
-// guard, the mailto shape) is unit-testable without a browser.
+// (the caller passes `now`) - so every branch is unit-testable without a
+// browser.
 //
-// WHY CLIPBOARD + PASTE, NOT AN ATTACHMENT: mailto: cannot attach files, and
+// Item 10 (Nate, furious, and right): the report used to embed the whole
+// (merely field-masked) debug log, which read as "your entire transaction
+// list" - a session with real statements in it produced a report shaped
+// like one. The report now carries NO per-transaction entries, anonymised or
+// not, and no file names at all: only a structural summary per statement
+// (see core/session-report.js) - counts, stage timings, the layout model,
+// checks, and errors with their stacks' file locations stripped. The
+// separate, NEVER-sent "copy full log" action (report/report.js) still
+// hands back the raw debug log verbatim for the owner's own troubleshooting.
+//
+// WHY CLIPBOARD + MAILTO, NOT AN ATTACHMENT: mailto: cannot attach files, and
 // its body travels in a URL that mail clients truncate, commonly around a
-// couple of thousand characters. A debug log can be far larger than that. So
-// the full report goes on the clipboard and the mail body carries only the
-// user's own words, the file name and a short instruction to paste - see
-// report/report.js for the UI side of this.
+// couple of thousand characters. So the report goes on the clipboard and the
+// mail body carries only the user's own words and a short instruction to
+// paste - see ui/report.js for the UI side of this.
 
-import { anonymizeEvents } from './anonymize.js';
+import { buildSessionSummary } from './session-report.js';
+import { stripKnownFilenames, redactStack } from './anonymize.js';
 
-export const REPORT_VERSION = 1;
+export const REPORT_VERSION = 2;
 
 // A single constant so it is easy to find and swap. A role address
 // (support@, help@) is preferable to a personal mailbox before this ships
 // on a public listing - it goes out in every report's mailto: forever.
 export const SUPPORT_EMAIL = 'nate@natedesmond.com';
-
-// Above this serialized size, the log is trimmed to its most recent entries
-// (see truncateLog). The report is destined for the clipboard and then a
-// mail body a human has to paste; beyond a few hundred KB some clipboard/
-// mail paths fail in ways that look like "nothing happened".
-export const MAX_LOG_BYTES = 200 * 1024;
 
 // Hard ceiling for the whole mailto: URL. Mail clients and browsers
 // truncate long mailto URLs silently and at inconsistent limits; staying
@@ -31,83 +35,75 @@ export const MAX_LOG_BYTES = 200 * 1024;
 // arriving intact everywhere.
 export const MAX_MAILTO_CHARS = 1800;
 
+// ponytail: a flat per-statement cap, not a byte-size budget like the old
+// log truncation - a real session realistically has a handful of statements
+// and a few dozen stage events each; upgrade to a byte-aware trim if a
+// pathological session ever actually produces a report too big to paste.
+export const MAX_STAGES_PER_STATEMENT = 300;
+
 export const PASTE_INSTRUCTION =
-  'The full report, including the debug log if you included it, is on your ' +
-  'clipboard. Paste it below this line if you can, but the file name and ' +
-  'description above are usually enough to start with.';
+  'The report above is on your clipboard. Paste it below this line if you can, ' +
+  'but your message and the statement above are usually enough to start with.';
 
-function serializedSize(value) {
-  try {
-    return JSON.stringify(value).length;
-  } catch {
-    return Infinity;
-  }
+function detectBrowserOS(ua) {
+  const s = String(ua || '');
+  let browser = 'unknown';
+  if (/Edg\//.test(s)) browser = 'Edge';
+  else if (/OPR\//.test(s)) browser = 'Opera';
+  else if (/Chrome\//.test(s)) browser = 'Chrome';
+  else if (/Firefox\//.test(s)) browser = 'Firefox';
+  else if (/Safari\//.test(s)) browser = 'Safari';
+  let os = 'unknown';
+  if (/Windows/.test(s)) os = 'Windows';
+  else if (/Mac OS X/.test(s)) os = 'macOS';
+  else if (/CrOS/.test(s)) os = 'ChromeOS';
+  else if (/Android/.test(s)) os = 'Android';
+  else if (/Linux/.test(s)) os = 'Linux';
+  return { browser, os };
+}
+
+function cleanStatement(s, nameToLabel) {
+  const scrub = (t) => stripKnownFilenames(t, nameToLabel);
+  return {
+    label: s.label,
+    summary: scrub(s.summary),
+    layoutModel: s.layoutModel,
+    checks: s.checks,
+    flagCounts: s.flagCounts,
+    stages: s.stages.slice(-MAX_STAGES_PER_STATEMENT).map((e) => ({ ...e, message: scrub(e.message) })),
+    errors: s.errors.map((e) => ({ stage: e.stage, message: scrub(e.message), stack: redactStack(scrub(e.stack)) })),
+  };
+}
+
+function cleanError(e, nameToLabel) {
+  const scrub = (t) => stripKnownFilenames(t, nameToLabel);
+  return { stage: e.stage, message: scrub(e.message), stack: redactStack(scrub(e.stack)) };
 }
 
 /**
- * Trim an already-anonymised log to fit maxBytes, keeping the newest
- * entries (the log is oldest-first, same as core/debuglog.js's events
- * array). Never throws, and drops entirely rather than producing something
- * unserializable.
- * @returns {{log: any[]|null, truncated: boolean, entriesIncluded: number, originalEntries: number, originalBytes: number}}
- */
-export function truncateLog(anonEvents, maxBytes) {
-  maxBytes = typeof maxBytes === 'number' ? maxBytes : MAX_LOG_BYTES;
-  if (!Array.isArray(anonEvents)) {
-    return { log: null, truncated: false, entriesIncluded: 0, originalEntries: 0, originalBytes: 0 };
-  }
-  const originalEntries = anonEvents.length;
-  const originalBytes = serializedSize(anonEvents);
-  if (originalBytes <= maxBytes) {
-    return { log: anonEvents, truncated: false, entriesIncluded: originalEntries, originalEntries, originalBytes };
-  }
-  // Halve from the oldest end until it fits - O(log n) steps, plenty for a
-  // ring buffer capped at 2000 entries.
-  let kept = anonEvents;
-  while (kept.length > 0 && serializedSize(kept) > maxBytes) {
-    kept = kept.slice(Math.ceil(kept.length / 2));
-  }
-  return { log: kept, truncated: true, entriesIncluded: kept.length, originalEntries, originalBytes };
-}
-
-function logNote(includeLog, trim) {
-  if (!includeLog) return 'The user chose not to include their debug log.';
-  if (!trim.log) return 'No debug log was available yet.';
-  if (trim.truncated) {
-    return (
-      'Debug log TRUNCATED to the ' + trim.entriesIncluded +
-      ' most recent entries (of ' + trim.originalEntries +
-      ') because the full log was ' + Math.round(trim.originalBytes / 1024) +
-      'KB, over the ' + Math.round(MAX_LOG_BYTES / 1024) + 'KB report limit.'
-    );
-  }
-  return 'Full debug log included (' + trim.entriesIncluded + ' entries).';
-}
-
-/**
- * Assemble the report object that goes on the clipboard.
- * input: {extensionVersion, userAgent, whatHappened, fileName, includeLog,
- *         events, now, maxLogBytes}
+ * Assemble the report object that goes on the clipboard. No per-transaction
+ * data, anonymised or not, and no file name ever appears anywhere in this -
+ * only the structural summary session-report.js builds.
+ * input: {extensionVersion, userAgent, whatHappened, statementLabel, events, now}
  */
 export function buildReport(input) {
   input = input || {};
-  const includeLog = input.includeLog !== false;
-  const anon = includeLog && Array.isArray(input.events) ? anonymizeEvents(input.events) : null;
-  const trim = truncateLog(anon, input.maxLogBytes);
+  const events = Array.isArray(input.events) ? input.events : [];
+  const { statements, nameToLabel, sessionErrors } = buildSessionSummary(events);
+  const { browser, os } = detectBrowserOS(input.userAgent);
   return {
     kind: 'statement-bridge-problem-report',
     reportVersion: REPORT_VERSION,
     extensionVersion: String(input.extensionVersion || 'unknown'),
-    userAgent: String(input.userAgent || 'unknown'),
+    browser,
+    os,
     createdAt: typeof input.now === 'number' ? input.now : Date.now(),
-    fileName: typeof input.fileName === 'string' ? input.fileName : '',
     whatHappened: typeof input.whatHappened === 'string' ? input.whatHappened : '',
-    logIncluded: includeLog && !!trim.log,
-    logTruncated: trim.truncated,
-    logNote: logNote(includeLog, trim),
-    // null rather than omitted: an explicit "no log here" reads
-    // unambiguously, an absent key reads like a bug in the reporter.
-    log: includeLog ? trim.log : null,
+    // The statement the user picked as "the one this is about" - an
+    // anonymous label from the list below, never a real file name.
+    statement: typeof input.statementLabel === 'string' ? input.statementLabel : '',
+    statements: statements.map((s) => cleanStatement(s, nameToLabel)),
+    sessionErrors: sessionErrors.map((e) => cleanError(e, nameToLabel)),
   };
 }
 
@@ -115,7 +111,7 @@ export function reportToJson(report) {
   return JSON.stringify(report, null, 2);
 }
 
-/** The mail draft. Never carries the log - only the user's words, the file name and the paste instruction - and shrinks whatHappened rather than blow the mailto budget. */
+/** The mail draft. Never carries the report - only the user's words, the chosen statement label and the paste instruction - and shrinks whatHappened rather than blow the mailto budget. */
 export function buildMailto(input) {
   input = input || {};
   const email = input.email || SUPPORT_EMAIL;
@@ -125,7 +121,7 @@ export function buildMailto(input) {
 
   function assemble(what) {
     const lines = [what || '(describe what happened here)', ''];
-    if (input.fileName) { lines.push('File: ' + input.fileName, ''); }
+    if (input.statementLabel) { lines.push('Statement: ' + input.statementLabel, ''); }
     lines.push(PASTE_INSTRUCTION);
     const body = lines.join('\n');
     return 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);

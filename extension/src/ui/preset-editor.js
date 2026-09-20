@@ -249,6 +249,29 @@ export function fieldCoverage(field, fileGroups) {
   return { kind: 'some', labels: withField.map((g) => g.label) };
 }
 
+/**
+ * Item 3/6 (NO-TEMPLATES): the visible coverage badge for one column pill -
+ * a pure helper (no DOM) so its text is unit-testable directly, the same
+ * split renderRowSnippet/blockLines uses for the DOM-vs-pure pieces of a
+ * feature. 'all' and 'none' coverage need no badge (the expected/default
+ * case, and a column with nothing to show respectively) - only 'some' gets
+ * one, with `title` naming which statements have it.
+ * @param {string} field
+ * @param {string} name - the column's current display name, for the title sentence
+ * @param {{label:string, rows:object[]}[]} groupsWithRows - fileGroups already filtered to ones with rows (fieldCoverage's own `total`)
+ * @returns {{text: string, title: string} | null}
+ */
+export function columnCoverageBadge(field, name, groupsWithRows) {
+  const coverage = fieldCoverage(field, groupsWithRows);
+  if (coverage.kind !== 'some') return null;
+  const total = groupsWithRows.length;
+  const covered = coverage.labels.length;
+  return {
+    text: `${covered}/${total}`,
+    title: `${name}: in ${covered} of ${total} statements (${coverage.labels.join(', ')})`,
+  };
+}
+
 const DATE_FORMAT_LABELS = {
   sheetsSerial: 'Google Sheets serial number',
   isoWithTime: 'ISO with time if available',
@@ -412,6 +435,7 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
   summary.textContent = 'Customise';
   details.appendChild(summary);
 
+  const groupsWithRows = groups.filter((g) => g.rows?.length);
   const pillRow = document.createElement('div');
   pillRow.className = 'column-pill-row';
   let dragFromField = null;
@@ -432,6 +456,18 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
     label.className = 'column-pill-label';
     label.textContent = name;
     pill.appendChild(label);
+
+    // Item 3: coverage per column - "all statements" needs no extra text (the
+    // expected case); "N of M statements" gets a small always-visible badge,
+    // with the full sentence (naming which statements) as the pill's title.
+    const badgeInfo = columnCoverageBadge(f.field, name, groupsWithRows);
+    if (badgeInfo) {
+      pill.title = badgeInfo.title;
+      const badge = document.createElement('sup');
+      badge.className = 'column-pill-coverage';
+      badge.textContent = badgeInfo.text;
+      pill.appendChild(badge);
+    }
 
     const toggle = () => onChange(idx != null ? toggleColumn(preset, idx) : addColumn(preset, f.field, f.name));
     pill.addEventListener('click', (e) => { if (e.target !== label || !label.isContentEditable) toggle(); });
@@ -581,6 +617,10 @@ function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows =
       // The box's fixed height (workspace.css) is header + PREVIEW_VISIBLE_ROWS
       // rows - exposed as a custom property so the two never drift apart.
       scrollWrap.style.setProperty('--preview-rows', String(PREVIEW_VISIBLE_ROWS));
+      // Item B (2026-09-20): the column count drives the table's min-width
+      // (workspace.css) - up to what fits, columns share the card's width so
+      // no header is ever cut off; beyond that it scrolls.
+      scrollWrap.style.setProperty('--preview-cols', String(columns.length));
     }
     const table = document.createElement('table');
     table.className = 'txn-table preset-preview-table';
