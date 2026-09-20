@@ -53,21 +53,18 @@ format, number format, and sign convention. You set one up once per bank
 export, through a short wizard; every later statement from the same source
 is then recognized automatically.
 
-A handful of starter statement types ship in
-`extension/src/core/builtin-profiles.js`, built against fictional example
-banks (Meridian Bank, Harbour Card, Riverside Bank, Summit Bank, Anchor
-Bank, Lattice Bank, Northwind Bank). They exist to demonstrate real parsing
-capabilities - grouped PDF layouts, tabbed CSV parsing, CR/DR markers,
-debit/credit column pairs - without shipping a real bank's name or export
-layout as a "default". See `docs/PRD-SUMMARY.md` for the product overview
-and `docs/PROFILE-SCHEMA.md` for the exact JSON shape.
+Nothing ships pre-made: `extension/src/core/builtin-profiles.js` exports an
+empty list. Every statement type is created by the person using the
+extension, the first time they drop that kind of file. See
+`docs/PRD-SUMMARY.md` for the product overview and `docs/PROFILE-SCHEMA.md`
+for the exact JSON shape a saved statement type takes.
 
 ## Adding a new bank
 
 You don't need to touch the code to add support for your own bank: drop a
 statement and walk the wizard once. If you're contributing a new *parsing
-capability* the app doesn't have yet (a layout shape none of the built-ins
-cover), see `CONTRIBUTING.md`.
+capability* the app doesn't have yet (a layout shape nothing in the test
+fixtures covers), see `CONTRIBUTING.md`.
 
 ## Repository layout
 

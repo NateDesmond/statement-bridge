@@ -9,17 +9,19 @@ easiest to review.
 - For a bug fix: reproduce it with a test first if you can, then fix the
   root cause (check every caller of the function you're touching, not just
   the path a report names).
-- For a new statement-type capability (a parsing shape no built-in covers):
-  add a synthetic fixture under `extension/test/fixtures/` (generate it with
-  a script under `extension/test/fixtures/gen/` where practical), a starter
-  profile in `extension/src/core/builtin-profiles.js`, and a regression
-  test. **Never name a real bank** in a fixture, a builtin profile, test
-  data, or a code comment - use a fictional bank name instead (see the
-  existing ones: Meridian Bank, Harbour Card, Riverside Bank, Summit Bank,
-  Anchor Bank, Lattice Bank, Northwind Bank, or invent another clearly
-  fictional one). This keeps the repository from ever shipping a real
-  bank's export layout as a "default", and keeps test data free of
-  anything that looks like a real account.
+- For a new statement-type capability (a parsing shape nothing in the test
+  fixtures covers yet): add a synthetic fixture under
+  `extension/test/fixtures/` (generate it with a script under
+  `extension/test/fixtures/gen/` where practical) and a regression test.
+  Nothing ships pre-made (`extension/src/core/builtin-profiles.js` exports
+  an empty list) - every real statement type is created by the person using
+  the extension, through the wizard, so a new capability only ever needs a
+  fixture and a test, never a shipped profile. **Never name a real bank**
+  in a fixture, test data, or a code comment - use a fictional bank name
+  instead (see the existing ones: Meridian Bank, Harbour Card, Riverside
+  Bank, Summit Bank, Anchor Bank, Lattice Bank, Northwind Bank, or invent
+  another clearly fictional one). This keeps test data free of anything
+  that looks like a real account.
 - Never commit real personal data: no real statements, no real account
   numbers, no real names in fixtures or comments.
 
