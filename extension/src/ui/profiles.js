@@ -5,6 +5,7 @@ import {
   loadProfiles, deleteProfile, duplicateProfile, updateProfile, serializeBackup, restoreBackup,
 } from '../core/profiles.js';
 import { profileHealthLabel } from '../core/home-state.js';
+import { formatShortDate } from '../core/daterange.js';
 import { fitTwoColumnGrid } from './nav.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -31,7 +32,7 @@ export function createProfilesScreen({ storage, onMapNewStatement }) {
           row.className = 'version-row';
           if (profile.id === focusProfileId) row.classList.add('version-row-focused');
           const isCurrent = vIdx === profile.versions.length - 1;
-          const created = version.createdAt ? new Date(version.createdAt).toLocaleDateString() : 'unknown date';
+          const created = version.createdAt ? formatShortDate(new Date(version.createdAt).toISOString().slice(0, 10)) : 'unknown date';
           // Item 3: a per-version health line from the last time it was
           // actually applied to a file ("Last used: 310 of 310 rows read" /
           // "Last used: amounts missing on 309 of 314 rows") - null (no line)

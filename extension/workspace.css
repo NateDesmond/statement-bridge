@@ -794,6 +794,7 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 #screen-wizard #wizard-confirm{min-height:calc(100vh - 153px);}
 #confirm-c{margin-top:auto;margin-bottom:auto;}
 .confirm-step{max-width:640px;margin:0 auto;text-align:center;}
+#confirm-focus{max-width:960px;}
 /* Pass 3 item 10: .confirm-step's own text-align:center (for the heading/
    totals/buttons above) was cascading into the preview table too, centring
    Date/Description text that every other table in the app (Home, Check a
@@ -1114,7 +1115,7 @@ table.accounts-table .mr-count-zero{color:var(--ink-dim);font-style:italic;}
    side padding) instead of stretching arbitrarily wide - never wide enough,
    or low enough, to sit on top of a result-table row. */
 .home-toast{
-  position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(10px);
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--ink-900);color:var(--ink-text);padding:10px 20px;border-radius:var(--radius);
   font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.28);opacity:0;transition:opacity .15s ease, transform .15s ease;
   z-index:50;max-width:984px;width:max-content;
@@ -1134,7 +1135,7 @@ table.accounts-table .mr-count-zero{color:var(--ink-dim);font-style:italic;}
 .reading h2{font-size:15px;margin:26px 0 6px;}
 .reading h2:first-child{margin-top:0;}
 .reading p{margin:0 0 4px;font-size:13.5px;color:var(--ink);}
-.reading .password-note{margin-top:22px;padding:12px 14px;background:var(--paper-raised);border:1px solid var(--paper-line);border-radius:var(--radius);font-size:13px;color:var(--ink-dim);}
+.reading .password-note{margin-top:22px;font-size:13px;color:var(--ink-dim);}
 .first-run-how-link{background:none;border:none;color:var(--ink-dim);text-decoration:underline;font-size:12.5px;cursor:pointer;padding:0;margin-top:10px;}
 
 /* Confirm-first notice (blank required column) */

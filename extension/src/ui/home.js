@@ -1543,7 +1543,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
             const tsv = buildTsv(ready, exportPreset(), { includeSourceColumns });
             try {
               await navigator.clipboard.writeText(tsv);
-              toast(`Copied ${ready.length} rows (${ocrPartialCaption(entry.pagesRead, entry.pagesTotal)})`);
+              toast(`Copied ${ready.length} transactions so far (${ocrPartialCaption(entry.pagesRead, entry.pagesTotal)})`);
             } catch {
               toast('Clipboard access was denied.');
             }
@@ -2420,8 +2420,8 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       allClearNoteEl.hidden = !allClear;
       if (allClear) {
         allClearNoteEl.textContent = bc.reconciles === true
-          ? 'Every transaction on the page is accounted for, and the balances add up.'
-          : 'Every transaction on the page is accounted for.';
+          ? 'Every transaction in your statement is accounted for, and the balances add up.'
+          : 'Every transaction in your statement is accounted for.';
       }
     }
     copyBtn.classList.toggle('btn-brass', !pendingDecisions);
@@ -2837,7 +2837,7 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       const tsv = buildTsv(rows, exportPreset(), { includeSourceColumns });
       try {
         await navigator.clipboard.writeText(tsv);
-        toast(`Copied ${rows.length} rows to the clipboard`);
+        toast(`Copied ${rows.length} transaction${rows.length === 1 ? '' : 's'} to the clipboard`);
         log('home.export', 'copy outcome', { ok: true, rows: rows.length });
         await markLastExported(rows);
         await saveLastUsedPrefs();

@@ -685,7 +685,7 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     }
     const summary = fileSummary(rows);
     const count = summary.rowCount;
-    const range = summary.dateRange ? ` from ${summary.dateRange.start} to ${summary.dateRange.end}` : '';
+    const range = summary.dateRange ? ` from ${formatShortDate(summary.dateRange.start)} to ${formatShortDate(summary.dateRange.end)}` : '';
     $('#confirm-a-heading').textContent = state.updateProfile
       ? 'This looks different from last time. Does this look right?'
       : `We found ${count} transaction${count === 1 ? '' : 's'}${range}. Does this look right?`;
@@ -2422,13 +2422,13 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     const countHtml = countResult.tone === 'ok' ? '' : `<div class="rs-item ${countRowClass}">${isGrouped ? countLabel : `<span class="num">${cc.extractedCount}</span>${countLabel}`}</div>`;
     host.innerHTML = `
       <div class="review-summary">
-        <div class="rs-item"><span class="num">${summary.rowCount}</span>rows parsed</div>
+        <div class="rs-item"><span class="num">${summary.rowCount}</span>transaction${summary.rowCount === 1 ? '' : 's'} read</div>
         ${countHtml}
       </div>
       ${balanceHtml}
       ${warnings.length ? `<div class="confirm-note" style="color:var(--warn);">${warnings.join('<br>')}</div>` : ''}
       <p class="pdf-anchor-hint">${currencyLines}</p>
-      <p class="pdf-anchor-hint">Flags: ${flagChips}</p>
+      <p class="pdf-anchor-hint">${flagChips === 'none' ? 'Nothing needs a second look.' : `Needs a look: ${flagChips}`}</p>
       ${lowConfidenceCount ? `<p class="pdf-anchor-hint"><a href="#" id="w-test-confirm-all">Confirm all ${lowConfidenceCount} low-confidence row${lowConfidenceCount === 1 ? '' : 's'}</a></p>` : ''}
       ${flaggedRows.length ? `<label class="flagged-only-toggle"><input type="checkbox" id="w-test-flaggedonly" ${flaggedOnly ? 'checked' : ''}> Show only flagged rows (${flaggedRows.length})</label>` : ''}
       ${skippedGroupHtml}
@@ -2832,9 +2832,9 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     $('#wizard-next')?.addEventListener('click', goNext);
     $('#confirm-yes')?.addEventListener('click', () => renderConfirmC());
     $('#confirm-off')?.addEventListener('click', () => showConfirmScreen('b'));
-    $('#confirm-fix-dates')?.addEventListener('click', () => openConfirmFocus('dates'));
-    $('#confirm-fix-amounts')?.addEventListener('click', () => openConfirmFocus('amounts'));
-    $('#confirm-fix-rows')?.addEventListener('click', () => openConfirmFocus('locate'));
+    $('#confirm-fix-dates')?.addEventListener('click', () => openConfirmFocus('dates', 'Which date format does this file use?'));
+    $('#confirm-fix-amounts')?.addEventListener('click', () => openConfirmFocus('amounts', 'How are amounts written in this file?'));
+    $('#confirm-fix-rows')?.addEventListener('click', () => openConfirmFocus('locate', 'Where do the transactions start and end?'));
     $('#confirm-fix-other')?.addEventListener('click', () => { setConfirmMode(false); setStep(2); });
     $('#confirm-focus-done')?.addEventListener('click', () => closeConfirmFocus());
     $('#confirm-save')?.addEventListener('click', async () => {

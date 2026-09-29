@@ -570,7 +570,7 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
   // Item 3: the normalisation note gets its own line beneath the preview.
   const moneyNote = document.createElement('p');
   moneyNote.className = 'pdf-anchor-hint money-direction-note';
-  moneyNote.textContent = 'All statements are normalised before export: money out is always negative internally, for bank and card accounts alike, so mixing accounts is safe.';
+  moneyNote.textContent = 'Money out is always negative and money in positive, for bank and card accounts alike, so mixing accounts is safe.';
   container.appendChild(moneyNote);
 }
 

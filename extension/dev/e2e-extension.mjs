@@ -655,9 +655,9 @@ async function runFirstTimerGermanCsvScenario() {
       check('Copy to Google Sheets is available', copyEnabled, '');
       if (copyEnabled) {
         await page.click('#copy-tsv-btn');
-        await page.waitForFunction(() => /Copied \d+ rows? to the clipboard/i.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
+        await page.waitForFunction(() => /Copied \d+ (rows?|transactions?) to the clipboard/i.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
         const afterCopy = await page.evaluate(() => document.body.innerText);
-        const copied = afterCopy.match(/Copied (\d+) rows? to the clipboard/i);
+        const copied = afterCopy.match(/Copied (\d+) (?:rows?|transactions?) to the clipboard/i);
         check('Copy produced the toast with the real row count (6)', !!copied && Number(copied[1]) === 6, copied ? copied[0] : 'no copy toast');
         await shotStep('04-after-copy');
       }
