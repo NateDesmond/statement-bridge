@@ -102,6 +102,12 @@ export const OCR_LOW_CONFIDENCE_THRESHOLD = 70;
 export const OCR_LOW_CONFIDENCE_AMOUNT_THRESHOLD = 60;
 const OUTLIER_MULTIPLE = 100;
 
+// P0-4 (PASS 4): below this per-token Tesseract confidence the read is bad
+// enough to be a reason in its own right - no corroborating anomaly needed.
+// Kept well under OCR_LOW_CONFIDENCE_AMOUNT_THRESHOLD so the deliberately
+// narrow 40-60 band still needs a second signal (see item 5c above).
+export const OCR_AMOUNT_CONFIDENCE_FLOOR = 40;
+
 /**
  * Normalize raw records into standard transaction rows.
  * @param {object[]} records - row objects keyed by source header (from csv.js), or pdf row objects.
@@ -164,7 +170,7 @@ export function normalizeRecords(records, version, meta = {}) {
     const amountRawText = (amountCfg.debit !== undefined || amountCfg.credit !== undefined)
       ? [amountCfg.credit ? record[amountCfg.credit] : '', amountCfg.debit ? record[amountCfg.debit] : ''].join(' ')
       : String(record[amountCfg.source] ?? '');
-    const { currency } = detectCurrency({
+    const { currency, unknownCode } = detectCurrency({
       columnValue: curCfg.mode === 'column' && curCfg.source ? record[curCfg.source] : undefined,
       headerHint: curCfg.mode === 'header' ? curCfg.value : undefined,
       rowText: amountRawText,
@@ -205,6 +211,13 @@ export function normalizeRecords(records, version, meta = {}) {
       if (!date) flags.push('unparseable_date');
       if (!amountResult.ok) flags.push('missing_amount');
     }
+
+    // P0-4 (PASS 4): the currency column held a three-letter token that is
+    // not a real ISO code - on an OCR'd statement that is a description word
+    // that drifted across ("LTD", "CIT"), and it used to be exported as the
+    // row's currency. currency.js has already fallen back to the statement
+    // currency; say so on the row rather than silently.
+    if (!skipped && unknownCode) flags.push('unknown_currency');
 
     // balance
     const balanceRaw = getSourceValue(record, fieldsCfg.balance?.source);
@@ -278,7 +291,8 @@ export function normalizeRecords(records, version, meta = {}) {
         const noDecimalAnomaly = fileMostlyHasDecimals && amountResult.minor % 100 === 0;
         const outlierAnomaly = fileMedianAbsMinor != null && fileMedianAbsMinor > 0
           && Math.abs(amountResult.minor) > fileMedianAbsMinor * OUTLIER_MULTIPLE;
-        if (retryDisagreed || noDecimalAnomaly || outlierAnomaly) {
+        const unreadable = amountConf < OCR_AMOUNT_CONFIDENCE_FLOOR;
+        if (retryDisagreed || noDecimalAnomaly || outlierAnomaly || unreadable) {
           flags.push('low_confidence_ocr');
           // Follow-up (2026-09-17): core/ocr.js's safety net (see
           // findAmountRetryCandidates/applyAmountRetryResults) stamps

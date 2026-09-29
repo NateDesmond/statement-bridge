@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { balanceCheck, countCheck, countCheckLabel, countCheckGrouped, groupedCountLabel, fileSummary, flagLabel, rowFlagLabel, diffGroupedExtraction, tagUnmatchedGroupedRows } from '../src/core/checks.js';
+import { balanceCheck, countCheck, countCheckLabel, countCheckGrouped, groupedCountLabel, fileSummary, flagLabel, rowFlagLabel, diffGroupedExtraction, tagUnmatchedGroupedRows, tagBalanceMismatches } from '../src/core/checks.js';
 import { groupItemsIntoLines, extractGroupedRows } from '../src/core/pdf.js';
 
 test('balanceCheck reconciles a clean sequence', () => {
@@ -313,4 +313,24 @@ test('rowFlagLabel falls back to flagLabel when the row has no hint, or for any 
   assert.equal(rowFlagLabel('low_confidence_ocr', { low_confidence_hint: null }), flagLabel('low_confidence_ocr'));
   assert.equal(rowFlagLabel('low_confidence_ocr', undefined), flagLabel('low_confidence_ocr'));
   assert.equal(rowFlagLabel('sign_unclear', { low_confidence_hint: 'irrelevant' }), flagLabel('sign_unclear'));
+});
+
+const bal = (amount, balance) => ({ amount, balance, flags: [] });
+const flagged = (rows) => rows.map((r) => r.flags.includes('balance_mismatch'));
+
+test('PASS-4 P0-4: tagBalanceMismatches flags the misread row in an oldest-first statement', () => {
+  const rows = [bal(-1000, 9000), bal(-54018, 3582), bal(2000, 5582)];
+  rows[1].amount = -24018; // OCR read 540.18 as 240.18
+  assert.deepEqual(flagged(tagBalanceMismatches(rows)), [false, true, false]);
+});
+
+test('PASS-4 P0-4: tagBalanceMismatches understands newest-first statements and stays quiet when they add up', () => {
+  // waldkonto shape: 14.09 -780 -> 1987.10, 10.09 +2345.67 -> 2767.10, 05.09 -112.40 -> 421.43
+  const rows = [bal(-78000, 198710), bal(234567, 276710), bal(-11240, 42143)];
+  assert.deepEqual(flagged(tagBalanceMismatches(rows)), [false, false, false]);
+});
+
+test('PASS-4 P0-4: tagBalanceMismatches ignores a column that is not a running balance', () => {
+  const rows = [bal(-100, 5000), bal(-200, 5000), bal(-300, 5000), bal(400, 5000)];
+  assert.deepEqual(flagged(tagBalanceMismatches(rows)), [false, false, false, false]);
 });

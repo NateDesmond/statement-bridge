@@ -452,7 +452,11 @@ const CURRENCY_ZERO_DECIMALS = new Set(['JPY', 'KRW', 'IDR', 'VND']);
 // same handful of phrases.
 // Page footers as OCR tends to read them: 'Page 1 of 3', 'Page 1/3', with or without trailing noise.
 const MONTH_ABBR_RE = /^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)$/i;
-const NON_TRANSACTION_LINE_RE = /^\s*page\s*[\dIlO]+\s*(?:of|\/|0f)\s*[\dIlO]+\b/i;
+// D1 (PASS 4): the page footer is not always alone on its line - a grouped
+// statement prints "Balance as of page 1: SGD 9500.00 Page 1 of 3" as one
+// line, which then became the next transaction's description. A "Page N of
+// M" ANYWHERE on a line makes it a page footer, not a transaction.
+const NON_TRANSACTION_LINE_RE = /\bpage\s*[\dIlO]+\s*(?:of|\/|0f)\s*[\dIlO]+\b/i;
 // "Ref: SB700001"-style reference lines are common banking vocabulary (not
 // tied to any one bank) and never a transaction amount on their own; a
 // reference number OCR'd with just enough digits to slip under
@@ -774,6 +778,18 @@ export function detectGroupedSignConvention(lines, customAmountRe) {
  * @param {{grouped?: {dateGroupPattern?:string, amountEndPattern?:string, trailingTypeLine?:boolean}, ignoreLinePatterns?:string[]}} pdfConfig
  * @returns {{date:string, description_raw:string, amount:string, currency:string, type:string}[]}
  */
+// D1 (PASS 4): "Amount: SGD -14.92" puts the field LABEL, not a
+// description, in front of the amount. A word ending in ":" immediately
+// before the amount is always a label ("Amount:", "Betrag:", "Total:"), so
+// drop it - both from the description AND from the "does this block carry an
+// inline description" test below, which decides whether the NEXT line is
+// this row's type line or the next transaction's merchant. Leaving it in ate
+// one merchant line per transaction.
+const TRAILING_FIELD_LABEL_RE = /(?:^|\s)[\p{L}][\p{L}\p{N}.\-]{0,23}:$/u;
+export function stripTrailingFieldLabel(text) {
+  return String(text).replace(TRAILING_FIELD_LABEL_RE, '').trim();
+}
+
 export function extractGroupedRows(lines, pdfConfig = {}) {
   const cfg = pdfConfig.grouped || {};
   const dateRe = cfg.dateGroupPattern ? new RegExp(cfg.dateGroupPattern) : DEFAULT_DATE_GROUP_RE;
@@ -832,7 +848,7 @@ export function extractGroupedRows(lines, pdfConfig = {}) {
       const amtItems = itemsForTextRange(line, amt.index, amt.length);
       const amtX = amtItems.length ? Math.min(...amtItems.map((it) => it.x)) : null;
       const { sign, unclear } = resolveGroupedSign(amt, amtX, signConvention, columnBands);
-      const inline = text.slice(0, amt.index).trim();
+      const inline = stripTrailingFieldLabel(text.slice(0, amt.index).trim());
       const descLines = inline ? [...pendingLines, inline] : pendingLines;
       current = {
         date: currentDate || '',

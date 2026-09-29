@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  scoreHeader, suggestMapping, suggestHeaderRow, suggestDateFormat,
+  scoreHeader, suggestMapping, suggestHeaderRow, suggestDateFormat, isDayMonthAmbiguous, bestDateFormat,
   suggestSignConvention, suggestNumberFormat,
   detectBankName, detectStatementType, detectCurrency, detectCountry,
   detectCrDrInSamples, suggestHeaderRowConfidence, suggestFooterRows,
@@ -253,4 +253,48 @@ test('Finding D1: suggestFooterRows never marks a real transaction row, and stop
     ['02/06/2026', 'Salary', '3000.00'],
   ];
   assert.deepEqual(suggestFooterRows(grid, 0), []);
+});
+
+// D2 (PASS 4): the short-row rule measures against the HEADER's width, so a
+// 12-column real bank export whose ordinary rows fill 5-6 cells flagged
+// every data row as a footer (5 of 5 here, 205 of 205 on a real file), and
+// the wizard then exported zero rows from a perfectly mapped statement.
+test('PASS-4 D2: suggestFooterRows finds no footer in a wide real-bank export whose rows all have a date and an amount', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { parseGrid } = await import('../src/core/csv.js');
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const text = fs.readFileSync(path.join(dir, 'fixtures', 'meridian_savings_real_export.csv'), 'utf-8');
+  const grid = await parseGrid(text);
+  const hRow = suggestHeaderRow(grid);
+  assert.equal(grid[hRow][0], 'Transaction Date');
+  assert.deepEqual(suggestFooterRows(grid, hRow), []);
+});
+
+// P1-a (PASS 4): 'Details' (DEBIT/CREDIT) and 'Description' both scored a
+// perfect header match and tied at confidence 0.92, so the leftmost column
+// won and every exported description read DEBIT or CREDIT.
+test('PASS-4 P1-a: a low-cardinality code column loses description_raw to the real narrative column', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { parseGrid } = await import('../src/core/csv.js');
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const grid = await parseGrid(fs.readFileSync(path.join(dir, 'fixtures', 'anchor_checking.csv'), 'utf-8'));
+  const hRow = suggestHeaderRow(grid);
+  const suggestions = suggestMapping(grid[hRow], grid.slice(hRow + 1, hRow + 6));
+  assert.equal(suggestions.find((s) => s.field === 'description_raw').source, 'Description');
+});
+
+test('PASS-4 P1-c: dates with day and month both <= 12 are flagged ambiguous', () => {
+  assert.equal(isDayMonthAmbiguous(['01/02/2026', '03/04/2026']), true);
+  assert.equal(isDayMonthAmbiguous(['13/02/2026', '03/04/2026']), false);
+  assert.equal(isDayMonthAmbiguous(['2026-02-01']), false);
+});
+
+test('PASS-4 P1-b: bestDateFormat names the format that reads the most rows', () => {
+  assert.deepEqual(bestDateFormat(['06/02/2026', '06/20/2026', '07/01/2026']), { format: 'MM/DD/YYYY', hits: 3, total: 3 });
+  assert.deepEqual(bestDateFormat(['31/01/2026', 'n/a', '']), { format: 'DD/MM/YYYY', hits: 1, total: 2 });
+  assert.equal(bestDateFormat(['hello']).format, null);
 });

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectCurrency, totalsPerCurrency, convertToTarget, formatBothDirections } from '../src/core/currency.js';
+import { detectCurrency, totalsPerCurrency, convertToTarget, formatBothDirections, isKnownCurrencyCode } from '../src/core/currency.js';
 
 test('detectCurrency prefers column over everything', () => {
   const r = detectCurrency({ columnValue: 'USD', headerHint: 'SGD', rowText: 'S$10', profileDefault: 'EUR' });
-  assert.deepEqual(r, { currency: 'USD', source: 'column' });
+  assert.deepEqual(r, { currency: 'USD', source: 'column', unknownCode: null });
 });
 
 test('detectCurrency falls back to header when no column', () => {
@@ -31,7 +31,7 @@ test('detectCurrency never guesses from bare dollar sign', () => {
 });
 
 test('detectCurrency returns null when nothing available', () => {
-  assert.deepEqual(detectCurrency({}), { currency: null, source: null });
+  assert.deepEqual(detectCurrency({}), { currency: null, source: null, unknownCode: null });
 });
 
 test('totalsPerCurrency groups by currency', () => {
@@ -106,4 +106,19 @@ test('D4: a per-month rate map missing one month blocks export for that pair', (
   assert.deepEqual(result.missingPairs, ['USD_SGD']);
   assert.equal(result.rows[0].converted_amount, -13000);
   assert.equal(result.rows[1].converted_amount, null);
+});
+
+
+// P0-4 (PASS 4): an OCR'd description word that drifted into the currency
+// column ("LTD", "CIT") used to be exported as the row's currency, because
+// any three capital letters were accepted.
+test('PASS-4 P0-4: a three-letter token that is not an ISO code never becomes the currency, and is reported back', () => {
+  const r = detectCurrency({ columnValue: 'LTD', profileDefault: 'SGD' });
+  assert.equal(r.currency, 'SGD');
+  assert.equal(r.source, 'profileDefault');
+  assert.equal(r.unknownCode, 'LTD');
+  assert.equal(detectCurrency({ columnValue: 'CIT', profileDefault: 'SGD' }).unknownCode, 'CIT');
+  assert.equal(detectCurrency({ columnValue: 'SGD', profileDefault: 'USD' }).currency, 'SGD');
+  assert.equal(isKnownCurrencyCode('sgd'), true);
+  assert.equal(isKnownCurrencyCode('LTD'), false);
 });

@@ -10,7 +10,7 @@
 import { formatMinor, formatMinorDisplay, parseAmount } from '../core/amount.js';
 import { parseDate } from '../core/date.js';
 import {
-  suggestMapping, suggestHeaderRow, suggestHeaderRowConfidence, suggestDateFormat,
+  suggestMapping, suggestHeaderRow, suggestHeaderRowConfidence, suggestDateFormat, isDayMonthAmbiguous, bestDateFormat,
   suggestSignConvention, suggestNumberFormat, suggestFooterRows,
   detectBankName, detectStatementType, detectCurrency, detectCountry, detectCrDrInSamples,
   isForeignAmountHeader, detectPendingPrefix,
@@ -199,6 +199,20 @@ export function linesAfterFirstDateGroup(lines) {
  * @param {object} [columnBands]
  * @param {number} [limit]
  */
+/**
+ * D3 (PASS 4): guess the date format from the column the mapping actually
+ * picked for `date`, not from column 0. On a header like
+ * `Details,Posting Date,Description,...` column 0 holds DEBIT/CREDIT, so the
+ * guess came back null, the day-first default stood, and `06/02/2026` was
+ * exported as 2026-02-06 with `06/20/2026` unreadable altogether.
+ * @param {{source:string, field:string}[]} mapping - one entry per grid column, in column order
+ * @param {string[][]} sampleRows
+ */
+export function suggestDateFormatForMapping(mapping, sampleRows) {
+  const dateCol = mapping.findIndex((m) => m.field === 'date');
+  return suggestDateFormat(sampleRows.map((r) => r[dateCol >= 0 ? dateCol : 0]));
+}
+
 export function groupedWholeFileSampleRows(allLines, signConvention, columnBands, limit = 3) {
   return extractPdfPagesRows(allLines, buildGroupedPdfConfig(signConvention, columnBands)).slice(0, limit);
 }
@@ -717,6 +731,21 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
       notice.textContent = 'We could not find the description column, so the descriptions are blank. Fix that first.';
       if (yesBtn) yesBtn.disabled = true;
       if (offBtn) offBtn.textContent = 'Fix the description column';
+    } else if (['DD/MM/YYYY', 'MM/DD/YYYY'].includes(state.dateFormat) && isDayMonthAmbiguous(rows.map((r) => r.date_raw))) {
+      // P1-c (PASS 4): every date here reads both ways, so the guess was a
+      // coin toss. Say so once, with the other reading one click away; Yes
+      // stays enabled because the rows themselves are right either way.
+      const dayFirst = state.dateFormat === 'DD/MM/YYYY';
+      notice.hidden = false;
+      notice.innerHTML = `These dates could be day-first or month-first. We read them as ${dayFirst ? 'day/month/year' : 'month/day/year'}. <a href="#" id="confirm-a-swap-dates">Read them as ${dayFirst ? 'month/day/year' : 'day/month/year'} instead</a>`;
+      $('#confirm-a-swap-dates').onclick = (e) => {
+        e.preventDefault();
+        state.dateFormat = dayFirst ? 'MM/DD/YYYY' : 'DD/MM/YYYY';
+        $('#w-dateformat').value = state.dateFormat;
+        renderConfirmA();
+      };
+      if (yesBtn) yesBtn.disabled = false;
+      if (offBtn) offBtn.textContent = "Something's off";
     } else {
       notice.hidden = true;
       if (yesBtn) yesBtn.disabled = false;
@@ -754,6 +783,7 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     const host = $('#confirm-focus-host');
     host.innerHTML = heading ? `<h2 class="section-title confirm-heading" tabindex="-1">${escapeHtml(heading)}</h2>` : '';
     state._confirmFocusKind = kind;
+    showFocusNote('');
     if (kind === 'locate') {
       host.appendChild($('#csv-header-picker'));
       host.appendChild($('#pdf-anchor-picker'));
@@ -788,8 +818,36 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     const livePreview = $('#confirm-focus-host .live-preview');
     const transformsHost = document.querySelector('#wizard-steps #step-2 .transforms-editor');
     if (livePreview && transformsHost) transformsHost.after(livePreview);
+    // P1-b (PASS 4): Done used to be a silent no-op when the chosen format
+    // still read no dates (renderConfirmA just reopened this screen). Say why,
+    // name the format that reads the most rows, and stay here.
+    if (state._confirmFocusKind === 'dates') {
+      const rows = tryComputeConfirmRows();
+      const dateFill = fieldFill(rows, (r) => r.date);
+      if (rows.length && dateFill < 0.5) {
+        const best = bestDateFormat(rows.map((r) => r.date_raw));
+        const read = rows.filter((r) => r.date).length;
+        const hint = best.format && best.format !== state.dateFormat ? ` Try ${best.format}, which reads ${best.hits} of ${best.total}.` : ' Check the header row if none of the formats fit.';
+        showFocusNote(`${state.dateFormat} reads ${read} of ${rows.length} dates.${hint}`);
+        $('#w-dateformat')?.focus();
+        return;
+      }
+    }
     state._confirmFocusKind = null;
     renderConfirmA();
+  }
+
+  function showFocusNote(text) {
+    let note = $('#confirm-focus-note');
+    if (!note) {
+      note = document.createElement('p');
+      note.id = 'confirm-focus-note';
+      note.className = 'confirm-notice';
+      note.setAttribute('role', 'status');
+      $('#confirm-focus-host').after(note);
+    }
+    note.hidden = !text;
+    note.textContent = text || '';
   }
 
   // --- Step 1: Basics ------------------------------------------------------
@@ -841,7 +899,10 @@ export function createWizard({ storage, onSaved, onOpenReport, onBack }) {
     // entry per header cell, in header order, so the array index IS the
     // column index to check against excludedColumns.
     state.mapping = rawMapping.filter((_, colIdx) => !state.excludedColumns.has(colIdx));
-    state.dateFormat = suggestDateFormat(sampleRows.map((r) => r[0])) || state.dateFormat;
+    // D3 (PASS 4): rawMapping, not state.mapping - state.mapping has the
+    // excluded columns filtered out, so its indices no longer line up with
+    // the grid's.
+    state.dateFormat = suggestDateFormatForMapping(rawMapping, sampleRows) || state.dateFormat;
     state.numberFormat = suggestNumberFormat(sampleRows.flat());
     state.signConvention = pickSignConvention(state.mapping, sampleRows);
     // Item e: a source whose sample descriptions carry a leading

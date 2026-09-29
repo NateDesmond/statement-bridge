@@ -1,6 +1,7 @@
 // Rule-based (no AI) mapping suggestions: header dictionary + value-shape scoring.
 
 import { parseAmount } from './amount.js';
+import { parseDate } from './date.js';
 
 // Corpus fix (2026-09-18): en/zh/ms are the three languages this dictionary
 // claims to support, but several common real-world terms were missing their
@@ -152,6 +153,13 @@ function isAmountLike(value) {
   const v = String(value ?? '').trim();
   if (v === '') return false;
   return parseAmount(v).minor != null;
+}
+
+/** A column whose many rows draw on a tiny set of repeated values (DEBIT/CREDIT, ACH_DEBIT/CHECK) - a category code, never a narrative description. */
+function looksLikeCategoryColumn(values) {
+  const filled = values.map((v) => String(v ?? '').trim()).filter(Boolean);
+  if (filled.length < 4) return false;
+  return new Set(filled).size <= 3;
 }
 
 function isCurrencyCodeLike(value) {
@@ -308,6 +316,13 @@ export function suggestMapping(header, sampleRows = []) {
           // outright instead of tying.
           shapeScore = values.filter(isAmountLike).length / values.length;
         } else if (field === 'currency') shapeScore = values.filter(isCurrencyCodeLike).length / values.length;
+        // P1-a (PASS 4): 'Details' and 'Description' both score headerScore 1
+        // and both took the flat 0.8 below, so the strict > kept whichever
+        // came first in header order - 'Details' (DEBIT/CREDIT) won, and
+        // every exported description read DEBIT or CREDIT. A narrative
+        // column is high-cardinality by nature; a column drawn from a tiny
+        // set of repeated codes is a category, not a description.
+        else if (field === 'description_raw' && looksLikeCategoryColumn(values)) shapeScore = 0.2;
         else shapeScore = 0.8;
       }
       const confidence = Math.min(1, headerScore * 0.6 + shapeScore * 0.4);
@@ -401,6 +416,14 @@ export function suggestFooterRows(grid, headerRowIdx) {
     if (!row || !row.length) return false;
     const filled = row.filter((c) => String(c ?? '').trim() !== '').length;
     if (filled === 0) return false;
+    // D2 (PASS 4): the "short row" rule below measures against the HEADER's
+    // width, so a wide real-bank export (12 columns, of which an ordinary
+    // transaction fills 5 or 6 - date, description, status, currency, one of
+    // debit/credit) tripped it on EVERY row, and the bottom-up scan then ate
+    // the whole table: 205 of 205 data rows pre-ticked as footers, exporting
+    // zero rows. A row carrying both a readable date and a readable amount
+    // is a transaction, whatever else it leaves blank - never a footer.
+    if (row.some(isDateLike) && row.some(isAmountLike)) return false;
     // Missing just one cell is normal for a real transaction row (a paired
     // debit/credit column always leaves the other one blank) - only a row
     // missing at least two cells against the header is short enough to be a
@@ -449,6 +472,23 @@ export function suggestDateFormat(values) {
   if (overFirst && !overSecond) return 'DD/MM/YYYY';
   if (overSecond && !overFirst) return 'MM/DD/YYYY';
   return 'DD/MM/YYYY'; // ambiguous default: day-first (more common outside the US)
+}
+
+/** Every numeric date has day and month both <= 12, so day-first and month-first read equally well and the guess is a coin toss. */
+export function isDayMonthAmbiguous(values) {
+  const slash = values.map((v) => String(v ?? '').trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.]\d{2,4}$/)).filter(Boolean);
+  return slash.length > 0 && slash.every((m) => +m[1] <= 12 && +m[2] <= 12);
+}
+
+/** The date format that reads the most of these raw values: { format, hits, total }. */
+export function bestDateFormat(values, opts = {}) {
+  const samples = values.filter((v) => v != null && String(v).trim() !== '');
+  let best = { format: null, hits: 0, total: samples.length };
+  for (const format of ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD MMM YYYY', 'DD MMM']) {
+    const hits = samples.filter((v) => parseDate(v, format, opts)).length;
+    if (hits > best.hits) best = { format, hits, total: samples.length };
+  }
+  return best;
 }
 
 /** Guess signConvention from a mapping: separate debit/credit columns imply debitCredit. */

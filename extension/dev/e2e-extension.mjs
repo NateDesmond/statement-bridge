@@ -951,6 +951,33 @@ async function runUnionExportScenario() {
 // run can be split into several sub-400s invocations without ever running
 // two at once - each name still launches its own fresh browser context in
 // sequence, same as running the whole file.
+async function runAmbiguousDatesScenario() {
+  console.log('\n=== scenario: every date reads both ways, confirm A offers the other reading (prefix ambigdates) ===');
+  const { context, page, pageErrors } = await launchExtensionContext();
+  const shotStep = shotter(page, 'ambigdates');
+  const fixture = path.join(extensionPath, 'test', 'fixtures', 'generic_ambiguous_dates.csv');
+  try {
+    await dropAndOpenWizard(page, fixture);
+    await shotStep('01-confirm-a');
+    const notice = await page.textContent('#confirm-a-notice').catch(() => '');
+    check('confirm A says the dates could be day-first or month-first', /day-first or month-first/.test(notice), notice);
+    const yesDisabled = await page.$eval('#confirm-yes', (b) => b.disabled);
+    check('Yes stays enabled', !yesDisabled, '');
+    const before = await page.$$eval('#confirm-a-preview tbody tr td:first-child', (tds) => tds.map((td) => td.textContent.trim()));
+    await page.click('#confirm-a-swap-dates');
+    await page.waitForTimeout(150);
+    await shotStep('02-after-swap');
+    const after = await page.$$eval('#confirm-a-preview tbody tr td:first-child', (tds) => tds.map((td) => td.textContent.trim()));
+    check('swapping the reading changes the previewed dates', before[0] === '10 Sep 2026' && after[0] === '9 Oct 2026', JSON.stringify({ before: before[0], after: after[0] }));
+    const notice2 = await page.textContent('#confirm-a-notice').catch(() => '');
+    check('the notice now offers day/month/year', /day\/month\/year instead/.test(notice2), notice2);
+    const cleanLog = await assertCleanLog(page, 'ambiguous dates (ambigdates)', pageErrors);
+    if (!cleanLog.ok) throw new Error(`ambigdates scenario: ${cleanLog.problems.join('; ')}`);
+  } finally {
+    await context.close();
+  }
+}
+
 const SCENARIOS = {
   map2: runMapFieldsScenario,
   map3: runFlagResolutionScenario,
@@ -962,6 +989,7 @@ const SCENARIOS = {
   confirmocr: runConfirmOcrYesScenario,
   firsttimerpdf: runFirstTimerUnknownPdfScenario,
   firsttimerde: runFirstTimerGermanCsvScenario,
+  ambigdates: runAmbiguousDatesScenario,
   setup: runConfirmScreensGalleryScenario,
   range: runManualRangeScenario,
   union2: runUnionExportScenario,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   seedMappingFromVersion, signConventionWarnings, slugify,
   buildGroupedPdfConfig, groupedWholeFileSampleRows, applyTestResolutions,
-  computeStepValid, computeStepReason, classifyGroupedPreviewLines,
+  computeStepValid, computeStepReason, classifyGroupedPreviewLines, suggestDateFormatForMapping,
   linesAfterFirstDateGroup, createWizard,
 } from '../src/ui/wizard.js';
 import { groupItemsIntoLines, extractGroupedRows, detectGroupedSignConvention } from '../src/core/pdf.js';
@@ -352,4 +352,33 @@ test('buildVersionFromWizard builds a grouped-rowModel pdf version, forcing sign
   assert.equal(version.fields.date.source, 'date');
   assert.equal(version.fields.amount.source, 'amount');
   assert.equal(version.signConvention, 'signed');
+});
+
+// D3 (PASS 4): suggestDateFormat was fed column 0 instead of the mapped date
+// column. On anchor_checking.csv (header `Details,Posting Date,...`) column 0
+// is DEBIT/CREDIT, so the guess was null, the day-first default stood, and
+// 06/02, 06/05, 06/12 came out transposed while 06/20/2026 never parsed.
+test('PASS-4 D3: the date format is guessed from the mapped date column, so anchor_checking dates are MM/DD/YYYY and not transposed', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { parseGrid } = await import('../src/core/csv.js');
+  const { suggestMapping, suggestHeaderRow } = await import('../src/core/suggest.js');
+  const { parseDate } = await import('../src/core/date.js');
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const grid = await parseGrid(fs.readFileSync(path.join(dir, 'fixtures', 'anchor_checking.csv'), 'utf-8'));
+  const hRow = suggestHeaderRow(grid);
+  const header = grid[hRow];
+  const sampleRows = grid.slice(hRow + 1, hRow + 6);
+  const byHeader = {};
+  for (const m of suggestMapping(header, sampleRows)) { if (!(m.source in byHeader)) byHeader[m.source] = m.field; }
+  const mapping = header.map((h) => ({ source: h, field: byHeader[h] || '' }));
+
+  const format = suggestDateFormatForMapping(mapping, sampleRows);
+  assert.equal(format, 'MM/DD/YYYY');
+  const dateCol = mapping.findIndex((m) => m.field === 'date');
+  assert.deepEqual(
+    sampleRows.map((r) => parseDate(r[dateCol], format)),
+    ['2026-06-02', '2026-06-05', '2026-06-12', '2026-06-20'],
+  );
 });

@@ -20,6 +20,8 @@ export const FLAG_LABELS = {
   sign_unclear: 'Direction unconfirmed, check against the page',
   pending: 'Pending, not yet posted',
   unmatched_line: 'Could not match to a line on the page',
+  unknown_currency: 'Currency not recognised, using the statement currency',
+  balance_mismatch: 'Amount may be misread, the balance does not add up',
 };
 
 /** flagLabel('unparseable_date') -> 'Date could not be read'; an id with no entry above shows as-is rather than disappearing. */
@@ -82,6 +84,46 @@ export function balanceCheck(rows, opts = {}) {
   }
 
   return { opening: opening ?? null, closing, total, reconciles, firstFailingRow };
+}
+
+/**
+ * P0-4 (PASS 4): an OCR'd digit misread into a plausible number
+ * (-540.18 read as -240.18) passes every other check silently - but the
+ * statement's own balance column does not lie. Where a row's stated balance
+ * is not the previous stated balance plus this row's amount, the amount (or
+ * the balance) was misread: flag THAT row, rather than balanceCheck's
+ * single "first failing row" summary, which says nothing per row and stops
+ * at the first break.
+ *
+ * Only consecutive rows that both carry a balance are compared, so a
+ * statement with no balance column, or one row missing its balance, is never
+ * flagged for it. Rows are compared in the order given (statement order).
+ * @param {object[]} rows - normalized rows, mutated in place
+ * @returns {object[]} the same rows
+ */
+export function tagBalanceMismatches(rows) {
+  const live = (rows || []).filter((r) => !r.skipped && r.balance != null && r.amount != null);
+  // Pairs of consecutive balance-carrying rows, read both ways: oldest-first
+  // (this balance = previous balance + this amount) and newest-first (previous
+  // balance = this balance + previous amount). Whichever reading fits the
+  // most pairs is the statement's order; if neither fits at least half, the
+  // column is not a running balance (an available balance, say) and nothing
+  // is flagged.
+  const pairs = [];
+  for (let i = 1; i < live.length; i++) pairs.push([live[i - 1], live[i]]);
+  if (!pairs.length) return rows;
+  const asc = pairs.map(([a, b]) => a.balance + b.amount === b.balance);
+  const desc = pairs.map(([a, b]) => b.balance + a.amount === a.balance);
+  const count = (arr) => arr.filter(Boolean).length;
+  const fits = count(asc) >= count(desc) ? asc : desc;
+  if (count(fits) * 2 < pairs.length) return rows;
+  const culprit = fits === asc ? (pair) => pair[1] : (pair) => pair[0];
+  pairs.forEach((pair, i) => {
+    if (fits[i]) return;
+    const row = culprit(pair);
+    if (!row.flags.includes('balance_mismatch')) row.flags.push('balance_mismatch');
+  });
+  return rows;
 }
 
 /**

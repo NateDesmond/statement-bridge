@@ -66,3 +66,19 @@ for (const { name, expectRowModel } of FIXTURES) {
     assert.equal(extras.length, 0, `no extra/phantom rows (found ${extras.length}: ${JSON.stringify(extras.map((r) => ({ date: r.date, amount: r.amount })))})`);
   });
 }
+
+// D1 (PASS 4): "Amount: SGD -14.92" left the field label "Amount:" as the
+// whole description and, because that label read as an inline description,
+// ate the NEXT transaction's merchant line as this row's `type`. 0 of 32
+// descriptions were right before the fix.
+test('PASS-4 D1: worstcase_grouped_3line descriptions are merchants, with no field label, no borrowed merchant and no page footer', async () => {
+  const { truth, rows } = await measure('worstcase_grouped_3line');
+  const merchants = new Set(truth.map((t) => t.description));
+  for (const r of rows) {
+    assert.ok(merchants.has(r.description_raw), `description is a merchant, got ${JSON.stringify(r.description_raw)}`);
+    const type = r.original?.type || '';
+    assert.ok(!/Amount:/i.test(type), `no field label in type, got ${JSON.stringify(type)}`);
+    assert.ok(!merchants.has(type), `no other row's merchant in type, got ${JSON.stringify(type)}`);
+    assert.ok(!/Balance as of|Page \d+ of/i.test(type), `no footer text in type, got ${JSON.stringify(type)}`);
+  }
+});

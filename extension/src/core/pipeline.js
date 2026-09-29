@@ -17,7 +17,7 @@
 import { extractPdfPagesRows } from './pdf.js';
 import { applyProfileVersion } from './csv.js';
 import { normalizeRecords } from './normalize.js';
-import { tagUnmatchedGroupedRows } from './checks.js';
+import { tagUnmatchedGroupedRows, tagBalanceMismatches } from './checks.js';
 
 /**
  * @param {{type:'csv'|'xlsx'|'pdf', name:string, ocr?:boolean, grid?:string[][]}} entry
@@ -46,5 +46,9 @@ export function buildFileRows(entry, source, version, metaOverrides = {}) {
   if (entry.type === 'pdf' && version.pdf?.rowModel === 'grouped' && source?.pagesLines) {
     tagUnmatchedGroupedRows(rows, source.pagesLines, version.pdf);
   }
+  // P0-4: wherever the statement prints a running balance, a row whose
+  // amount does not reconcile against it is flagged - the only check that
+  // catches an OCR digit misread into a plausible number.
+  tagBalanceMismatches(rows);
   return rows;
 }
