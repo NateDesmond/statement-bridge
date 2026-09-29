@@ -27,7 +27,7 @@ export const REPORT_VERSION = 2;
 // A single constant so it is easy to find and swap. A role address
 // (support@, help@) is preferable to a personal mailbox before this ships
 // on a public listing - it goes out in every report's mailto: forever.
-export const SUPPORT_EMAIL = 'nate@natedesmond.com';
+export const SUPPORT_EMAIL = 'alex@urbanalgorithm.com';
 
 // Hard ceiling for the whole mailto: URL. Mail clients and browsers
 // truncate long mailto URLs silently and at inconsistent limits; staying
