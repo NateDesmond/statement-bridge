@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCsv, buildTsv, suggestFilename, preExportSummary, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, unionPreset, isUnionPresetColumns, fieldValue } from '../src/core/export.js';
+import { buildCsv, buildTsv, suggestFilename, preExportSummary, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, unionPreset, isUnionPresetColumns, fieldValue, LAYOUT_PRESETS, AVAILABLE_FIELDS, BLANK_FIELD, CONST_FIELD, isValuelessField } from '../src/core/export.js';
 import { convertToTarget } from '../src/core/currency.js';
 
 const rows = [
@@ -240,4 +240,71 @@ test('fieldValue money_out/money_in split by the internal sign, never both non-e
   assert.equal(fieldValue(out, 'money_in', {}), '');
   assert.equal(fieldValue(inRow, 'money_out', {}), '');
   assert.equal(fieldValue(inRow, 'money_in', {}), '5000.00');
+});
+
+// --- EXPORT-AND-DUPES part 2: blank/fixed-text columns, renames, Everything ---
+
+test('rule 5: the Everything layout is exactly the field catalog, with no blank or fixed-text column in it', () => {
+  const everything = LAYOUT_PRESETS.find((l) => l.key === 'everything');
+  assert.deepEqual(everything.columns.map((c) => c.field), AVAILABLE_FIELDS.map((f) => f.field));
+  assert.deepEqual(everything.columns.map((c) => c.name), AVAILABLE_FIELDS.map((f) => f.name));
+  for (const f of ['post_date', 'reference', 'type', 'orig_amount', 'orig_currency', 'source_file', 'source_page', 'source_line', 'profile_version']) {
+    assert.ok(everything.columns.some((c) => c.field === f), `Everything is missing ${f}`);
+  }
+  assert.ok(!everything.columns.some((c) => isValuelessField(c.field)));
+});
+
+test('rule 3: a blank column exports as an empty cell, a fixed-text column repeats its value down every row', () => {
+  const preset = {
+    columns: [
+      { field: 'date', name: 'date' },
+      { field: BLANK_FIELD, name: 'plaid_account_id' },
+      { field: CONST_FIELD, name: 'asset_id', value: 'SC_Rach' },
+    ],
+    dateFormat: 'YYYY-MM-DD', signConvention: 'signed', headerRow: true,
+  };
+  const lines = buildCsv(rows, preset).split('\r\n');
+  assert.equal(lines[0], 'date,plaid_account_id,asset_id');
+  assert.equal(lines[1], '2026-06-01,,SC_Rach');
+  assert.equal(lines[2], '2026-06-15,,SC_Rach');
+});
+
+test('rule 3: fieldValue reads a fixed-text value off the column, not the row, and a missing value is still empty', () => {
+  assert.equal(fieldValue(rows[0], CONST_FIELD, DEFAULT_PRESET, { field: CONST_FIELD, name: 'asset_id', value: 'SC_Rach' }), 'SC_Rach');
+  assert.equal(fieldValue(rows[0], CONST_FIELD, DEFAULT_PRESET, { field: CONST_FIELD, name: 'asset_id' }), '');
+  assert.equal(fieldValue(rows[0], CONST_FIELD, DEFAULT_PRESET), '');
+  assert.equal(fieldValue(rows[0], BLANK_FIELD, DEFAULT_PRESET, { field: BLANK_FIELD, name: 'notes' }), '');
+});
+
+test('rule 3: a fixed-text value containing the delimiter is quoted like any other cell', () => {
+  const preset = { columns: [{ field: CONST_FIELD, name: 'tag', value: 'a,b' }], dateFormat: 'YYYY-MM-DD', signConvention: 'signed', headerRow: true };
+  assert.equal(buildCsv([rows[0]], preset).split('\r\n')[1], '"a,b"');
+  assert.equal(buildTsv([rows[0]], preset).split('\r\n')[1], 'a,b');
+});
+
+test('rule 4/8: a renamed header is what Copy for Sheets writes, and rule 9 target layout produces Nate\'s exact TSV header', () => {
+  const preset = {
+    columns: [
+      { field: 'date', name: 'date' },
+      { field: 'description_raw', name: 'payee' },
+      { field: 'amount', name: 'amount' },
+      { field: 'currency', name: 'currency' },
+      { field: BLANK_FIELD, name: 'plaid_account_id' },
+      { field: 'account_label', name: 'asset_id' },
+      { field: BLANK_FIELD, name: 'notes' },
+    ],
+    dateFormat: 'YYYY-MM-DD', signConvention: 'signed', headerRow: true,
+  };
+  const row = { date: '2026-09-01', description_raw: 'BONUS INTEREST (SALARY)', amount: 4766, currency: 'sgd', account_label: 'SC_Rach' };
+  const lines = buildTsv([row], preset).split('\r\n');
+  assert.equal(lines[0], 'date\tpayee\tamount\tcurrency\tplaid_account_id\tasset_id\tnotes');
+  assert.equal(lines[1], '2026-09-01\tBONUS INTEREST (SALARY)\t47.66\tsgd\t\tSC_Rach\t');
+});
+
+test('rule 3: two blank columns keep their own separate headers (the target layout needs two)', () => {
+  const preset = {
+    columns: [{ field: BLANK_FIELD, name: 'plaid_account_id' }, { field: BLANK_FIELD, name: 'notes' }],
+    dateFormat: 'YYYY-MM-DD', signConvention: 'signed', headerRow: true,
+  };
+  assert.equal(buildCsv([rows[0]], preset).split('\r\n')[0], 'plaid_account_id,notes');
 });

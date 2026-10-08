@@ -892,35 +892,75 @@ table.raw-grid td.raw-col-excluded{color:#b9b3a0;background:#f5f3ec;text-decorat
 .danger-confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .danger-confirm input{font-family:inherit;font-size:12.5px;padding:8px 10px;border-radius:5px;border:1px solid #e3bcb0;width:140px;}
 
-/* --------- Home/Settings: column layout (REBUILD-HOME item 7, 2026-09-18) --------- */
-/* Six layout radio cards, each with a name, a one-line description, and a
-   tiny strip naming its columns - replaces the old dropdown + checkbox list. */
-.layout-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
-.layout-card{
-  display:flex;flex-direction:column;gap:4px;text-align:left;font:inherit;
-  border:1px solid var(--paper-line);border-radius:var(--radius);padding:12px 14px;
-  background:#fff;cursor:pointer;min-width:0;
-}
-.layout-card.active{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass);}
-.layout-card-name{font-size:13px;font-weight:600;}
-.layout-card-desc{font-size:11.5px;color:var(--ink-dim);}
-.layout-card-strip{font-size:10.5px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* --------- Home: the export column builder (EXPORT-AND-DUPES part 2) ---------
+   One calm panel: a "Start from" select, the export as a horizontal row of
+   column cards (header, one real sample value, a drag handle, an x), "Add a
+   column", then one row of format options. Replaces the old radio-card grid
+   and the pill row whose HTML5 drag never worked. */
+.builder-row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;margin-bottom:22px;}
+.builder-options-row{margin-top:26px;margin-bottom:0;}
+.picker-group-toggle{padding-bottom:9px;}
 
-/* "Customise": collapsed by default, one row of toggle pills for whichever
-   columns actually have data this session - click toggles, double-click
-   renames in place, drag reorders. */
-.columns-customise{margin-bottom:14px;}
-.columns-customise summary{cursor:pointer;font-size:12.5px;color:var(--ink-dim);padding:6px 0;}
-.column-pill-row{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;}
-.column-pill{
-  display:inline-flex;align-items:center;border:1px solid var(--paper-line);border-radius:100px;
-  padding:6px 12px;font-size:12px;background:#fff;color:var(--ink-dim);cursor:grab;
+/* One card per exported column, left to right in export order. */
+.column-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+.column-card{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:5px 8px;
+  border:1px solid var(--paper-line);border-radius:var(--radius);background:#fff;
+  padding:9px 10px 10px;min-width:120px;max-width:230px;
 }
-.column-pill.enabled{background:var(--ink-800);color:var(--ink-text);border-color:var(--ink-800);}
-.column-pill-label[contenteditable="true"]{outline:none;border-bottom:1px dashed currentColor;cursor:text;}
-/* Item 6 (NO-TEMPLATES): a partial-coverage column ("2 of 3 statements") gets
-   a small badge on its pill - unobtrusive, but visible without a hover. */
-.column-pill-coverage{margin-left:5px;font-size:9.5px;opacity:0.75;font-weight:600;}
+.column-card.dragging{border-color:var(--brass);box-shadow:0 4px 14px rgba(13,26,23,.16);}
+.cc-handle{
+  appearance:none;border:none;background:none;margin:0;padding:0 2px;cursor:grab;
+  color:var(--ink-dim);font-size:13px;line-height:1;touch-action:none;
+}
+.cc-handle:active{cursor:grabbing;}
+/* Both the header and (for a fixed-text column) the value are click-to-edit,
+   so both carry the same dashed-underline-on-edit affordance. */
+.cc-name{font-size:12.5px;font-weight:600;color:var(--ink);cursor:text;overflow-wrap:anywhere;}
+.cc-name[contenteditable="true"]{outline:none;border-bottom:1px dashed var(--brass);}
+.cc-coverage{margin-left:4px;font-size:9.5px;font-weight:600;color:var(--ink-dim);}
+.cc-remove{appearance:none;border:none;background:none;margin:0;padding:0 2px;cursor:pointer;color:var(--ink-dim);font-size:15px;line-height:1;}
+.cc-remove:hover{color:var(--danger);}
+.cc-sample{grid-column:2/4;font-size:11px;color:var(--ink-dim);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.cc-sample-empty{font-style:italic;opacity:.75;}
+.cc-sample-editable{cursor:text;border-bottom:1px dashed var(--paper-line);}
+.cc-sample-editable[contenteditable="true"]{outline:none;border-bottom-color:var(--brass);}
+
+/* "Add a column": a native disclosure holding every field this app can
+   produce, grouped, each with its own sample value from the first row. */
+.add-column-summary{cursor:pointer;display:inline-block;font-size:12.5px;font-weight:600;color:var(--ink);padding:6px 0;}
+.add-column-summary:hover{color:var(--brass);}
+.add-column-menu{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:18px 24px;
+  border:1px solid var(--paper-line);border-radius:var(--radius);background:var(--paper);
+  padding:16px 18px;margin-top:10px;
+}
+.acm-group-label{margin:0 0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);}
+.acm-item{
+  display:block;width:100%;text-align:left;font:inherit;appearance:none;cursor:pointer;
+  background:#fff;border:1px solid var(--paper-line);border-radius:5px;padding:6px 9px;margin-bottom:6px;
+}
+.acm-item:hover:not(:disabled){border-color:var(--brass);}
+.acm-item:disabled{cursor:default;opacity:.55;}
+.acm-name{display:block;font-size:12px;font-weight:600;color:var(--ink);}
+.acm-sample{display:block;font-size:10.5px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.acm-const{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:#fff;border:1px solid var(--paper-line);border-radius:5px;padding:8px 9px;}
+.acm-const .acm-name{flex-basis:100%;}
+.acm-const input{font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--paper-line);border-radius:5px;width:86px;}
+
+/* Rule 6: date range, accounts, source columns and currency conversion sit
+   behind one collapsed disclosure, so the sheet opens on the columns alone. */
+.more-options{margin-top:26px;}
+.more-options > summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-dim);padding:8px 0;}
+.more-options > summary:hover{color:var(--ink);}
+.more-options[open] > summary{margin-bottom:14px;}
+
+/* Rule 1: "Edit columns" sits on the preview caption's own line, and the
+   preview's table header is a second handle for the same builder. */
+.preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.preview-head .preset-preview-caption{margin:12px 0 4px;}
+.preview-head-clickable{cursor:pointer;}
+.preview-head-clickable:hover th{color:var(--brass);}
 /* Item 4: the date format picker's live example, right next to its select. */
 .pg-example{display:block;margin-top:4px;font-size:11px;color:var(--ink-dim);}
 .money-direction-note{margin-top:10px;grid-column:1/-1;}

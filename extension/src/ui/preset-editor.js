@@ -4,7 +4,10 @@
 // header row pickers, and a live 2-sample-row preview. Used by the Settings
 // screen and the Home "Change" drawer.
 
-import { fieldValue, formatDateOut, DATE_FORMATS, LAYOUT_PRESETS, visibleColumns as exportVisibleColumns } from '../core/export.js';
+import {
+  fieldValue, formatDateOut, DATE_FORMATS, LAYOUT_PRESETS, visibleColumns as exportVisibleColumns,
+  FIELD_GROUPS, STANDARD_FIELDS, SOURCE_FIELDS, AVAILABLE_FIELDS, BLANK_FIELD, CONST_FIELD, isValuelessField,
+} from '../core/export.js';
 import { groupPlainNumber } from '../core/amount.js';
 
 // Fields whose export value is a plain number and reads better grouped
@@ -54,41 +57,14 @@ const PLACEHOLDER_ROWS = [
 
 function escapeHtml(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
-// Standard fields every row can carry, regardless of source file type or
-// currency mode. Mode B's three (fx_rate/converted_amount/converted_currency)
-// are listed unconditionally too - a column with nothing to show just
-// previews empty, same as any other field on a file that doesn't set it.
-export const STANDARD_FIELDS = [
-  { field: 'date', name: 'Date' },
-  { field: 'post_date', name: 'Posting date' },
-  { field: 'description_raw', name: 'Description' },
-  { field: 'amount', name: 'Amount' },
-  { field: 'money_out', name: 'Money out' },
-  { field: 'money_in', name: 'Money in' },
-  { field: 'currency', name: 'Currency' },
-  { field: 'balance', name: 'Balance' },
-  { field: 'account_label', name: 'Account' },
-  { field: 'bank', name: 'Bank' },
-  { field: 'statement_type', name: 'Statement type' },
-  { field: 'reference', name: 'Reference' },
-  { field: 'orig_amount', name: 'Original amount' },
-  { field: 'orig_currency', name: 'Original currency' },
-  { field: 'fx_rate', name: 'FX rate' },
-  { field: 'converted_amount', name: 'Converted amount' },
-  { field: 'converted_currency', name: 'Target currency' },
-  { field: 'flags', name: 'Flags' },
-];
+// The one FIELD_GROUPS group the session's own extra_* columns belong to:
+// they are literally columns from the imported files.
+const SOURCE_GROUP_LABEL = 'Source columns from the imported files';
 
-// Source-trace columns: where a row actually came from.
-export const SOURCE_FIELDS = [
-  { field: 'source_file', name: 'File' },
-  { field: 'source_page', name: 'Page' },
-  { field: 'source_line', name: 'Line' },
-  { field: 'profile_version', name: 'Setup version' },
-];
-
-/** Back-compat flat list (addColumn's default-name lookup, older callers). */
-export const AVAILABLE_FIELDS = [...STANDARD_FIELDS, ...SOURCE_FIELDS];
+// Part 2 rule 3/5: the field catalog now lives in core/export.js (next to
+// DATE_FORMATS), so the "Everything" layout can be derived from it instead of
+// hand-kept. Re-exported here for every existing caller and test.
+export { FIELD_GROUPS, STANDARD_FIELDS, SOURCE_FIELDS, AVAILABLE_FIELDS };
 
 /** "extra_statement_code" -> "Statement Code". */
 export function humanizeExtraField(field) {
@@ -124,17 +100,27 @@ export function newPreset(name = 'New column layout') {
   return { name, columns: [], dateFormat: 'YYYY-MM-DD', signConvention: 'signed', headerRow: true };
 }
 
-export function addColumn(preset, field, name) {
-  if (preset.columns.some((c) => c.field === field)) return preset; // already present, no-op
+export function addColumn(preset, field, name, value) {
+  // A blank or fixed-text column is a thing the user adds, not a field of the
+  // data - Nate's target shape needs TWO blanks (plaid_account_id, notes), so
+  // these are the one column kind that may legitimately repeat (rule 3).
+  if (!isValuelessField(field) && preset.columns.some((c) => c.field === field)) return preset;
   const meta = AVAILABLE_FIELDS.find((f) => f.field === field);
-  const columns = [...preset.columns, { field, name: name || meta?.name || field, enabled: true }];
-  return { ...preset, columns };
+  const column = { field, name: name || meta?.name || field, enabled: true };
+  if (field === CONST_FIELD) column.value = value ?? '';
+  return { ...preset, columns: [...preset.columns, column] };
+}
+
+/** The constant a `const` column writes down every row (rule 3). */
+export function setColumnValue(preset, index, value) {
+  return { ...preset, columns: preset.columns.map((c, i) => (i === index ? { ...c, value } : c)) };
 }
 
 /** Drop later duplicates of a field, keeping the first occurrence's position. */
 export function dedupeColumns(columns) {
   const seen = new Set();
   return columns.filter((c) => {
+    if (isValuelessField(c.field)) return true; // repeats are the point (rule 3)
     if (seen.has(c.field)) return false;
     seen.add(c.field);
     return true;
@@ -367,10 +353,10 @@ let instanceCounter = 0;
  */
 export function renderPresetEditor({ container, preset, sampleRows = [], profiles = [], fileGroups, previewRows, previewPreset, onChange, tableOnly = false, showPreview = true, flaggedRowIds = null }) {
   // The container is fully re-rendered on every edit (a controlled
-  // component, like review.js) - remember whether Customise was left open so
-  // toggling a pill or reordering columns doesn't collapse it back closed
-  // out from under the person doing it.
-  const wasCustomiseOpen = container.querySelector('.columns-customise')?.open ?? false;
+  // component, like review.js) - remember whether the Add a column menu was
+  // left open, so adding one column doesn't collapse the menu back closed
+  // out from under someone adding three.
+  const wasAddMenuOpen = container.querySelector('.add-column')?.open ?? false;
   container.innerHTML = '';
   if (!container.dataset.presetEditorId) container.dataset.presetEditorId = `pe${instanceCounter++}`;
   const uid = container.dataset.presetEditorId;
@@ -380,185 +366,330 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
   // one synthetic group over all the sample rows it does have.
   const groups = fileGroups || (sampleRows.length ? [{ label: 'This session', rows: sampleRows }] : []);
 
-  const extraFields = collectExtraFields(sampleRows, profiles);
-  const allFields = [...STANDARD_FIELDS, ...SOURCE_FIELDS, ...extraFields];
-  const byPresetIndex = new Map(preset.columns.map((c, i) => [c.field, i]));
-
   // tableOnly (Simple B's Home result table): skip every column-editing
-  // control below (the layout cards, Customise, the date/money-direction
-  // pickers, the header-row toggle) - straight to the live preview table at
-  // the end of this function.
+  // control below (Start from, the column cards, Add a column, the format
+  // row) - straight to the live preview table at the end of this function.
   if (tableOnly) {
     renderPreviewOnly({ container, previewRows, previewPreset: previewPreset || preset, sampleRows, tableOnly: true, flaggedRowIds });
     return;
   }
 
-  // Item 7: six layout radio cards replace the old saved-preset dropdown.
-  // Picking one resets `columns` to that layout's own shape (see
-  // applyLayoutPreset) - Customise below is what re-personalises it.
+  // ---- Part 2 rule 6: "Start from" -------------------------------------
+  // One select replaces the six radio cards. Picking a layout resets
+  // `columns` to that layout's own shape (applyLayoutPreset); "Custom" only
+  // appears once the columns no longer match any layout, and is the selected
+  // option then, so the control never lies about what is on screen.
   const activeLayoutKey = matchLayoutKey(preset);
-  const cardGrid = document.createElement('div');
-  cardGrid.className = 'layout-cards';
-  cardGrid.setAttribute('role', 'radiogroup');
-  cardGrid.setAttribute('aria-label', 'Column layout');
-  for (const layout of LAYOUT_PRESETS) {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = `layout-card${layout.key === activeLayoutKey ? ' active' : ''}`;
-    card.setAttribute('role', 'radio');
-    card.setAttribute('aria-checked', String(layout.key === activeLayoutKey));
-    card.innerHTML = `
-      <span class="layout-card-name">${escapeHtml(layout.name)}</span>
-      <span class="layout-card-desc">${escapeHtml(layout.description)}</span>
-      <span class="layout-card-strip">${escapeHtml(layout.columns.map((c) => c.name).join(', '))}</span>`;
-    card.onclick = () => onChange(applyLayoutPreset(preset, layout.key));
-    cardGrid.appendChild(card);
+  const startRow = document.createElement('div');
+  startRow.className = 'builder-row';
+  startRow.innerHTML = `
+    <div class="picker-group"><label class="pg-label" for="${uid}-startfrom">Start from</label>
+      <select id="${uid}-startfrom" data-test="start-from">
+        ${activeLayoutKey ? '' : '<option value="">Custom</option>'}
+        ${LAYOUT_PRESETS.map((l) => `<option value="${l.key}">${escapeHtml(l.name)}</option>`).join('')}
+      </select></div>`;
+  const startSelect = startRow.querySelector('select');
+  startSelect.value = activeLayoutKey || '';
+  startSelect.addEventListener('change', (e) => { if (e.target.value) onChange(applyLayoutPreset(preset, e.target.value)); });
+  container.appendChild(startRow);
+
+  // ---- Part 2 rule 2: "Your columns" ----------------------------------
+  // The export, left to right, as one card per column: its header name
+  // (click to rename, rule 4), one real sample value from the first row
+  // underneath it, a drag handle and an x. No enabled/disabled split any
+  // more - a column is either in the export or removed.
+  // Only columns that actually export are shown: a legacy preset's
+  // enabled:false column is dropped from the export by activeColumns, so
+  // showing a card for it would be a card that does nothing.
+  const visibleIndices = preset.columns.map((c, i) => (c.enabled === false ? -1 : i)).filter((i) => i >= 0);
+  const sampleRow = (Array.isArray(previewRows) && previewRows[0]) || sampleRows[0] || PLACEHOLDER_ROWS[0];
+  const sampleFor = (column) => {
+    if (column.field === BLANK_FIELD) return '';
+    if (column.field.startsWith('original.')) return sampleRow?.original?.[column.field.slice(9)] ?? '';
+    return fieldValue(sampleRow || {}, column.field, preset, column);
+  };
+
+  /** Click-to-edit one piece of text in place; commit on blur or Enter, revert on Escape. */
+  function inlineEdit(el, current, commit) {
+    el.contentEditable = 'true';
+    el.focus();
+    document.execCommand('selectAll', false, undefined);
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      el.contentEditable = 'false';
+      const value = el.textContent.trim();
+      if (save && value && value !== current) commit(value);
+      else el.textContent = current;
+    };
+    el.addEventListener('blur', () => finish(true), { once: true });
+    el.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); el.blur(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); el.blur(); }
+    });
   }
-  container.appendChild(cardGrid);
 
-  // Item 7: "Customise" is collapsed by default and lists ONLY columns that
-  // actually have data this session (or, with no live session, whatever
-  // fieldCoverage's sample-row fallback finds) - never a field with nothing
-  // to show. One row of toggle pills: click toggles the column on/off,
-  // double-click renames it in place, drag reorders it - replaces both the
-  // old reorderable enabled list and the disabled checklist with one control.
-  const availableFields = allFields.filter((f) => fieldCoverage(f.field, groups).kind !== 'none');
-  // Columns already on the preset keep their place even if (edge case) their
-  // field lost its only source of data since being enabled - a customisation
-  // never silently disappears out from under the person who made it.
-  const pillFields = [...preset.columns, ...availableFields.filter((f) => !byPresetIndex.has(f.field))];
+  const columnsLabel = document.createElement('h2');
+  columnsLabel.className = 'section-title';
+  columnsLabel.textContent = 'Your columns';
+  container.appendChild(columnsLabel);
 
-  const details = document.createElement('details');
-  details.className = 'columns-customise';
-  details.open = wasCustomiseOpen;
-  const summary = document.createElement('summary');
-  summary.textContent = 'Customise';
-  details.appendChild(summary);
+  const cardList = document.createElement('div');
+  cardList.className = 'column-cards';
+  cardList.setAttribute('role', 'list');
+  cardList.setAttribute('aria-label', 'Export columns, in order');
 
   const groupsWithRows = groups.filter((g) => g.rows?.length);
-  const pillRow = document.createElement('div');
-  pillRow.className = 'column-pill-row';
-  let dragFromField = null;
-  pillFields.forEach((f) => {
-    const idx = byPresetIndex.get(f.field);
-    const enabled = idx != null && preset.columns[idx].enabled !== false;
-    const name = idx != null ? preset.columns[idx].name : f.name;
 
-    const pill = document.createElement('span');
-    pill.className = `column-pill${enabled ? ' enabled' : ''}`;
-    pill.draggable = true;
-    pill.tabIndex = 0;
-    pill.setAttribute('role', 'button');
-    pill.setAttribute('aria-pressed', String(enabled));
-    pill.title = 'Click to include or exclude; double-click to rename; drag to reorder';
+  visibleIndices.forEach((realIdx, pos) => {
+    const column = preset.columns[realIdx];
+    const card = document.createElement('div');
+    card.className = 'column-card';
+    card.setAttribute('role', 'listitem');
+    card.tabIndex = 0;
+    card.dataset.field = column.field;
+    card.dataset.test = 'column-card';
 
-    const label = document.createElement('span');
-    label.className = 'column-pill-label';
-    label.textContent = name;
-    pill.appendChild(label);
+    const handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'cc-handle';
+    handle.setAttribute('aria-label', `Move ${column.name}. Use Alt and the left or right arrow keys.`);
+    handle.title = 'Drag to reorder, or focus the column and press Alt with the left or right arrow key';
+    handle.textContent = '⠇';
 
-    // Item 3: coverage per column - "all statements" needs no extra text (the
-    // expected case); "N of M statements" gets a small always-visible badge,
-    // with the full sentence (naming which statements) as the pill's title.
-    const badgeInfo = columnCoverageBadge(f.field, name, groupsWithRows);
-    if (badgeInfo) {
-      pill.title = badgeInfo.title;
-      const badge = document.createElement('sup');
-      badge.className = 'column-pill-coverage';
-      badge.textContent = badgeInfo.text;
-      pill.appendChild(badge);
+    const nameEl = document.createElement('span');
+    nameEl.className = 'cc-name';
+    nameEl.setAttribute('role', 'button');
+    nameEl.tabIndex = 0;
+    nameEl.title = 'Click to rename this column';
+    nameEl.textContent = column.name;
+    const startRename = () => inlineEdit(nameEl, column.name, (value) => onChange(renameColumn(preset, realIdx, value)));
+    nameEl.addEventListener('click', (e) => { e.stopPropagation(); if (!nameEl.isContentEditable) startRename(); });
+    nameEl.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && !nameEl.isContentEditable) { e.preventDefault(); startRename(); }
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'cc-remove';
+    remove.setAttribute('aria-label', `Remove the ${column.name} column`);
+    remove.title = `Remove the ${column.name} column`;
+    remove.textContent = '×';
+    remove.onclick = (e) => { e.stopPropagation(); onChange(removeColumn(preset, realIdx)); };
+
+    const sampleEl = document.createElement('span');
+    sampleEl.className = 'cc-sample';
+    const sample = String(sampleFor(column) ?? '');
+    if (column.field === BLANK_FIELD) {
+      sampleEl.classList.add('cc-sample-empty');
+      sampleEl.textContent = 'left blank';
+    } else if (sample === '') {
+      sampleEl.classList.add('cc-sample-empty');
+      sampleEl.textContent = 'nothing in this file';
+    } else {
+      sampleEl.textContent = sample;
+    }
+    // A fixed-text column's "sample" IS its constant, so the same
+    // click-to-edit that renames a header also corrects the value (rule 3).
+    if (column.field === CONST_FIELD) {
+      sampleEl.classList.add('cc-sample-editable');
+      sampleEl.title = 'Click to change the value written down every row';
+      sampleEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!sampleEl.isContentEditable) inlineEdit(sampleEl, sample, (value) => onChange(setColumnValue(preset, realIdx, value)));
+      });
     }
 
-    const toggle = () => onChange(idx != null ? toggleColumn(preset, idx) : addColumn(preset, f.field, f.name));
-    pill.addEventListener('click', (e) => { if (e.target !== label || !label.isContentEditable) toggle(); });
-    pill.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    // Item 3 (kept): a column only some statements carry gets its "2/3"
+    // badge here, on the card, instead of on the old pill.
+    const badgeInfo = isValuelessField(column.field) ? null : columnCoverageBadge(column.field, column.name, groupsWithRows);
+    if (badgeInfo) {
+      const badge = document.createElement('sup');
+      badge.className = 'cc-coverage';
+      badge.textContent = badgeInfo.text;
+      badge.title = badgeInfo.title;
+      nameEl.appendChild(badge);
+    }
 
-    label.addEventListener('dblclick', (e) => {
-      e.stopPropagation();
-      label.contentEditable = 'true';
-      label.focus();
-      document.execCommand('selectAll', false, undefined);
-      const commit = () => {
-        label.contentEditable = 'false';
-        const value = label.textContent.trim();
-        if (value && idx != null) onChange(renameColumn(preset, idx, value));
-        else label.textContent = name;
-      };
-      label.addEventListener('blur', commit, { once: true });
-      label.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); label.blur(); } }, { once: true });
-    });
+    card.append(handle, nameEl, remove, sampleEl);
 
-    pill.addEventListener('dragstart', (e) => { dragFromField = f.field; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f.field); });
-    pill.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-    pill.addEventListener('drop', (e) => {
+    // Rule 2, keyboard: Alt+Left/Right moves the focused card one place.
+    card.addEventListener('keydown', (e) => {
+      if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+      const nextPos = pos + (e.key === 'ArrowLeft' ? -1 : 1);
+      if (nextPos < 0 || nextPos >= visibleIndices.length) return;
       e.preventDefault();
-      const fromField = dragFromField ?? e.dataTransfer.getData('text/plain');
-      const fromIdx = byPresetIndex.get(fromField);
-      const toIdx = byPresetIndex.get(f.field);
-      if (fromIdx == null || toIdx == null || fromIdx === toIdx) return;
-      onChange(moveColumn(preset, fromIdx, toIdx));
+      onChange(moveColumn(preset, realIdx, visibleIndices[nextPos]));
     });
 
-    pillRow.appendChild(pill);
+    // Rule 2, pointer: pointerdown/move/up on the handle, with the DOM node
+    // itself moved across a neighbour's midpoint so the drag is visible
+    // while it happens. The preset is only told once, on pointerup - this
+    // component fully re-renders on every onChange, which would otherwise
+    // destroy the node being dragged mid-gesture. HTML5 dragstart/drop (the
+    // old pill editor's approach) never fired reliably here at all.
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const startPos = [...cardList.children].indexOf(card);
+      card.classList.add('dragging');
+      try { handle.setPointerCapture(e.pointerId); } catch { /* synthetic event without a real pointer */ }
+      // "Past the neighbour's midpoint" in READING order, not in x alone -
+      // the row of cards wraps onto a second line as soon as there are more
+      // than five or six of them, and an x-only test can never cross a wrap.
+      const pastStart = (r, ev) => ev.clientY < r.top || (ev.clientY <= r.bottom && ev.clientX < r.left + r.width / 2);
+      const pastEnd = (r, ev) => ev.clientY > r.bottom || (ev.clientY >= r.top && ev.clientX > r.left + r.width / 2);
+      const onMove = (ev) => {
+        const siblings = [...cardList.children];
+        const at = siblings.indexOf(card);
+        const prev = siblings[at - 1];
+        const next = siblings[at + 1];
+        if (prev && pastStart(prev.getBoundingClientRect(), ev)) { cardList.insertBefore(card, prev); return; }
+        if (next && pastEnd(next.getBoundingClientRect(), ev)) { cardList.insertBefore(card, next.nextSibling); }
+      };
+      const onUp = () => {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        card.classList.remove('dragging');
+        const endPos = [...cardList.children].indexOf(card);
+        if (endPos === startPos || endPos < 0) return;
+        onChange(moveColumn(preset, realIdx, visibleIndices[endPos]));
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+
+    cardList.appendChild(card);
   });
-  if (!pillFields.length) {
+  if (!visibleIndices.length) {
     const empty = document.createElement('p');
     empty.className = 'pdf-anchor-hint';
-    empty.textContent = 'No columns with data yet.';
-    pillRow.appendChild(empty);
+    empty.textContent = 'No columns yet. Add one below.';
+    cardList.appendChild(empty);
   }
-  details.appendChild(pillRow);
-  container.appendChild(details);
+  container.appendChild(cardList);
 
-  // Item 4: a live example next to the date format picker, computed from the
-  // first real sample value on hand - "15 Sep 2026 → 2026-09-15" - not an
-  // arbitrary made-up date.
+  // ---- Part 2 rule 3: "Add a column" ----------------------------------
+  // Every field this app can produce, grouped, each showing its own sample
+  // value from the first row, plus the two columns that come from the user
+  // rather than the data: a blank one to fill in later, and fixed text.
+  const extraMenuFields = collectExtraFields(sampleRows, profiles);
+  const menuGroups = FIELD_GROUPS.map((g) => ({
+    label: g.label,
+    fields: g.label === SOURCE_GROUP_LABEL ? [...g.fields, ...extraMenuFields] : g.fields,
+  }));
+
+  const addWrap = document.createElement('details');
+  addWrap.className = 'add-column';
+  addWrap.open = wasAddMenuOpen;
+  const addSummary = document.createElement('summary');
+  addSummary.className = 'add-column-summary';
+  addSummary.setAttribute('data-test', 'add-column');
+  addSummary.textContent = 'Add a column';
+  addWrap.appendChild(addSummary);
+
+  const menu = document.createElement('div');
+  menu.className = 'add-column-menu';
+  for (const group of menuGroups) {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'acm-group';
+    const groupLabel = document.createElement('p');
+    groupLabel.className = 'acm-group-label';
+    groupLabel.textContent = group.label;
+    groupEl.appendChild(groupLabel);
+    for (const f of group.fields) {
+      const already = preset.columns.some((c) => c.field === f.field);
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'acm-item';
+      item.dataset.field = f.field;
+      item.disabled = already;
+      const itemSample = String(sampleFor(f) ?? '');
+      item.innerHTML = `<span class="acm-name">${escapeHtml(f.name)}</span>`
+        + `<span class="acm-sample${itemSample ? '' : ' cc-sample-empty'}">${escapeHtml(already ? 'already added' : itemSample || 'nothing in this file')}</span>`;
+      item.onclick = () => onChange(addColumn(preset, f.field, f.name));
+      groupEl.appendChild(item);
+    }
+    menu.appendChild(groupEl);
+  }
+
+  // The user's own two kinds. Blank is one click; fixed text needs its own
+  // header and value, so it asks for both right here rather than adding a
+  // column the user then has to discover how to fill in.
+  const ownGroup = document.createElement('div');
+  ownGroup.className = 'acm-group';
+  ownGroup.innerHTML = '<p class="acm-group-label">Your own</p>';
+  const blankItem = document.createElement('button');
+  blankItem.type = 'button';
+  blankItem.className = 'acm-item';
+  blankItem.dataset.field = BLANK_FIELD;
+  blankItem.dataset.test = 'add-blank';
+  blankItem.innerHTML = '<span class="acm-name">Blank column</span><span class="acm-sample cc-sample-empty">left blank, for you to fill in</span>';
+  blankItem.onclick = () => onChange(addColumn(preset, BLANK_FIELD, 'Blank'));
+  ownGroup.appendChild(blankItem);
+
+  const constForm = document.createElement('div');
+  constForm.className = 'acm-const';
+  constForm.innerHTML = `
+    <span class="acm-name">Fixed text</span>
+    <input type="text" class="acm-const-name" aria-label="Fixed text column header" placeholder="Header">
+    <input type="text" class="acm-const-value" aria-label="Fixed text value" placeholder="Value">
+    <button type="button" class="btn btn-ghost btn-sm acm-const-add">Add</button>`;
+  const constName = constForm.querySelector('.acm-const-name');
+  const constValue = constForm.querySelector('.acm-const-value');
+  constForm.querySelector('.acm-const-add').onclick = () => {
+    const header = constName.value.trim();
+    if (!header) { constName.focus(); return; }
+    onChange(addColumn(preset, CONST_FIELD, header, constValue.value));
+  };
+  ownGroup.appendChild(constForm);
+  menu.appendChild(ownGroup);
+
+  addWrap.appendChild(menu);
+  container.appendChild(addWrap);
+
+  // ---- Part 2 rule 6: one row of format options ------------------------
+  // Date format, money direction and the header-row toggle on one line
+  // under the columns. Everything else (date range, accounts, source
+  // columns, currency conversion) lives in the drawer's own "More options"
+  // disclosure around this editor - see workspace.html.
+  // Item 4 (kept): a live example next to the date format picker, computed
+  // from the first real sample value on hand, not an arbitrary made-up date.
   const exampleSourceDate = sampleRows.find((r) => r.date)?.date || '2026-09-15';
   const dateExampleFor = (format) => `${exampleSourceDate} → ${formatDateOut(exampleSourceDate, format)}`;
 
-  const pickerRow = document.createElement('div');
-  pickerRow.className = 'picker-row';
-  pickerRow.style.marginTop = '16px';
-  pickerRow.innerHTML = `
-    <div class="picker-group"><label class="pg-label" for="${uid}-dateformat">Export date format</label>
+  const optionsRow = document.createElement('div');
+  optionsRow.className = 'builder-row builder-options-row';
+  optionsRow.innerHTML = `
+    <div class="picker-group"><label class="pg-label" for="${uid}-dateformat">Date format</label>
       <select id="${uid}-dateformat" data-opt="dateFormat">
         ${DATE_FORMATS.map((f) => `<option value="${f}">${escapeHtml(dateFormatLabel(f))}</option>`).join('')}
       </select>
       <span class="pg-example" id="${uid}-dateformat-example"></span></div>
-    <div class="picker-group"><label class="pg-label" for="${uid}-signconvention">Money direction in export</label>
+    <div class="picker-group"><label class="pg-label" for="${uid}-signconvention">Money direction</label>
       <select id="${uid}-signconvention" data-opt="signConvention">
         <option value="signed">Money out negative, money in positive (default)</option>
         <option value="positiveIsOut">Money out positive, money in negative</option>
         <option value="twoColumn">Two columns: Money out and Money in</option>
       </select></div>
-  `;
-  pickerRow.querySelector('[data-opt="dateFormat"]').value = preset.dateFormat;
-  pickerRow.querySelector(`#${uid}-dateformat-example`).textContent = dateExampleFor(preset.dateFormat);
-  pickerRow.querySelector('[data-opt="signConvention"]').value = preset.signConvention;
-  pickerRow.querySelector('[data-opt="dateFormat"]').addEventListener('change', (e) => {
+    <div class="picker-group picker-group-toggle">
+      <span class="toggle-line"><input type="checkbox" id="${uid}-headerrow"><label for="${uid}-headerrow">Include header row</label></span>
+    </div>`;
+  optionsRow.querySelector('[data-opt="dateFormat"]').value = preset.dateFormat;
+  optionsRow.querySelector(`#${uid}-dateformat-example`).textContent = dateExampleFor(preset.dateFormat);
+  optionsRow.querySelector('[data-opt="signConvention"]').value = preset.signConvention;
+  optionsRow.querySelector('[data-opt="dateFormat"]').addEventListener('change', (e) => {
     onChange(setOption(preset, 'dateFormat', e.target.value));
   });
-  pickerRow.querySelector('[data-opt="signConvention"]').addEventListener('change', (e) => {
+  optionsRow.querySelector('[data-opt="signConvention"]').addEventListener('change', (e) => {
     onChange(applyMoneyDirection(preset, e.target.value));
   });
-  container.appendChild(pickerRow);
-
-  // Item 3: "Include header row" gets its own line under the date/money-
-  // direction pickers, not sharing a flex row with the normalisation note
-  // (which used to leave it sitting oddly to the note's right).
-  const headerRowLine = document.createElement('div');
-  headerRowLine.className = 'toggle-line';
-  headerRowLine.style.marginTop = '12px';
-  const headerCheckbox = document.createElement('input');
-  headerCheckbox.type = 'checkbox';
-  headerCheckbox.id = `${uid}-headerrow`;
+  const headerCheckbox = optionsRow.querySelector(`#${uid}-headerrow`);
   headerCheckbox.checked = preset.headerRow !== false;
   headerCheckbox.onchange = () => onChange(setOption(preset, 'headerRow', headerCheckbox.checked));
-  const headerLabel = document.createElement('label');
-  headerLabel.setAttribute('for', `${uid}-headerrow`);
-  headerLabel.textContent = 'Include header row';
-  headerRowLine.append(headerCheckbox, headerLabel);
-  container.appendChild(headerRowLine);
+  container.appendChild(optionsRow);
 
   // Item 2 (REBUILD-HOME, 2026-09-18): Home's "Adjust what's exported" sheet
   // passes showPreview:false - the ONE result table above it already shows
@@ -597,7 +728,18 @@ function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows =
   const previewCaption = document.createElement('p');
   previewCaption.className = 'pdf-anchor-hint preset-preview-caption';
   previewCaption.textContent = live ? 'Preview of what will be copied' : 'Sample';
-  container.appendChild(previewCaption);
+  // Part 2 rule 1: Home's result table parks its "Edit columns" button on
+  // this same line (home.js's renderResultTable reparents the static button
+  // into .preview-head), so the way into the builder sits next to the thing
+  // it changes rather than as small text further down the card.
+  if (tableOnly) {
+    const head = document.createElement('div');
+    head.className = 'preview-head';
+    head.appendChild(previewCaption);
+    container.appendChild(head);
+  } else {
+    container.appendChild(previewCaption);
+  }
 
   const previewHost = document.createElement('div');
   if (columns.length && allPreviewRows.length) {
@@ -625,7 +767,7 @@ function renderPreviewOnly({ container, previewRows, previewPreset, sampleRows =
     const table = document.createElement('table');
     table.className = 'txn-table preset-preview-table';
     const cellFor = (row, col) => {
-      const raw = col.field.startsWith('original.') ? row.original?.[col.field.slice(9)] : fieldValue(row, col.field, pPreset);
+      const raw = col.field.startsWith('original.') ? row.original?.[col.field.slice(9)] : fieldValue(row, col.field, pPreset, col);
       if (!NUMERIC_PREVIEW_FIELDS.has(col.field)) return raw;
       const grouped = groupPlainNumber(String(raw ?? ''));
       // Home's result table only (tableOnly) - the export string (fieldValue/

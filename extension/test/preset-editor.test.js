@@ -4,7 +4,7 @@ import {
   newPreset, addColumn, removeColumn, moveColumn, renameColumn, setOption, validatePreset,
   toggleColumn, activeColumns, dedupeColumns, collectExtraFields, humanizeExtraField,
   STANDARD_FIELDS, SOURCE_FIELDS,
-  presetSettingsEqual, presetPickerLabel, resolveWorkingPreset,
+  presetSettingsEqual, presetPickerLabel, resolveWorkingPreset, setColumnValue,
 } from '../src/ui/preset-editor.js';
 import { DEFAULT_PRESET } from '../src/core/export.js';
 
@@ -251,4 +251,39 @@ test('resolveWorkingPreset: migration - nothing persisted yet starts from the "S
   assert.equal(resolveWorkingPreset(null, presets, 1), presets[1]);
   assert.equal(resolveWorkingPreset(undefined, presets, null), presets[0]);
   assert.equal(resolveWorkingPreset(undefined, presets, 99), presets[0]); // out-of-range index falls back
+});
+
+// --- EXPORT-AND-DUPES part 2 rule 3: blank and fixed-text columns ---------
+
+test('rule 3: blank and fixed-text columns may repeat, every other field is still added once', () => {
+  let p = newPreset('t');
+  p = addColumn(p, 'blank', 'plaid_account_id');
+  p = addColumn(p, 'blank', 'notes');
+  p = addColumn(p, 'const', 'asset_id', 'SC_Rach');
+  p = addColumn(p, 'const', 'tag', 'x');
+  p = addColumn(p, 'date');
+  p = addColumn(p, 'date');
+  assert.deepEqual(p.columns.map((c) => c.name), ['plaid_account_id', 'notes', 'asset_id', 'tag', 'Date']);
+  assert.deepEqual(p.columns.filter((c) => c.field === 'const').map((c) => c.value), ['SC_Rach', 'x']);
+});
+
+test('rule 3: dedupeColumns never collapses repeated blank or fixed-text columns', () => {
+  const columns = [
+    { field: 'blank', name: 'plaid_account_id' },
+    { field: 'date', name: 'Date' },
+    { field: 'blank', name: 'notes' },
+    { field: 'date', name: 'Date again' },
+    { field: 'const', name: 'asset_id', value: 'a' },
+    { field: 'const', name: 'tag', value: 'b' },
+  ];
+  assert.deepEqual(dedupeColumns(columns).map((c) => c.name), ['plaid_account_id', 'Date', 'notes', 'asset_id', 'tag']);
+});
+
+test('rule 3/4: setColumnValue changes one fixed-text value, renameColumn its header, and neither touches the other columns', () => {
+  let p = newPreset('t');
+  p = addColumn(p, 'const', 'asset_id', 'SC_Rach');
+  p = addColumn(p, 'const', 'tag', 'x');
+  p = setColumnValue(p, 1, 'y');
+  p = renameColumn(p, 0, 'asset');
+  assert.deepEqual(p.columns.map((c) => [c.name, c.value]), [['asset', 'SC_Rach'], ['tag', 'y']]);
 });

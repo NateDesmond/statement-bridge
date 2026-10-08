@@ -13,6 +13,10 @@ export const FLAG_LABELS = {
   unparseable_date: 'Date could not be read',
   missing_amount: 'Amount missing',
   possible_duplicate: 'Possible duplicate',
+  // EXPORT-AND-DUPES rule 4: the cross-file duplicate DECISION (one card per
+  // pair of rows, showing both sides) - never a per-row "possible duplicate"
+  // the user cannot act on without seeing the other row.
+  duplicate_across_files: 'Looks like the same transaction in two files',
   date_outside_period: 'Date outside statement period',
   manually_added: 'Added manually, not from the source file',
   ocr: 'Read with text recognition',

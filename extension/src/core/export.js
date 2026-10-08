@@ -18,6 +18,70 @@ export const DATE_FORMATS = [
   'sheetsSerial', 'isoWithTime',
 ];
 
+// Part 2 rule 3/5: the one catalog of every field this app can put in a
+// column, grouped the way the builder's "Add a column" menu lists them.
+// Lives here (next to DATE_FORMATS) rather than in the UI layer so the
+// "Everything" layout below can be derived from it instead of hand-kept.
+export const FIELD_GROUPS = [
+  {
+    label: 'Core',
+    fields: [
+      { field: 'date', name: 'Date' },
+      { field: 'post_date', name: 'Posting date' },
+      { field: 'description_raw', name: 'Description' },
+      { field: 'amount', name: 'Amount' },
+      { field: 'money_out', name: 'Money out' },
+      { field: 'money_in', name: 'Money in' },
+      { field: 'currency', name: 'Currency' },
+      { field: 'balance', name: 'Balance' },
+      { field: 'account_label', name: 'Account' },
+      { field: 'type', name: 'Type' },
+      { field: 'reference', name: 'Reference' },
+    ],
+  },
+  {
+    label: 'Statement',
+    fields: [
+      { field: 'bank', name: 'Bank' },
+      { field: 'statement_type', name: 'Statement type' },
+      { field: 'flags', name: 'Flags' },
+    ],
+  },
+  {
+    label: 'Original currency',
+    fields: [
+      { field: 'orig_amount', name: 'Original amount' },
+      { field: 'orig_currency', name: 'Original currency' },
+      { field: 'fx_rate', name: 'FX rate' },
+      { field: 'converted_amount', name: 'Converted amount' },
+      { field: 'converted_currency', name: 'Target currency' },
+    ],
+  },
+  {
+    label: 'Source columns from the imported files',
+    fields: [
+      { field: 'source_file', name: 'File' },
+      { field: 'source_page', name: 'Page' },
+      { field: 'source_line', name: 'Line' },
+      { field: 'profile_version', name: 'Setup version' },
+    ],
+  },
+];
+
+/** Standard fields every row can carry, regardless of source file type or currency mode. */
+export const STANDARD_FIELDS = FIELD_GROUPS.slice(0, 3).flatMap((g) => g.fields);
+/** Source-trace columns: where a row actually came from. */
+export const SOURCE_FIELDS = FIELD_GROUPS[3].fields;
+/** The whole catalog, flat, in menu order. */
+export const AVAILABLE_FIELDS = [...STANDARD_FIELDS, ...SOURCE_FIELDS];
+
+// Part 2 rule 3: the two column kinds that carry no row data (see fieldValue).
+// Deliberately NOT in AVAILABLE_FIELDS - they are things the user adds, not
+// fields the app can produce, so "Everything" is the catalog and nothing else.
+export const BLANK_FIELD = 'blank';
+export const CONST_FIELD = 'const';
+export function isValuelessField(field) { return field === BLANK_FIELD || field === CONST_FIELD; }
+
 export function formatDateOut(iso, format) {
   if (!iso) return '';
   const [yStr, mStr, dStr] = iso.slice(0, 10).split('-');
@@ -70,7 +134,15 @@ function formatMoneyIn(minor, currency) {
  * buildCsv's escaped/quoted text output (which breaks on a value containing
  * the delimiter).
  */
-export function fieldValue(row, field, preset) {
+export function fieldValue(row, field, preset, column) {
+  // Part 2 rule 3: two column kinds carry no row data at all - a blank
+  // column the user fills in later (plaid_account_id, notes), and a fixed
+  // text column repeating one constant down every row (asset_id = SC_Rach).
+  // They live on the preset like any other column, so they survive save/
+  // reload, and they are the only fields whose value comes from the COLUMN
+  // rather than the row.
+  if (field === 'blank') return '';
+  if (field === 'const') return column?.value ?? '';
   if (field === 'date') return formatDateOut(row.date, preset.dateFormat);
   if (field === 'post_date') return formatDateOut(row.post_date, preset.dateFormat);
   if (field === 'amount') return formatAmountOut(row.amount, row.currency, preset.signConvention);
@@ -138,7 +210,7 @@ function buildDelimited(rows, preset, delimiter, { includeSourceColumns = false 
   for (const row of rows) {
     const cells = columns.map((c) => {
       if (c.field.startsWith('original.')) return escapeCsvCell(row.original?.[c.field.slice(9)], delimiter);
-      return escapeCsvCell(fieldValue(row, c.field, preset), delimiter);
+      return escapeCsvCell(fieldValue(row, c.field, preset, c), delimiter);
     });
     lines.push(cells.join(delimiter));
   }
@@ -355,18 +427,11 @@ export const LAYOUT_PRESETS = [
     key: 'everything',
     name: 'Everything',
     description: 'Every column this app can produce.',
-    columns: [
-      { field: 'date', name: 'Date' },
-      { field: 'post_date', name: 'Posting date' },
-      { field: 'account_label', name: 'Account' },
-      { field: 'description_raw', name: 'Description' },
-      { field: 'amount', name: 'Amount' },
-      { field: 'currency', name: 'Currency' },
-      { field: 'balance', name: 'Balance' },
-      { field: 'bank', name: 'Bank' },
-      { field: 'statement_type', name: 'Statement type' },
-      { field: 'reference', name: 'Reference' },
-      { field: 'flags', name: 'Flags' },
-    ],
+    // Part 2 rule 5: literally the whole catalog, in catalog order - the old
+    // hand-kept list silently missed reference/type/orig_amount/
+    // orig_currency and every source column, so "Everything" did not mean
+    // everything. Derived, so a field added to FIELD_GROUPS can never fall
+    // out of this layout again (test/export.test.js asserts the equality).
+    columns: AVAILABLE_FIELDS.map((f) => ({ ...f })),
   },
 ];

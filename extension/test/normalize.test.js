@@ -304,3 +304,76 @@ test('D2 finding 6: a saved profile whose default currency is SGD, reused on row
   assert.equal(converted[0].converted_amount, Math.round(-15000 * 0.009 * 100));
   assert.equal(converted[0].converted_currency, 'SGD');
 });
+
+// --- EXPORT-AND-DUPES rule 1/2: a CSV/XLSX export is authoritative ---------
+// A CSV is the bank's own text, not a reading of a picture of it: none of the
+// confidence-style flags may land on its rows (one suppression test per flag),
+// and two identical rows in ONE file are two real transactions, never a
+// duplicate question. Keyed on the source kind in the shared flag producer
+// (version.csv), so every call site - Home, wizard Test, wizard Save - gets
+// the same answer. Only a true failure (unreadable date/amount) survives.
+const csvVersion = { ...dbsVersion, csv: { headerRow: 0, skipRowsBefore: 0, footerRules: [], ignoreRowRules: [] } };
+const currencyColumnVersion = (over) => ({
+  ...over,
+  id: 'v-cur',
+  dateFormat: 'DD/MM/YYYY',
+  numberFormat: '1,234.56',
+  signConvention: 'debitCredit',
+  fields: {
+    date: { source: 'Transaction Date' },
+    description_raw: { source: ['Reference'] },
+    amount: { debit: 'Debit Amount', credit: 'Credit Amount' },
+    currency: { mode: 'column', source: 'Currency' },
+  },
+});
+
+test('rule 1: unknown_currency never lands on a CSV row (it still falls back to the statement currency silently)', () => {
+  const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', Currency: 'LTD' }];
+  const meta = { currency: 'SGD', sourceFile: 'a.csv' };
+  const pdfRows = normalizeRecords(records, currencyColumnVersion({}), meta);
+  assert.ok(pdfRows[0].flags.includes('unknown_currency'), 'a PDF read of the same token still asks');
+  const csvRows = normalizeRecords(records, currencyColumnVersion({ csv: { headerRow: 0 } }), meta);
+  assert.ok(!csvRows[0].flags.includes('unknown_currency'));
+  assert.equal(csvRows[0].currency, 'SGD', 'silent fallback to the statement currency');
+});
+
+test('rule 1: sign_unclear never lands on a CSV row', () => {
+  const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '', _signUnclear: true }];
+  const rows = normalizeRecords(records, csvVersion, { currency: 'SGD', sourceFile: 'a.csv' });
+  assert.ok(!rows[0].flags.includes('sign_unclear'));
+});
+
+test('rule 1: low_confidence_ocr, amount_alt and its hint never land on a CSV row', () => {
+  const records = [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '173.00', 'Credit Amount': '', _amountConfidence: 0 }];
+  const meta = { currency: 'SGD', sourceFile: 'a.csv', ocr: true };
+  const pdfRows = normalizeRecords(records, dbsVersion, meta);
+  assert.ok(pdfRows[0].flags.includes('low_confidence_ocr'), 'the PDF/OCR path still asks');
+  assert.ok(pdfRows[0].amount_alt != null && pdfRows[0].low_confidence_hint);
+  const csvRows = normalizeRecords(records, csvVersion, meta);
+  assert.ok(!csvRows[0].flags.includes('low_confidence_ocr'));
+  assert.equal(csvRows[0].amount_alt, null);
+  assert.equal(csvRows[0].low_confidence_hint, null);
+});
+
+test('rule 1: a true failure (unreadable date, missing amount) is still flagged on a CSV row', () => {
+  const records = [{ 'Transaction Date': 'not a date', Reference: 'NETS PAY', 'Debit Amount': '10.00', 'Credit Amount': '' }];
+  const rows = normalizeRecords(records, csvVersion, { currency: 'SGD', sourceFile: 'a.csv' });
+  assert.ok(rows[0].flags.includes('unparseable_date'));
+  const noAmount = normalizeRecords(
+    [{ 'Transaction Date': '01/06/2026', Reference: 'NETS PAY', 'Debit Amount': '', 'Credit Amount': '' }],
+    csvVersion, { currency: 'SGD', sourceFile: 'a.csv' },
+  );
+  assert.ok(noAmount[0].flags.includes('missing_amount'));
+});
+
+test('rule 2: two identical rows in ONE CSV file are two real transactions, never possible_duplicate', () => {
+  const records = [
+    { 'Transaction Date': '01/06/2026', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+    { 'Transaction Date': '01/06/2026', Reference: 'STARBUCKS COFFEE', 'Debit Amount': '5.80', 'Credit Amount': '' },
+  ];
+  const csvRows = normalizeRecords(records, csvVersion, { currency: 'SGD', sourceFile: 'a.csv' });
+  assert.deepEqual(csvRows[0].flags, []);
+  assert.deepEqual(csvRows[1].flags, []);
+  const pdfRows = normalizeRecords(records, dbsVersion, { currency: 'SGD', sourceFile: 'a.pdf' });
+  assert.ok(pdfRows[1].flags.includes('possible_duplicate'), 'a PDF read can really double-read one printed line');
+});

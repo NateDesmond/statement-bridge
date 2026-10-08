@@ -87,6 +87,7 @@ async function dropAndOpenWizard(page, fixturePath) {
     await mapBtn.click();
   } else {
     await page.click('#change-link');
+    await page.evaluate(() => { const d = document.querySelector('#more-options'); if (d) d.open = true; });
     await page.waitForSelector('#accounts-table-body tr');
     await page.click('#accounts-table-body a:has-text("Set up again")');
   }
@@ -233,6 +234,7 @@ async function runFlagResolutionScenario() {
 
   console.log('2. reopen via the Change drawer\'s "Update mapping" link...');
   await page.click('#change-link');
+    await page.evaluate(() => { const d = document.querySelector('#more-options'); if (d) d.open = true; });
   await page.waitForSelector('#accounts-table-body tr');
   await page.click('#accounts-table-body a:has-text("Set up again")');
   await page.waitForSelector('#screen-wizard.active', { timeout: 10000 });
@@ -978,6 +980,128 @@ async function runAmbiguousDatesScenario() {
   }
 }
 
+
+// --- EXPORT-AND-DUPES rule 5: cross-file duplicate decisions --------------
+// Two Meridian Bank exports of the SAME account whose date ranges differ (a
+// June-only export next to a June-to-July one) repeat three transactions.
+// That is not a re-download of one month, so nothing may merge silently:
+// each repeated transaction is ONE decision card showing BOTH rows and both
+// file names, and nothing is dropped until the user answers.
+//
+// Note on the spec's "two different-type CSVs" variant: unreachable in the
+// real app by design - the dedupe fingerprint is scoped to the account
+// label, which carries the statement type (home-state.js's
+// defaultAccountLabel), so a savings row and a credit-card row never
+// fingerprint-match in the first place. The same-account, different-range
+// pair below is the reachable form of that question, so run 2 answers it
+// with "Keep both" instead.
+function writeDupFixtures() {
+  const srcPath = path.join(extensionPath, 'test', 'fixtures', 'meridian_savings_40rows.csv');
+  const lines = fs.readFileSync(srcPath, 'utf8').split('\n');
+  const headerBlock = lines.slice(0, 6); // 4 preamble lines, a blank, the column header
+  // The first three transactions with the description written differently
+  // (same date, amount and balance): a near twin, which is the case that asks.
+  const dataRows = lines.slice(6, 9).map((l) => l.replace(/^(\S+),([^,]+),/, (m, d, desc) => `${d},POS ${desc},`));
+  const juneOnly = [
+    headerBlock[0],
+    headerBlock[1],
+    'Statement Period: 01 Jun 2026 to 30 Jun 2026',
+    headerBlock[3],
+    '',
+    headerBlock[5],
+    ...dataRows,
+    '20/06/2026,PAYNOW UNIQUE 999,,9.00,5000.00',
+    'Total,0.00,9.00,',
+  ].join('\n');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-ext-e2e-dups-'));
+  const wide = path.join(dir, 'meridian_jun_jul.csv');
+  const narrow = path.join(dir, 'meridian_june.csv');
+  fs.writeFileSync(wide, lines.join('\n'));
+  fs.writeFileSync(narrow, juneOnly);
+  return { wide, narrow, names: ['meridian_jun_jul.csv', 'meridian_june.csv'] };
+}
+
+/** The transaction count off the result card's own headline ("44 transactions from 2 statements ..."). */
+async function exportedRowCount(page) {
+  const text = await page.textContent('#export-summary');
+  return Number((text.match(/(\d+)\s+transaction/) || [])[1]);
+}
+
+async function dropBothDupFixtures(page, fixtures) {
+  await page.evaluate(async (profiles) => { await chrome.storage.local.set({ profiles }); },
+    sampleProfiles().filter((p) => p.bank === 'Meridian Bank'));
+  await page.$('#file-input').then((el) => el.setInputFiles([fixtures.wide, fixtures.narrow]));
+  await page.waitForFunction(() => document.querySelectorAll('.file-row .badge-ok, .file-row .badge-warn').length >= 2, { timeout: 120000 });
+  await page.waitForSelector('#attention-cards [data-test="duplicate-pairs"]', { timeout: 30000 });
+  await page.waitForTimeout(400);
+}
+
+async function runDuplicatePairScenario() {
+  console.log('\n=== scenario: cross-file duplicates ask once per pair (prefix dups) ===');
+  const fixtures = writeDupFixtures();
+  const outDir = path.join(extensionPath, 'audit', 'fix-shots');
+  fs.mkdirSync(outDir, { recursive: true });
+
+  console.log('run 1: Keep one merges each pair...');
+  let { context, page, pageErrors } = await launchExtensionContext();
+  try {
+    await dropBothDupFixtures(page, fixtures);
+    const pairCount = await page.$$eval('[data-test="dup-pair"]', (els) => els.length);
+    check('one decision card per repeated transaction (3 pairs)', pairCount === 3, `pairs=${pairCount}`);
+
+    const cardsText = await page.textContent('#attention-cards');
+    check('no per-row "Possible duplicate" card anywhere', !/Possible duplicate/.test(cardsText), cardsText.slice(0, 160));
+    check('the card names what it is asking', /same transaction in two files/.test(cardsText), cardsText.slice(0, 160));
+
+    const firstCard = await page.textContent('[data-test="dup-pair"]');
+    check('the pair card shows both file names', fixtures.names.every((n) => firstCard.includes(n)), firstCard.replace(/\s+/g, ' ').slice(0, 220));
+    const sides = await page.$$eval('[data-test="dup-pair"]:first-child [data-test="dup-side"]', (els) => els.length);
+    check('the pair card shows two rows side by side', sides === 2, `sides=${sides}`);
+    const defaultLabel = await page.textContent('[data-test="dup-pair"] button[data-default="true"]');
+    check('CSV + CSV defaults to Keep both', /Keep both/.test(defaultLabel), defaultLabel);
+
+    await page.screenshot({ path: path.join(outDir, 'dups-1440.png'), fullPage: false });
+    console.log('   screenshot:', path.join(outDir, 'dups-1440.png'));
+
+    const before = await exportedRowCount(page);
+    check('nothing is dropped before the user answers', before === 44, `rows=${before}`);
+    for (let i = 0; i < 3; i++) {
+      await page.click('[data-test="dup-pair"] [data-test="dup-keep-one"]');
+      await page.waitForTimeout(400);
+    }
+    const after = await exportedRowCount(page);
+    check('Keep one drops exactly the pair count', after === before - 3, `before=${before} after=${after}`);
+    const gone = await page.$('[data-test="duplicate-pairs"]');
+    check('every question is answered, the banner is gone', !gone, '');
+    const mergedNotice = await page.textContent('#dedupe-notice-line').catch(() => '');
+    check('a hand-merged row is still undoable', /3 rows merged/.test(mergedNotice) && /Undo/.test(mergedNotice), mergedNotice);
+
+    const cleanLog = await assertCleanLog(page, 'duplicate pairs, Keep one (dups)', pageErrors);
+    if (!cleanLog.ok) throw new Error(`dups scenario (run 1): ${cleanLog.problems.join('; ')}`);
+  } finally {
+    await context.close();
+  }
+
+  console.log('run 2: Keep both leaves every row in place...');
+  ({ context, page, pageErrors } = await launchExtensionContext());
+  try {
+    await dropBothDupFixtures(page, fixtures);
+    const before = await exportedRowCount(page);
+    for (let i = 0; i < 3; i++) {
+      await page.click('[data-test="dup-pair"] [data-test="dup-keep-both"]');
+      await page.waitForTimeout(400);
+    }
+    const after = await exportedRowCount(page);
+    check('Keep both leaves the row count unchanged', after === before, `before=${before} after=${after}`);
+    const gone = await page.$('[data-test="duplicate-pairs"]');
+    check('an answered question never comes back', !gone, '');
+    const cleanLog = await assertCleanLog(page, 'duplicate pairs, Keep both (dups)', pageErrors);
+    if (!cleanLog.ok) throw new Error(`dups scenario (run 2): ${cleanLog.problems.join('; ')}`);
+  } finally {
+    await context.close();
+  }
+}
+
 const SCENARIOS = {
   map2: runMapFieldsScenario,
   map3: runFlagResolutionScenario,
@@ -993,6 +1117,7 @@ const SCENARIOS = {
   setup: runConfirmScreensGalleryScenario,
   range: runManualRangeScenario,
   union2: runUnionExportScenario,
+  dups: runDuplicatePairScenario,
 };
 
 async function main() {

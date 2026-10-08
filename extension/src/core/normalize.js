@@ -108,6 +108,12 @@ const OUTLIER_MULTIPLE = 100;
 // narrow 40-60 band still needs a second signal (see item 5c above).
 export const OCR_AMOUNT_CONFIDENCE_FLOOR = 40;
 
+// EXPORT-AND-DUPES rule 1: the confidence-style flags, none of which may ever
+// land on a CSV/XLSX row (see normalizeRecords's csvSource). 'balance_mismatch'
+// is produced by checks.js's tagBalanceMismatches, not here, so pipeline.js
+// gates that call on the same source kind rather than filtering it after.
+export const CONFIDENCE_FLAGS = new Set(['low_confidence_ocr', 'sign_unclear', 'unknown_currency', 'balance_mismatch']);
+
 /**
  * Normalize raw records into standard transaction rows.
  * @param {object[]} records - row objects keyed by source header (from csv.js), or pdf row objects.
@@ -121,6 +127,19 @@ export function normalizeRecords(records, version, meta = {}) {
   const numberFormat = version.numberFormat;
   const signConvention = version.signConvention || 'signed';
   const seen = new Map(); // fingerprint -> count, for possible-duplicate flag
+
+  // EXPORT-AND-DUPES rule 1: a CSV/XLSX export is the bank's own text, not a
+  // reading of a picture of it - there is nothing uncertain for a human to
+  // confirm, so none of the confidence-style flags may ever land on one of
+  // its rows (a real user dropped several CSVs and got a wall of "check this
+  // against the page" cards for values that were never in doubt). Only a true
+  // failure (unreadable date/amount) and duplicate questions survive here.
+  // `version.csv` is set for exactly the CSV/XLSX path and left undefined for
+  // a PDF (wizard.js's buildVersionFromWizard; pipeline.js routes a PDF
+  // through extractPdfPagesRows instead), so it is the source-kind key.
+  // `pending`/`date_outside_period`/`manually_added` are not confidence
+  // flags - they state a fact the file itself prints - and stay.
+  const csvSource = !!version.csv;
 
   // Item 5c: batch context for the low-confidence sanity checks below - the
   // file's own median amount (of everything that parsed at all) and whether
@@ -265,7 +284,11 @@ export function normalizeRecords(records, version, meta = {}) {
     // possible_duplicate even when their (unreadable) raw dates are actually
     // different calendar dates. Same exclusion this row already gets from
     // every other date-anchored check (e.g. date_outside_period above).
-    if (!skipped && date) {
+    // EXPORT-AND-DUPES rule 2: within ONE CSV/XLSX file, two identical rows
+    // are two real transactions (two coffees on the same day), and the file is
+    // authoritative about that - never a duplicate question. A PDF/OCR read
+    // can really double-read the same printed line, so it still asks.
+    if (!skipped && date && !csvSource) {
       const fingerprint = [meta.accountLabel, date, amountResult.minor, currency, description_raw.toLowerCase()].join('|');
       const count = (seen.get(fingerprint) || 0) + 1;
       seen.set(fingerprint, count);
@@ -333,6 +356,10 @@ export function normalizeRecords(records, version, meta = {}) {
       flags.push('pending');
     }
 
+    // Rule 1, applied once at the end rather than at each push site, so a
+    // flag added here later cannot leak onto a CSV row by being forgotten.
+    const rowFlags = csvSource ? flags.filter((f) => !CONFIDENCE_FLAGS.has(f)) : flags;
+
     return {
       row_id: `${meta.sourceFile || 'file'}:${idx}`,
       date,
@@ -345,7 +372,9 @@ export function normalizeRecords(records, version, meta = {}) {
       description_raw,
       merchant: null,
       amount: amountResult.minor,
-      amount_alt,
+      // Rule 1: amount_alt is the "likely X, check the page" suggestion that
+      // only an OCR read can produce - never offered for a CSV row.
+      amount_alt: csvSource ? null : amount_alt,
       currency,
       orig_amount,
       orig_currency,
@@ -359,8 +388,8 @@ export function normalizeRecords(records, version, meta = {}) {
       source_page: null,
       source_line: idx,
       profile_version: version.id ?? null,
-      flags,
-      low_confidence_hint,
+      flags: rowFlags,
+      low_confidence_hint: csvSource ? null : low_confidence_hint,
       skipped,
       excluded: false,
       edited: false,

@@ -81,3 +81,36 @@ test('a row confirmed "Looks right" in Test survives Save: same row_id, resoluti
   assert.ok(savedRow.confirmed, 'the Test-step confirmation carried into the saved row');
   assert.ok(!savedRow.flags.includes('sign_unclear'), 'confirmRow clears the resolved warning');
 });
+
+// EXPORT-AND-DUPES rule 1: balance_mismatch is produced by checks.js after
+// normalize.js, so the suppression for a CSV/XLSX source lives here, at the
+// one call site - a balance column that does not add up in the bank's own
+// export is the bank's arithmetic, not a misread to check against a page.
+test('rule 1: buildFileRows never flags balance_mismatch on a CSV source, though the same rows do fail the balance check', async () => {
+  const { tagBalanceMismatches } = await import('../src/core/checks.js');
+  const csvVersion = {
+    id: 'v-csv',
+    csv: { headerRow: 0, skipRowsBefore: 0, footerRules: [], ignoreRowRules: [] },
+    fields: {
+      date: { source: 'Date' },
+      description_raw: { source: ['Description'] },
+      amount: { source: 'Amount' },
+      balance: { source: 'Balance' },
+      currency: { mode: 'profileDefault' },
+    },
+    dateFormat: 'DD/MM/YYYY', numberFormat: '1,234.56', signConvention: 'signed',
+  };
+  const grid = [
+    ['Date', 'Description', 'Amount', 'Balance'],
+    ['01/06/2026', 'Coffee', '-5.00', '1000.00'],
+    ['02/06/2026', 'Salary', '100.00', '1100.00'],
+    ['03/06/2026', 'Groceries', '-50.00', '1050.00'],
+    ['04/06/2026', 'Refund', '20.00', '2000.00'], // does not reconcile
+  ];
+  const entry = { type: 'csv', name: 'bank_export.csv', grid };
+  const rows = buildFileRows(entry, {}, csvVersion, { currency: 'SGD' });
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every((r) => !r.flags.includes('balance_mismatch')), 'no "check it against the page" on authoritative text');
+  tagBalanceMismatches(rows);
+  assert.ok(rows[3].flags.includes('balance_mismatch'), 'the same rows really do fail the balance check - only the CSV call site skips it');
+});

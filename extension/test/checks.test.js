@@ -302,6 +302,8 @@ test('flagLabel returns the shared human label for a known flag, and the raw id 
   assert.equal(flagLabel('unparseable_date'), 'Date could not be read');
   assert.equal(flagLabel('possible_duplicate'), 'Possible duplicate');
   assert.equal(flagLabel('some_future_flag'), 'some_future_flag');
+  // EXPORT-AND-DUPES rule 4: the cross-file duplicate decision's own copy.
+  assert.equal(flagLabel('duplicate_across_files'), 'Looks like the same transaction in two files');
 });
 
 test('rowFlagLabel prefers the row\'s own low_confidence_hint over the generic caption', () => {

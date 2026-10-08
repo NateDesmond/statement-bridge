@@ -49,6 +49,12 @@ export function buildFileRows(entry, source, version, metaOverrides = {}) {
   // P0-4: wherever the statement prints a running balance, a row whose
   // amount does not reconcile against it is flagged - the only check that
   // catches an OCR digit misread into a plausible number.
-  tagBalanceMismatches(rows);
+  // EXPORT-AND-DUPES rule 1: a PDF only. A CSV/XLSX export prints the amounts
+  // the bank itself holds, so a balance column that does not add up there is
+  // the bank's own arithmetic (or a currency/column quirk), never a misread -
+  // telling the user to "check it against the page" is noise on a file that
+  // IS the authoritative text. Same source-kind key as normalize.js's
+  // csvSource, read from the file entry instead of the version.
+  if (entry.type === 'pdf') tagBalanceMismatches(rows);
   return rows;
 }

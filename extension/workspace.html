@@ -115,20 +115,35 @@
           <span class="export-warn-note" id="export-warn-note"></span>
           <p class="pdf-anchor-hint" id="export-blocked-note" style="color:var(--danger);"></p>
 
+          <!-- Part 2 rule 1: "Edit columns" is a visible secondary button, not
+               small text - home.js's renderResultTable moves this node onto the
+               preview caption's own line (.preview-head) the moment the table
+               renders, so it sits next to the header it edits, and parks it
+               back here first (the table's container is wiped on every
+               re-render, which would otherwise destroy the button). The
+               preview's table header is clickable for the same thing. -->
+          <div id="edit-columns-home" hidden>
+            <button type="button" class="btn btn-ghost btn-sm" id="change-link" aria-expanded="false" aria-controls="change-drawer">Edit columns</button>
+          </div>
+
           <div id="result-table"></div>
 
           <div class="result-links">
-            <button type="button" class="btn-quiet" id="change-link" aria-expanded="false" aria-controls="change-drawer">Adjust what's exported</button>
             <button type="button" class="btn-quiet" id="add-more-link">Add more statements</button>
           </div>
 
           <div class="drawer-body" id="change-drawer" hidden>
             <h2 class="section-title" id="change-drawer-title">Export settings</h2>
 
-            <!-- Item 13: three visually bounded cards (When / What to copy /
-                 Currency) instead of six flat all-caps labels in a row - the
-                 IDs/structure JS already targets are untouched, only the
-                 grouping/wrapping around them changed. -->
+            <!-- Part 2 rule 6: the columns builder IS the panel; date range,
+                 accounts, source columns and currency conversion sit under one
+                 collapsed disclosure so the sheet opens calm. The IDs/structure
+                 JS already targets are untouched, only the wrapping changed. -->
+            <h2 class="section-title">Columns</h2>
+            <div id="home-preset-editor"></div>
+
+            <details class="more-options" id="more-options">
+              <summary>More options</summary>
             <div class="panel drawer-card">
               <h3 class="drawer-card-title">When</h3>
               <h2 class="section-title">Date range</h2>
@@ -154,7 +169,7 @@
             </div>
 
             <div class="panel drawer-card">
-              <h3 class="drawer-card-title">What to copy</h3>
+              <h3 class="drawer-card-title">Which statements</h3>
               <!-- Item 8 (REBUILD-HOME, 2026-09-18): one table, Coverage by
                    account and Sources merged - nothing about accounts anywhere
                    else in the sheet. -->
@@ -164,8 +179,6 @@
                 <tbody id="accounts-table-body"></tbody>
               </table>
 
-              <h2 class="section-title">Columns</h2>
-              <div id="home-preset-editor"></div>
               <div class="toggle-line" style="margin-top:8px;">
                 <input type="checkbox" id="source-cols-home">
                 <label for="source-cols-home">Include original source columns</label>
@@ -196,6 +209,7 @@
                 </table>
               </div>
             </div>
+            </details>
           </div>
         </div>
 

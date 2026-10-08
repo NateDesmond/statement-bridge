@@ -1,6 +1,9 @@
 // Duplicate detection: within-file duplicates are kept (real repeats happen,
-// e.g. two identical coffee purchases); cross-file overlaps are merged,
-// keeping the max occurrence count seen across the files being compared.
+// e.g. two identical coffee purchases); an exact cross-file twin merges silently,
+// a near twin (same date and amount, different description) is asked about once,
+// keeping the max occurrence count seen across the files being compared. Any
+// other cross-file overlap is returned as a `pairs` decision for the user to
+// answer once, showing both rows (EXPORT-AND-DUPES rule 3/4).
 
 // The first 12 alphanumeric characters of the normalised description,
 // uppercase, no spaces or punctuation. A CSV export of a statement is often
@@ -85,17 +88,32 @@ export function fingerprint(row, accountLabel) {
   return [acct, row.date, row.amount ?? '', row.currency ?? '', descriptionKey(row.description_raw)].join('|');
 }
 
+/** Same account, date, amount and currency: everything but the description. */
+function nearKey(row, accountLabel) {
+  if (!row.date) return null;
+  const acct = accountLabel ?? row.account_label ?? '';
+  return [acct, row.date, row.amount ?? '', row.currency ?? ''].join('|');
+}
+
 /**
- * Merge rows from multiple files, collapsing cross-file duplicates.
- * Within a single file's own row list, duplicates are left as-is (each kept).
- * Across files, rows sharing a fingerprint are merged into one, keeping the
- * row from the file with the highest per-file occurrence count for that
- * fingerprint (ties keep the first file encountered).
+ * Merge rows from multiple files.
+ * Within a single file's own row list, duplicates are left as-is (each kept:
+ * two coffees on the same day are two coffees).
+ * Across files, rows sharing a full fingerprint (account, date, amount,
+ * currency, description) are the same transaction seen twice (a re-download,
+ * an overlapping export) and merge silently, keeping the row from the file
+ * with the highest per-file occurrence count for that fingerprint (ties keep
+ * the CSV/text file over an OCR one, then the first file encountered).
+ * A NEAR match - same account, date, amount and currency but a different
+ * description, which is what an OCR'd PDF next to the bank's own CSV looks
+ * like - is a real question: both rows are kept and the caller gets ONE
+ * `pairs` entry per near key per file pair to ask about, never a per-row
+ * flag the user cannot act on.
  * @param {{sourceFile:string, rows:object[], accountLabel?:string, ocr?:boolean}[]} files
- * @returns {{merged: object[], removed: object[]}} removed rows kept for undo
+ * @returns {{merged: object[], removed: object[], pairs: object[]}} removed rows kept for undo;
+ *   each pair is { key, fingerprint, keep:{fileIdx,sourceFile,row,ocr}, drop:{...} }
  */
 export function mergeAcrossFiles(files) {
-  // occurrence count of each fingerprint, per file
   const perFileCounts = files.map(({ rows, accountLabel }) => {
     const counts = new Map();
     for (const row of rows) {
@@ -105,11 +123,17 @@ export function mergeAcrossFiles(files) {
     }
     return counts;
   });
+  const perFileNear = files.map(({ rows, accountLabel }) => {
+    const m = new Map();
+    for (const row of rows) {
+      const k = nearKey(row, accountLabel);
+      if (k == null) continue;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(row);
+    }
+    return m;
+  });
 
-  // Winner per fingerprint: highest per-file occurrence count; on a tie,
-  // prefer the CSV/text file over a PDF/OCR one (D3 - a CSV export's
-  // description is normally more reliable/complete than an OCR read of the
-  // same statement), else the first file encountered.
   const bestFileIndexByFp = new Map(); // fp -> { fileIdx, count, ocr }
   files.forEach(({ rows, accountLabel, ocr }, fileIdx) => {
     const counts = perFileCounts[fileIdx];
@@ -126,21 +150,33 @@ export function mergeAcrossFiles(files) {
 
   const merged = [];
   const removed = [];
-  files.forEach(({ rows, accountLabel }, fileIdx) => {
+  const pairs = [];
+  const pairKeys = new Set(); // one decision per near key per file pair
+  files.forEach((file, fileIdx) => {
+    const { rows, accountLabel } = file;
     for (const row of rows) {
       const fp = fingerprint(row, accountLabel);
-      if (fp == null) { merged.push(row); continue; } // no valid date - never merged
-      const seenElsewhere = files.some((f, i) => i !== fileIdx && perFileCounts[i].has(fp));
-      if (!seenElsewhere) { merged.push(row); continue; }
+      if (fp == null) { merged.push(row); continue; }
       const best = bestFileIndexByFp.get(fp);
-      if (best.fileIdx === fileIdx) {
-        // Emit this file's occurrences up to its own count once per fingerprint pass;
-        // simplest correct rule: keep all rows from the winning file, drop the rest.
-        merged.push(row);
-      } else {
-        removed.push(row);
-      }
+      if (best.fileIdx !== fileIdx) { removed.push(row); continue; }
+      merged.push(row);
+      const nk = nearKey(row, accountLabel);
+      files.forEach((other, otherIdx) => {
+        if (otherIdx === fileIdx) return;
+        if (perFileCounts[otherIdx].has(fp)) return; // exact twin there: merged silently
+        const twin = (perFileNear[otherIdx].get(nk) || []).find((r) => fingerprint(r, other.accountLabel) !== fp
+          && !perFileCounts[fileIdx].has(fingerprint(r, other.accountLabel)));
+        if (!twin) return;
+        const key = `${nk}|${Math.min(fileIdx, otherIdx)}|${Math.max(fileIdx, otherIdx)}`;
+        if (pairKeys.has(key)) return;
+        pairKeys.add(key);
+        // Keep the CSV/text row over the OCR one; on a tie keep the earlier file.
+        const thisWins = (!file.ocr && other.ocr) || (!!file.ocr === !!other.ocr && fileIdx < otherIdx);
+        const mine = { fileIdx, sourceFile: file.sourceFile, row, ocr: !!file.ocr };
+        const theirs = { fileIdx: otherIdx, sourceFile: other.sourceFile, row: twin, ocr: !!other.ocr };
+        pairs.push({ key, fingerprint: fp, keep: thisWins ? mine : theirs, drop: thisWins ? theirs : mine });
+      });
     }
   });
-  return { merged, removed };
+  return { merged, removed, pairs };
 }

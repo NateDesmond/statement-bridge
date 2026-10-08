@@ -20,6 +20,7 @@ import { assertCleanLog } from './lib/assert-clean-log.mjs';
 // only covers screens still reachable through the gear dropdown).
 async function openReviewFromHome(page) {
   await page.click('#change-link');
+    await page.evaluate(() => { const d = document.querySelector('#more-options'); if (d) d.open = true; });
   await page.waitForSelector('#change-drawer:not([hidden])', { timeout: 10000 });
   // .first(): a session with several mapped accounts has one "Check" link
   // per account row - any of them opens the same Review screen (it defaults

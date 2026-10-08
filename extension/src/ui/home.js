@@ -14,13 +14,13 @@ import { ocrDocument } from '../core/ocr.js';
 import { suggestHeaderRow } from '../core/suggest.js';
 import { loadProfiles, matchProfile, learnSignatures, pdfAnchorCandidates, updateVersionLastUsed, guessProfileByFilename, setProfilePasswordHint } from '../core/profiles.js';
 import { resolvePreset, filterByRange, coverageWarnings, formatShortDate } from '../core/daterange.js';
-import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, isUnionPresetColumns, unionPreset, suggestFilename, LAYOUT_PRESETS } from '../core/export.js';
+import { buildCsv, buildTsv, DEFAULT_PRESET, DEFAULT_PRESET_MODE_B, isDefaultPresetColumns, isUnionPresetColumns, unionPreset, suggestFilename, LAYOUT_PRESETS, visibleColumns } from '../core/export.js';
 import { checkFileSize, checkBatchSize } from '../core/limits.js';
-import { fileSummary, countCheckGrouped, groupedCountLabel, rowFlagLabel, balanceCheck } from '../core/checks.js';
+import { fileSummary, countCheckGrouped, groupedCountLabel, rowFlagLabel, flagLabel, balanceCheck } from '../core/checks.js';
 import { mergeAcrossFiles, fingerprint, isExactDuplicateFile, sha256Hex, findDuplicateByHash } from '../core/dedupe.js';
 import { detectCurrency, convertToTarget, formatBothDirections } from '../core/currency.js';
 import { saveSession, sessionsNearingDeletion } from '../core/sessions.js';
-import { renderPresetEditor as renderPresetEditorInto, newPreset, applyLayoutPreset, matchLayoutKey, resolveWorkingPreset } from './preset-editor.js';
+import { renderPresetEditor as renderPresetEditorInto, newPreset, applyLayoutPreset, resolveWorkingPreset } from './preset-editor.js';
 import { renderRowSnippet, renderRowMagnifier } from './pdf-render.js';
 import { resolveConfirm, resolveEdit, resolveExclude, hasUnresolvableFlag } from './rowedit.js';
 import { parseAmount, decimalsFor } from '../core/amount.js';
@@ -72,6 +72,18 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
   let includeSourceColumns = false;
   let drawerOpen = false;
   let dedupeNotice = null; // { removed: [], accountLabel } for the merged/Undo card
+  // EXPORT-AND-DUPES rule 3/4: cross-file overlaps that are NOT plainly the
+  // same statement twice are questions, not merges - one card per pair of
+  // rows (dedupe.js's `pairs`), recomputed by mergeDuplicates on every
+  // change. `dupKeepBoth` remembers the pairs the user has already answered
+  // "Keep both" for (by dedupe.js's stable pair key), so an answered
+  // question never comes back; `manualDupRemovals` are the rows a "Keep one"
+  // answer merged away, folded into the same "N rows merged / Undo" notice
+  // an automatic merge uses, so a hand-merged row is never unrecoverable.
+  let duplicatePairs = [];
+  const dupKeepBoth = new Set();
+  let manualDupRemovals = [];
+  const dupFocused = new Set(); // pair keys whose default button already took focus once
   let restorePending = false;
   let profilesCache = []; // for the preset editor's extra_* column discovery; refreshed on drawer open
   // Item 12/item 2 (NO-TEMPLATES): whether "Use a statement type I already
@@ -1219,7 +1231,8 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       f.duplicateDroppedSameFile = false;
       f.duplicateDroppedFrom = null;
     }
-    if (filesWithRows.length < 2) { dedupeNotice = null; return; }
+    duplicatePairs = [];
+    if (filesWithRows.length < 2) { dedupeNotice = dedupeNoticeFrom([], new Map()); return; }
     // accountLabel is the file's own account identity (bank + masked account,
     // or the user's saved label) - always pass it so the merge keys off the
     // account, never off which profile matched (a user-saved profile and a
@@ -1228,8 +1241,17 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // ocr: true routes D3's CSV-over-OCR tie-break (mergeAcrossFiles keeps
     // the CSV/text file's row when two files' occurrence counts for the same
     // fingerprint are equal).
-    const { removed } = mergeAcrossFiles(filesWithRows.map((f) => ({ sourceFile: f.name, rows: f.rows, accountLabel: f.accountLabel, ocr: !!f.ocr })));
-    if (!removed.length) { dedupeNotice = null; return; }
+    // Rule 3: statementType + the file's own date range decide whether an
+    // overlap may still be merged silently (the same statement arriving
+    // twice) or has to be asked about - see dedupe.js's mergeAcrossFiles.
+    const { removed, pairs } = mergeAcrossFiles(filesWithRows.map((f) => ({
+      sourceFile: f.name, rows: f.rows, accountLabel: f.accountLabel, ocr: !!f.ocr,
+      statementType: f.profile?.statementType ?? null, range: dateRangeOfRows(f.rows),
+    })));
+    duplicatePairs = pairs
+      .filter((p) => !dupKeepBoth.has(p.key) && p.keep.row && p.drop.row)
+      .map((p) => ({ ...p, keepFile: filesWithRows[p.keep.fileIdx], dropFile: filesWithRows[p.drop.fileIdx] }));
+    if (!removed.length) { dedupeNotice = dedupeNoticeFrom([], new Map()); return; }
     // Filter by row object identity, not row_id string: row_id is
     // `${sourceFile}:${idx}`, and the exact scenario this merge exists for -
     // the same filename dropped twice - gives both files' rows identical
@@ -1291,7 +1313,41 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // an actual partial-overlap file still surface that notice.
     const noticeRows = removed.filter((r) => !rowOrigin.get(r)?.exactDuplicateOf);
     for (const f of filesWithRows) f.rows = f.rows.filter((r) => !removedSet.has(r));
-    dedupeNotice = noticeRows.length ? { removed: noticeRows, rowOrigin, count: noticeRows.length } : null;
+    dedupeNotice = dedupeNoticeFrom(noticeRows, rowOrigin);
+  }
+
+  /** The quiet "N rows merged / Undo" notice: rows an automatic merge removed, plus the rows a "Keep one" duplicate decision merged by hand (rule 4) - one notice, one Undo, either way. */
+  function dedupeNoticeFrom(noticeRows, rowOrigin) {
+    const all = [...noticeRows, ...manualDupRemovals.map((m) => m.row)];
+    if (!all.length) return null;
+    const origin = new Map(rowOrigin);
+    for (const m of manualDupRemovals) origin.set(m.row, m.file);
+    return { removed: all, rowOrigin: origin, count: all.length };
+  }
+
+  /**
+   * Rule 4: one answer resolves the whole pair. "Keep both" (they are two
+   * different transactions) remembers the pair so it is never asked again;
+   * "Keep one" drops the losing row - dedupe.js already picked which side
+   * wins (the CSV/text row over an OCR one, else the higher-occurrence
+   * file), and the row goes into the same Undo notice an automatic merge uses.
+   */
+  function resolveDuplicatePair(pair, choice) {
+    if (choice === 'both') {
+      dupKeepBoth.add(pair.key);
+    } else {
+      const file = pair.dropFile;
+      const idx = file.rows.indexOf(pair.drop.row);
+      if (idx !== -1) {
+        file.rows.splice(idx, 1);
+        manualDupRemovals.push({ row: pair.drop.row, file });
+      }
+    }
+    mergeDuplicates();
+    renderAll();
+    onFilesChanged?.();
+    autosave();
+    announce(choice === 'both' ? 'Keeping both rows.' : 'Merged into one row.');
   }
 
   function undoDedupe() {
@@ -1311,6 +1367,9 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       f.duplicateDroppedSameFile = false;
       f.duplicateDroppedFrom = null;
     }
+    // A "Keep one" answer is undone the same way: its row is back on its file
+    // (above), so the pair becomes an open question again (rule 4).
+    manualDupRemovals = [];
     dedupeNotice = null;
     renderAll();
     onFilesChanged?.();
@@ -1831,6 +1890,8 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     const decisionRows = flaggedDecisionRows(state.files);
     for (const card of cards) container.appendChild(renderCard(card));
     if (decisionRows.length) container.appendChild(renderDecisionBanner(decisionRows));
+    // Rule 3/4: the cross-file duplicate questions, one card per pair.
+    if (duplicatePairs.length) container.appendChild(renderDuplicatePairsBanner(duplicatePairs));
 
     renderDedupeNotice();
   }
@@ -1907,11 +1968,99 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     return el;
   }
 
-  function decisionBodyHtml(row) {
+  /** One row's "date &middot; description &middot; amount currency" line - shared by the per-row decision cards and the cross-file duplicate card's two sides, so both word a transaction identically. */
+  function decisionTxnHtml(row) {
     const amount = row.amount != null ? (row.amount / (10 ** decimalsFor(row.currency))).toFixed(decimalsFor(row.currency)) : '';
     const amountClass = row.amount != null ? (row.amount < 0 ? 'amount-out' : 'amount-in') : '';
     const parts = [row.date, escapeHtml(row.description_raw || ''), amount ? `<span class="num ${amountClass}">${amount}${row.currency ? ` ${row.currency}` : ''}</span>` : null].filter(Boolean);
-    return `<div class="db-txn">${parts.join(' &middot; ')}</div><div class="db-why">${escapeHtml(decisionReasonLabel(row))}</div>`;
+    return `<div class="db-txn">${parts.join(' &middot; ')}</div>`;
+  }
+
+  function decisionBodyHtml(row) {
+    return `${decisionTxnHtml(row)}<div class="db-why">${escapeHtml(decisionReasonLabel(row))}</div>`;
+  }
+
+  // --- Rule 3/4: the cross-file duplicate decision --------------------------
+  // ONE card per pair of rows, never one card per row: the complaint this
+  // fixes is a wall of "Possible duplicate" cards each showing a single row
+  // in isolation, which nobody can answer. Both rows are shown side by side
+  // with the file each came from (and, for a PDF row, the page snippet), and
+  // one answer resolves both.
+
+  function renderDuplicatePairsBanner(pairs) {
+    const details = document.createElement('details');
+    details.className = 'decision-banner';
+    details.open = true;
+    details.setAttribute('role', 'listitem');
+    details.setAttribute('data-test', 'duplicate-pairs');
+    const n = pairs.length;
+    details.innerHTML = `<summary>${n} transaction${n === 1 ? '' : 's'} appear${n === 1 ? 's' : ''} in two files</summary><div class="decision-list"></div>`;
+    const list = details.querySelector('.decision-list');
+    for (const pair of pairs) list.appendChild(renderDuplicatePairCard(pair));
+    return details;
+  }
+
+  /** One side of a duplicate pair: which file it came from, the transaction line, and - for a PDF row - the same page crop the per-row cards show. */
+  function renderDuplicateSide(file, row) {
+    const side = document.createElement('div');
+    side.className = 'decision-body';
+    side.setAttribute('data-test', 'dup-side');
+    const where = document.createElement('div');
+    where.className = 'decision-snippet-label';
+    // The label style uppercases its text, which is wrong for a file name the
+    // user picked - keep the name exactly as it is on disk.
+    where.style.textTransform = 'none';
+    where.textContent = file.name;
+    side.append(where);
+    if (file.type === 'pdf') {
+      const snippet = document.createElement('div');
+      snippet.className = 'decision-snippet';
+      snippet.textContent = 'Loading…';
+      side.appendChild(snippet);
+      loadDecisionSnippet(file, row, snippet).then((isCanvas) => { if (isCanvas) wireSnippetMagnifier(snippet, file, row); });
+    }
+    const txn = document.createElement('div');
+    txn.innerHTML = decisionTxnHtml(row);
+    side.appendChild(txn);
+    return side;
+  }
+
+  function renderDuplicatePairCard(pair) {
+    const el = document.createElement('div');
+    el.className = 'decision-row';
+    el.setAttribute('role', 'listitem');
+    el.setAttribute('data-test', 'dup-pair');
+
+    const why = document.createElement('div');
+    why.className = 'decision-body';
+    why.style.flex = '1 1 100%';
+    why.innerHTML = `<div class="db-txn">${escapeHtml(flagLabel('duplicate_across_files'))}</div>
+      <div class="db-why">Keep both if these are two different transactions. Keep one to merge them into a single row.</div>`;
+
+    const choices = document.createElement('div');
+    choices.className = 'decision-choices';
+    choices.style.flex = '1 1 100%';
+    const keepBoth = mkBtn('btn-choice good', 'Keep both', () => resolveDuplicatePair(pair, 'both'), 'dup-keep-both');
+    const keepOne = mkBtn('btn-choice fix', 'Keep one', () => resolveDuplicatePair(pair, 'one'), 'dup-keep-one');
+    choices.append(keepBoth, keepOne);
+
+    el.append(why, renderDuplicateSide(pair.keepFile, pair.keep.row), renderDuplicateSide(pair.dropFile, pair.drop.row), choices);
+
+    // Default answer: two CSV/XLSX exports are both authoritative text, so
+    // the same date/amount/description twice is most likely two real
+    // transactions ("Keep both"); a PDF next to a CSV is almost always the
+    // same statement in two formats, so "Keep one" leads there. Focus is
+    // taken once per pair, and never out from under something the user is
+    // already typing in.
+    const defaultBtn = (pair.keepFile.type === 'pdf' || pair.dropFile.type === 'pdf') ? keepOne : keepBoth;
+    defaultBtn.setAttribute('data-default', 'true');
+    if (!dupFocused.has(pair.key)) {
+      dupFocused.add(pair.key);
+      requestAnimationFrame(() => {
+        if (!document.activeElement || document.activeElement === document.body) defaultBtn.focus();
+      });
+    }
+    return el;
   }
 
   /** Item 5a/item 7 shared: the row's page anchor (source_page/source_y/source_h/source_y2), or null when there's nothing to crop (a columns-rowModel PDF, or a CSV/XLSX row). */
@@ -2442,6 +2591,15 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     // card get a small dot here instead of the card repeating their date/
     // description/amount a second time.
     const flaggedRowIds = new Set(flaggedDecisionRows(state.files).map(({ row }) => row.row_id));
+    // Part 2 rule 1: the way into the column builder sits next to the thing
+    // it changes. The button itself is static markup (so its wiring and
+    // aria-expanded live in one place, wireDrawer) - this moves the node onto
+    // the preview caption's line, parking it back in its own static home
+    // first, since renderPresetEditor wipes the container it is about to be
+    // rendered into.
+    const editBtn = $('#change-link');
+    const btnHome = $('#edit-columns-home');
+    if (editBtn && btnHome) btnHome.appendChild(editBtn);
     renderPresetEditorInto({
       container,
       preset: activePreset,
@@ -2450,6 +2608,14 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
       tableOnly: true,
       flaggedRowIds,
     });
+    const head = container.querySelector('.preview-head');
+    if (head && editBtn) head.appendChild(editBtn);
+    const thead = container.querySelector('thead');
+    if (thead) {
+      thead.classList.add('preview-head-clickable');
+      thead.title = 'Click any header to edit the columns';
+      thead.onclick = () => { if (!drawerOpen) editBtn?.click(); };
+    }
   }
 
   /** Item 17: the active preset's own display name (from RANGE_OPTIONS below), for pairing with its concrete dates - "Last full month" next to "(1 to 31 Aug)", not just a bare date range with no name attached. */
@@ -2618,11 +2784,15 @@ export function createHome({ storage, state, sessionStore, onOpenWizard, onRevie
     }
   }
 
-  /** "With balance" (a matched built-in layout), "Default" (the untouched union default, item B) or "Customised" (actually edited away from every layout's own shape). */
+  /** Part 2 rule 7: the actual column headers, in export order ("date,
+   * payee, amount, currency, plaid_account_id, asset_id, notes") - a layout
+   * name like "With balance" told the user nothing about what they were
+   * about to paste. visibleColumns applies the same balance rule the export
+   * and the preview do, so this line can never name a column the file will
+   * not contain. */
   function columnsSummaryLabel() {
-    const key = matchLayoutKey(activePreset);
-    if (key) return LAYOUT_PRESETS.find((l) => l.key === key)?.name;
-    return presetCustomized ? 'Customised' : 'Default';
+    const names = visibleColumns(exportPreset().columns, rowsForExport()).map((c) => c.name);
+    return names.length ? names.join(', ') : 'none';
   }
 
   function renderDrawer() {
