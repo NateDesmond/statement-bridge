@@ -16,8 +16,14 @@ function uuid() {
 }
 
 export async function loadProfiles(storage) {
-  const stored = await storage.get(STORAGE_KEY);
-  return stored || [];
+  const stored = (await storage.get(STORAGE_KEY)) || [];
+  // Builds before 2026-09-20 seeded fictional built-in templates (ids
+  // builtin-*) into storage; removing them from the code never removed them
+  // from a device, and a real bank's CSV could still fuzzy-match one of them
+  // ("Meridian Bank savings"). Purge them once, here, so no device keeps one.
+  const kept = stored.filter((p) => !(p.builtIn || String(p.id || '').startsWith('builtin-')));
+  if (kept.length !== stored.length) await storage.set(STORAGE_KEY, kept);
+  return kept;
 }
 
 async function saveProfiles(storage, profiles) {

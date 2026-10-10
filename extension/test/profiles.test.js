@@ -528,3 +528,14 @@ test('guessProfileByFilename shows nothing when two or more profiles have a hint
   const profiles = await loadProfiles(storage);
   assert.equal(guessProfileByFilename('anything.pdf', profiles), null);
 });
+
+test('loadProfiles purges leftover built-in templates from older builds', async () => {
+  const storage = createMemoryStorage();
+  await storage.set('profiles', [
+    { id: 'builtin-meridian-savings', builtIn: true, bank: 'Meridian Bank', statementType: 'savings', versions: [] },
+    { id: 'u-1', builtIn: false, bank: 'DBS', statementType: 'savings', versions: [] },
+  ]);
+  const profiles = await loadProfiles(storage);
+  assert.deepEqual(profiles.map((p) => p.id), ['u-1']);
+  assert.deepEqual((await storage.get('profiles')).map((p) => p.id), ['u-1'], 'the purge is written back');
+});
