@@ -213,6 +213,34 @@ async function main() {
     const afterDrag = await columnNames(page);
     check('pointer drag put asset_id where the target layout wants it', JSON.stringify(afterDrag) === JSON.stringify(TARGET_HEADER), afterDrag.join(','));
 
+    // --- Real mouse drag (Nate 2026-10-10: cards moved, export did not) ---
+    console.log('8b. drag with the real mouse, two places right, then compare cards / preview / summary...');
+    {
+      const cards = page.locator('#home-preset-editor .column-card');
+      const handle = cards.nth(1).locator('.cc-handle');
+      const hb = await handle.boundingBox();
+      const tb = await cards.nth(3).boundingBox();
+      await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 25; i++) await page.mouse.move(hb.x + ((tb.x + tb.width * 0.8 - hb.x) * i) / 25, hb.y + ((tb.y + tb.height / 2 - hb.y) * i) / 25);
+      await page.mouse.up();
+      await page.waitForTimeout(400);
+      const names = await columnNames(page);
+      const expected = [...TARGET_HEADER];
+      const [moved] = expected.splice(1, 1);
+      expected.splice(3, 0, moved);
+      check('real mouse drag moved the second card two places right', JSON.stringify(names) === JSON.stringify(expected), names.join(','));
+      const previewHeader = await page.$$eval('.preset-preview-table thead th', (ths, n) => ths.map((t) => t.textContent.trim()).slice(0, n), expected.length);
+      check('the preview header shows exactly the card order', JSON.stringify(previewHeader.map((h) => h.toLowerCase())) === JSON.stringify(names.map((n) => n.toLowerCase())), `preview=${previewHeader.join(',')} cards=${names.join(',')}`);
+      // Put it back for the rest of the script.
+      await page.locator('#home-preset-editor .column-card').nth(3).focus();
+      await page.keyboard.press('Alt+ArrowLeft');
+      await page.keyboard.press('Alt+ArrowLeft');
+      await page.waitForTimeout(200);
+      const restored = await columnNames(page);
+      check('keyboard moves restore the target order', JSON.stringify(restored) === JSON.stringify(TARGET_HEADER), restored.join(','));
+    }
+
     // --- Rule 7: the summary names the real columns ----------------------
     const summary = await page.$eval('#change-drawer-title .drawer-settings-summary', (el) => el.textContent);
     check('rule 7: the summary line reads the actual column names in order', summary.includes(TARGET_HEADER.join(', ')), summary);

@@ -140,6 +140,22 @@ export function moveColumn(preset, fromIndex, toIndex) {
   return { ...preset, columns };
 }
 
+/**
+ * Put the visible columns in exactly this order (indices into preset.columns,
+ * as the builder's cards show them after a drag or a keyboard move); columns
+ * that are switched off keep their place after them. Reading the order back
+ * from the cards themselves means the saved list can never disagree with
+ * what is on screen, which index arithmetic on a move did.
+ */
+export function reorderColumns(preset, orderedIndices) {
+  const picked = new Set(orderedIndices);
+  const columns = [
+    ...orderedIndices.map((i) => preset.columns[i]).filter(Boolean),
+    ...preset.columns.filter((c, i) => !picked.has(i)),
+  ];
+  return { ...preset, columns };
+}
+
 export function renameColumn(preset, index, name) {
   const columns = preset.columns.map((c, i) => (i === index ? { ...c, name } : c));
   return { ...preset, columns };
@@ -341,6 +357,9 @@ export function resolveWorkingPreset(storedWorking, presets, startFromIdx) {
 // instance, not a fixed string, or their <label for> would bind to whichever
 // instance happens to be first in the DOM.
 let instanceCounter = 0;
+// A keyboard move re-renders the cards; the moved card must keep focus so
+// the next Alt+arrow keeps moving it. Set by the keydown, consumed on render.
+let pendingFocusPos = null;
 
 /**
  * @param {boolean} [tableOnly] - Simple B's Home result table: just the live
@@ -449,6 +468,7 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
     card.setAttribute('role', 'listitem');
     card.tabIndex = 0;
     card.dataset.field = column.field;
+    card.dataset.realIdx = String(realIdx);
     card.dataset.test = 'column-card';
 
     const handle = document.createElement('button');
@@ -520,7 +540,11 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
       const nextPos = pos + (e.key === 'ArrowLeft' ? -1 : 1);
       if (nextPos < 0 || nextPos >= visibleIndices.length) return;
       e.preventDefault();
-      onChange(moveColumn(preset, realIdx, visibleIndices[nextPos]));
+      const order = [...visibleIndices];
+      order.splice(pos, 1);
+      order.splice(nextPos, 0, realIdx);
+      pendingFocusPos = nextPos;
+      onChange(reorderColumns(preset, order));
     });
 
     // Rule 2, pointer: pointerdown/move/up on the handle, with the DOM node
@@ -548,21 +572,25 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
         if (next && pastEnd(next.getBoundingClientRect(), ev)) { cardList.insertBefore(card, next.nextSibling); }
       };
       const onUp = () => {
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-        handle.removeEventListener('pointercancel', onUp);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
         card.classList.remove('dragging');
         const endPos = [...cardList.children].indexOf(card);
         if (endPos === startPos || endPos < 0) return;
-        onChange(moveColumn(preset, realIdx, visibleIndices[endPos]));
+        // The cards ARE the order: read it back rather than recomputing it.
+        onChange(reorderColumns(preset, [...cardList.children].map((c) => Number(c.dataset.realIdx))));
       };
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onUp);
-      handle.addEventListener('pointercancel', onUp);
+      // On the document, not the handle: a release outside the handle (or a
+      // pointer capture that never took) must still commit the order.
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
     });
 
     cardList.appendChild(card);
   });
+
   if (!visibleIndices.length) {
     const empty = document.createElement('p');
     empty.className = 'pdf-anchor-hint';
@@ -570,6 +598,11 @@ export function renderPresetEditor({ container, preset, sampleRows = [], profile
     cardList.appendChild(empty);
   }
   container.appendChild(cardList);
+  // Only now is the list in the document, so focus() can take.
+  if (pendingFocusPos != null) {
+    cardList.children[pendingFocusPos]?.focus();
+    pendingFocusPos = null;
+  }
 
   // ---- Part 2 rule 3: "Add a column" ----------------------------------
   // Every field this app can produce, grouped, each showing its own sample

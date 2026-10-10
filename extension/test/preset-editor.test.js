@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  newPreset, addColumn, removeColumn, moveColumn, renameColumn, setOption, validatePreset,
+  newPreset, addColumn, removeColumn, moveColumn, reorderColumns, renameColumn, setOption, validatePreset,
   toggleColumn, activeColumns, dedupeColumns, collectExtraFields, humanizeExtraField,
   STANDARD_FIELDS, SOURCE_FIELDS,
   presetSettingsEqual, presetPickerLabel, resolveWorkingPreset, setColumnValue,
@@ -286,4 +286,16 @@ test('rule 3/4: setColumnValue changes one fixed-text value, renameColumn its he
   p = setColumnValue(p, 1, 'y');
   p = renameColumn(p, 0, 'asset');
   assert.deepEqual(p.columns.map((c) => [c.name, c.value]), [['asset', 'SC_Rach'], ['tag', 'y']]);
+});
+
+test('reorderColumns takes the on-screen order verbatim and keeps switched-off columns after it', () => {
+  const p = { columns: [
+    { field: 'date', name: 'Date' }, { field: 'description_raw', name: 'Description' },
+    { field: 'balance', name: 'Balance', enabled: false }, { field: 'amount', name: 'Amount' }, { field: 'currency', name: 'Currency' },
+  ] };
+  const next = reorderColumns(p, [0, 1, 3, 4]);
+  assert.deepEqual(next.columns.map((c) => c.field), ['date', 'description_raw', 'amount', 'currency', 'balance']);
+  const moved = reorderColumns(p, [0, 1, 4, 3]);
+  assert.deepEqual(moved.columns.map((c) => c.field), ['date', 'description_raw', 'currency', 'amount', 'balance']);
+  assert.deepEqual(p.columns.map((c) => c.field), ['date', 'description_raw', 'balance', 'amount', 'currency'], 'input untouched');
 });
